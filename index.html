@@ -12,13 +12,13 @@ canvas { image-rendering: pixelated; }
 </style>
 </head>
 <body>
-<h3>Retro WASM 1.7</h3>
+<h3>Retro WASM 1.8</h3>
 <canvas id="screen" width="256" height="224"></canvas><br><br>
 <!-- Virtual Gamepad Controls -->
 <div id="gamepad" style="display: flex; justify-content: center; gap: 40px; margin-bottom: 20px;">
-	<div id="dpad" style="display: flex; flex-direction: column; align-items: center;">
-		<button class="btn-control" data-btn="up" style="width:40px;height:40px;margin-bottom:5px;">▲</button>
-		<div style="display: flex;">
+	<div id="dpad" style="display: flex; flex-direction: column; align-items: center; gap:5px">
+		<button class="btn-control" data-btn="up" style="width:40px;height:40px;">▲</button>
+		<div style="display: flex; gap:5px">
 			<button class="btn-control" data-btn="left" style="width:40px;height:40px;">◀</button>
 			<button class="btn-control" data-btn="down" style="width:40px;height:40px;">▼</button>
 			<button class="btn-control" data-btn="right" style="width:40px;height:40px;">▶</button>
