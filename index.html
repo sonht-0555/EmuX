@@ -14,6 +14,37 @@ canvas { image-rendering: pixelated; }
 <body>
 <h3>Retro WASM 1.7</h3>
 <canvas id="screen" width="256" height="224"></canvas><br><br>
+<!-- Virtual Gamepad Controls -->
+<div id="gamepad" style="display: flex; justify-content: center; gap: 40px; margin-bottom: 20px;">
+	<div id="dpad" style="display: flex; flex-direction: column; align-items: center;">
+		<button class="btn-control" data-btn="up" style="width:40px;height:40px;margin-bottom:5px;">▲</button>
+		<div style="display: flex;">
+			<button class="btn-control" data-btn="left" style="width:40px;height:40px;margin-right:5px;">◀</button>
+			<button class="btn-control" data-btn="down" style="width:40px;height:40px;margin-right:5px;">▼</button>
+			<button class="btn-control" data-btn="right" style="width:40px;height:40px;">▶</button>
+		</div>
+	</div>
+	<div id="abxy" style="display: flex; flex-direction: column; align-items: center; gap: 5px;">
+		<div>
+			<button class="btn-control" data-btn="y" style="width:40px;height:40px;margin-right:5px;">Y</button>
+			<button class="btn-control" data-btn="x" style="width:40px;height:40px;">X</button>
+		</div>
+		<div>
+			<button class="btn-control" data-btn="b" style="width:40px;height:40px;margin-right:5px;">B</button>
+			<button class="btn-control" data-btn="a" style="width:40px;height:40px;">A</button>
+		</div>
+	</div>
+	<div id="lrstartselect" style="display: flex; flex-direction: column; align-items: center; gap: 5px;">
+		<div>
+			<button class="btn-control" data-btn="l" style="width:40px;height:40px;margin-right:5px;">L</button>
+			<button class="btn-control" data-btn="r" style="width:40px;height:40px;">R</button>
+		</div>
+		<div>
+			<button class="btn-control" data-btn="select" style="width:60px;height:30px;margin-right:5px;">Select</button>
+			<button class="btn-control" data-btn="start" style="width:60px;height:30px;">Start</button>
+		</div>
+	</div>
+</div>
 <input type="file" id="rom" accept=".gba,.smc,.sfc">
 <button id="resume">Resume Audio</button>
 </body>

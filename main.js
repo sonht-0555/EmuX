@@ -39,7 +39,30 @@ function writeAudio(ptr, frames) {
 function audio_cb() {}
 function audio_batch_cb(ptr, frames) { return writeAudio(ptr, frames); }
 function input_poll_cb() {}
-function input_state_cb() { return 0 }
+
+// Virtual pad state
+const padState = {
+  up: false, down: false, left: false, right: false,
+  a: false, b: false, x: false, y: false,
+  l: false, r: false, start: false, select: false
+};
+
+// Libretro button mapping (GBA/SNES)
+// 0: B, 1: Y, 2: Select, 3: Start, 4: Up, 5: Down, 6: Left, 7: Right, 8: A, 9: X, 10: L, 11: R
+const btnMap = {
+  up: 4, down: 5, left: 6, right: 7,
+  a: 8, b: 0, x: 9, y: 1,
+  l: 10, r: 11, start: 3, select: 2
+};
+
+function input_state_cb(port, device, index, id) {
+  // Only support port 0, device 1 (joypad)
+  if (port !== 0 || device !== 1) return 0;
+  for (const key in btnMap) {
+    if (btnMap[key] === id) return padState[key] ? 1 : 0;
+  }
+  return 0;
+}
 function env_cb() { return 0 }
 function video_cb(ptr, w, h, pitch) {
   const ctx = Module.canvas.getContext("2d");
@@ -116,8 +139,21 @@ async function loadRomFile(file) {
 };
 document.addEventListener("DOMContentLoaded", () => {
 // ===== ROM Loader =====
-    document.getElementById("resume").onclick = () => { if (audioCtx) audioCtx.resume() };
-    document.getElementById("rom").onchange = async (e) => {
-        loadRomFile(e.target.files[0]);
-    };
+  document.getElementById("resume").onclick = () => { if (audioCtx) audioCtx.resume() };
+  document.getElementById("rom").onchange = async (e) => {
+    loadRomFile(e.target.files[0]);
+  };
+
+  // Virtual gamepad event listeners
+  document.querySelectorAll('.btn-control').forEach(btn => {
+    const key = btn.getAttribute('data-btn');
+    // Mouse/touch start
+    btn.addEventListener('mousedown', () => { padState[key] = true; });
+    btn.addEventListener('touchstart', e => { padState[key] = true; e.preventDefault(); });
+    // Mouse/touch end
+    btn.addEventListener('mouseup', () => { padState[key] = false; });
+    btn.addEventListener('mouseleave', () => { padState[key] = false; });
+    btn.addEventListener('touchend', e => { padState[key] = false; e.preventDefault(); });
+    btn.addEventListener('touchcancel', e => { padState[key] = false; e.preventDefault(); });
+  });
 });
