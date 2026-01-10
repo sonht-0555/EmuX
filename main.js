@@ -13,7 +13,7 @@ function initAudio() {
   processor.onaudioprocess = e => {
     const L = e.outputBuffer.getChannelData(0), R = e.outputBuffer.getChannelData(1);
     if (!isRunning) return L.fill(0), R.fill(0);
-    while (fifoCnt < 1024 * RATIO) Module._retro_run();
+    // Không gọi Module._retro_run() ở đây nữa, chỉ lấy audio từ fifo
     for (let i = 0; i < 1024; i++) {
       const pos = i * RATIO, idx = (fifoHead + (pos | 0)) % 8192, frac = pos % 1;
       L[i] = (fifoL[idx] * (1 - frac) + fifoL[(idx + 1) % 8192] * frac) / 32768;
@@ -24,6 +24,18 @@ function initAudio() {
   };
   processor.connect(audioCtx.destination);
   audioCtx.resume();
+}
+
+// Main loop dùng requestAnimationFrame để chạy video và audio
+function mainLoop() {
+  if (!isRunning) return;
+  // Chạy 1 frame (gồm cả video_cb và audio_batch_cb)
+  Module._retro_run();
+  // Nếu audio buffer quá thấp, chạy thêm frame để bù audio (giữ đồng bộ)
+  while (fifoCnt < 1024 * RATIO * 2) {
+    Module._retro_run();
+  }
+  requestAnimationFrame(mainLoop);
 }
 function writeAudio(ptr, frames) {
   if (!audioCtx || fifoCnt + frames >= 8192) return frames;
@@ -105,24 +117,19 @@ function initWebGL(w, h) {
 
 function video_cb(ptr, w, h, pitch) {
   if (!gl) initWebGL(w, h);
-  // Convert RGB565 to RGBA8888 (tối ưu hoá)
-  const pixelData = new Uint16Array(Module.HEAPU8.buffer, ptr, (pitch >> 1) * h);
-  const gameStride = pitch >> 1;
-  // Giữ lại buffer để tránh tạo mới mỗi frame
-  if (!video_cb._rgbaBuffer || video_cb._rgbaBuffer.length !== w * h * 4) {
-    video_cb._rgbaBuffer = new Uint8Array(w * h * 4);
-  }
-  const rgba = video_cb._rgbaBuffer;
-  let srcIndex = 0, destIndex = 0;
+  // Convert RGB565 to RGBA8888
+  const pixelData = new Uint16Array(Module.HEAPU8.buffer, ptr, (pitch / 2) * h);
+  const gameStride = pitch / 2;
+  const rgba = new Uint8Array(w * h * 4);
   for (let y = 0; y < h; y++) {
-    let row = y * gameStride;
-    for (let x = 0; x < w; x++, srcIndex++, destIndex += 4) {
-      const color = pixelData[row + x];
-      // Tách màu nhanh hơn
-      const r = (color & 0xF800) >> 11;
-      const g = (color & 0x07E0) >> 5;
-      const b = color & 0x001F;
-      rgba[destIndex]     = (r << 3) | (r >> 2);
+    for (let x = 0; x < w; x++) {
+      const srcIndex = y * gameStride + x;
+      const destIndex = (y * w + x) * 4;
+      const color = pixelData[srcIndex];
+      const r = (color >> 11) & 0x1F;
+      const g = (color >> 5) & 0x3F;
+      const b = color & 0x1F;
+      rgba[destIndex] = (r << 3) | (r >> 2);
       rgba[destIndex + 1] = (g << 2) | (g >> 4);
       rgba[destIndex + 2] = (b << 3) | (b >> 2);
       rgba[destIndex + 3] = 255;
@@ -130,7 +137,7 @@ function video_cb(ptr, w, h, pitch) {
   }
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, glTexture);
-  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, rgba);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, rgba);
   gl.useProgram(glProgram);
   gl.uniform1i(glLoc.t, 0);
   gl.viewport(0, 0, w, h);
@@ -185,7 +192,7 @@ async function loadRomFile(file) {
     Module.HEAPU32[(info >> 2) + 3] = 0;
     Module._retro_load_game(info);
     isRunning = true;
-    setTimeout(() => { audioCtx.resume() }, 2000);
+    setTimeout(() => { audioCtx.resume(); mainLoop(); }, 2000);
 };
 document.addEventListener("DOMContentLoaded", () => {
 // ===== ROM Loader =====
