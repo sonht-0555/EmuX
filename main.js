@@ -13,7 +13,6 @@ function initAudio() {
   processor.onaudioprocess = e => {
     const L = e.outputBuffer.getChannelData(0), R = e.outputBuffer.getChannelData(1);
     if (!isRunning) return L.fill(0), R.fill(0);
-    // Không gọi Module._retro_run() ở đây nữa, chỉ lấy audio từ fifo
     for (let i = 0; i < 1024; i++) {
       const pos = i * RATIO, idx = (fifoHead + (pos | 0)) % 8192, frac = pos % 1;
       L[i] = (fifoL[idx] * (1 - frac) + fifoL[(idx + 1) % 8192] * frac) / 32768;
@@ -24,18 +23,6 @@ function initAudio() {
   };
   processor.connect(audioCtx.destination);
   audioCtx.resume();
-}
-
-// Main loop dùng requestAnimationFrame để chạy video và audio
-function mainLoop() {
-  if (!isRunning) return;
-  // Chạy 1 frame (gồm cả video_cb và audio_batch_cb)
-  Module._retro_run();
-  // Nếu audio buffer quá thấp, chạy thêm frame để bù audio (giữ đồng bộ)
-  while (fifoCnt < 1024 * RATIO * 2) {
-    Module._retro_run();
-  }
-  requestAnimationFrame(mainLoop);
 }
 function writeAudio(ptr, frames) {
   if (!audioCtx || fifoCnt + frames >= 8192) return frames;
@@ -51,22 +38,19 @@ function writeAudio(ptr, frames) {
 function audio_cb() {}
 function audio_batch_cb(ptr, frames) { return writeAudio(ptr, frames); }
 function input_poll_cb() {}
-
+function mainLoop() { Module._retro_run(); while (fifoCnt < 1024 * RATIO * 2) { Module._retro_run() } requestAnimationFrame(mainLoop) }
 // Virtual pad state
 const padState = {
   up: false, down: false, left: false, right: false,
   a: false, b: false, x: false, y: false,
   l: false, r: false, start: false, select: false
 };
-
-// Libretro button mapping (GBA/SNES)
 // 0: B, 1: Y, 2: Select, 3: Start, 4: Up, 5: Down, 6: Left, 7: Right, 8: A, 9: X, 10: L, 11: R
 const btnMap = {
   up: 4, down: 5, left: 6, right: 7,
   a: 8, b: 0, x: 9, y: 1,
   l: 10, r: 11, start: 3, select: 2
 };
-
 function input_state_cb(port, device, index, id) {
   // Only support port 0, device 1 (joypad)
   if (port !== 0 || device !== 1) return 0;
@@ -81,40 +65,33 @@ let gl = null, glProgram = null, glTexture = null, glBuffer = null, glLoc = {};
 function initWebGL(w, h) {
   const canvas = Module.canvas;
   gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
-  if (!gl) throw new Error('WebGL not supported');
-  // Vertex shader
-  const vs = gl.createShader(gl.VERTEX_SHADER);
-  // Flip Y: v = vec2((a.x+1.)/2., 1.-(a.y+1.)/2.)
-  gl.shaderSource(vs, `attribute vec2 a;varying vec2 v;void main(){gl_Position=vec4(a,0,1);v=vec2((a.x+1.)/2.,1.-(a.y+1.)/2.);}`);
-  gl.compileShader(vs);
-  // Fragment shader
-  const fs = gl.createShader(gl.FRAGMENT_SHADER);
-  gl.shaderSource(fs, `precision mediump float;varying vec2 v;uniform sampler2D t;void main(){gl_FragColor=texture2D(t,v);}`);
-  gl.compileShader(fs);
-  // Program
+  const vsSrc = 'attribute vec2 a;varying vec2 v;void main(){gl_Position=vec4(a,0,1);v=(a+1.0)/2.0;v.y=1.0-v.y;}';
+  const fsSrc = 'precision mediump float;varying vec2 v;uniform sampler2D t;void main(){gl_FragColor=texture2D(t,v);}';
+  function compile(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    return s;
+  }
   glProgram = gl.createProgram();
-  gl.attachShader(glProgram, vs);
-  gl.attachShader(glProgram, fs);
+  gl.attachShader(glProgram, compile(gl.VERTEX_SHADER, vsSrc));
+  gl.attachShader(glProgram, compile(gl.FRAGMENT_SHADER, fsSrc));
   gl.linkProgram(glProgram);
   gl.useProgram(glProgram);
-  // Quad buffer
   glBuffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, glBuffer);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
-  glLoc.a = gl.getAttribLocation(glProgram, 'a');
+  glLoc = { a: gl.getAttribLocation(glProgram, 'a'), t: gl.getUniformLocation(glProgram, 't') };
   gl.enableVertexAttribArray(glLoc.a);
   gl.vertexAttribPointer(glLoc.a, 2, gl.FLOAT, false, 0, 0);
-  // Texture
   glTexture = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, glTexture);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  glLoc.t = gl.getUniformLocation(glProgram, 't');
   gl.viewport(0, 0, w, h);
 }
-
 function video_cb(ptr, w, h, pitch) {
   if (!gl) initWebGL(w, h);
   // Convert RGB565 to RGBA8888
@@ -200,7 +177,6 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("rom").onchange = async (e) => {
     loadRomFile(e.target.files[0]);
   };
-
   // Virtual gamepad event listeners
   document.querySelectorAll('.btn-control').forEach(btn => {
     const key = btn.getAttribute('data-btn');
