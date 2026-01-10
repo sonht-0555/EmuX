@@ -72,7 +72,8 @@ function initWebGL(w, h) {
   if (!gl) throw new Error('WebGL not supported');
   // Vertex shader
   const vs = gl.createShader(gl.VERTEX_SHADER);
-  gl.shaderSource(vs, `attribute vec2 a;varying vec2 v;void main(){gl_Position=vec4(a,0,1);v=(a+1.)/2.;}`);
+  // Flip Y: v = vec2((a.x+1.)/2., 1.-(a.y+1.)/2.)
+  gl.shaderSource(vs, `attribute vec2 a;varying vec2 v;void main(){gl_Position=vec4(a,0,1);v=vec2((a.x+1.)/2.,1.-(a.y+1.)/2.);}`);
   gl.compileShader(vs);
   // Fragment shader
   const fs = gl.createShader(gl.FRAGMENT_SHADER);
@@ -104,19 +105,24 @@ function initWebGL(w, h) {
 
 function video_cb(ptr, w, h, pitch) {
   if (!gl) initWebGL(w, h);
-  // Convert RGB565 to RGBA8888
-  const pixelData = new Uint16Array(Module.HEAPU8.buffer, ptr, (pitch / 2) * h);
-  const gameStride = pitch / 2;
-  const rgba = new Uint8Array(w * h * 4);
+  // Convert RGB565 to RGBA8888 (tối ưu hoá)
+  const pixelData = new Uint16Array(Module.HEAPU8.buffer, ptr, (pitch >> 1) * h);
+  const gameStride = pitch >> 1;
+  // Giữ lại buffer để tránh tạo mới mỗi frame
+  if (!video_cb._rgbaBuffer || video_cb._rgbaBuffer.length !== w * h * 4) {
+    video_cb._rgbaBuffer = new Uint8Array(w * h * 4);
+  }
+  const rgba = video_cb._rgbaBuffer;
+  let srcIndex = 0, destIndex = 0;
   for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const srcIndex = y * gameStride + x;
-      const destIndex = (y * w + x) * 4;
-      const color = pixelData[srcIndex];
-      const r = (color >> 11) & 0x1F;
-      const g = (color >> 5) & 0x3F;
-      const b = color & 0x1F;
-      rgba[destIndex] = (r << 3) | (r >> 2);
+    let row = y * gameStride;
+    for (let x = 0; x < w; x++, srcIndex++, destIndex += 4) {
+      const color = pixelData[row + x];
+      // Tách màu nhanh hơn
+      const r = (color & 0xF800) >> 11;
+      const g = (color & 0x07E0) >> 5;
+      const b = color & 0x001F;
+      rgba[destIndex]     = (r << 3) | (r >> 2);
       rgba[destIndex + 1] = (g << 2) | (g >> 4);
       rgba[destIndex + 2] = (b << 3) | (b >> 2);
       rgba[destIndex + 3] = 255;
@@ -124,7 +130,7 @@ function video_cb(ptr, w, h, pitch) {
   }
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, glTexture);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, rgba);
+  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, rgba);
   gl.useProgram(glProgram);
   gl.uniform1i(glLoc.t, 0);
   gl.viewport(0, 0, w, h);
