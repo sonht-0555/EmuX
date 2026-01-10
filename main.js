@@ -174,7 +174,7 @@ async function loadRomFile(file) {
 };
 document.addEventListener("DOMContentLoaded", () => {
 // ===== ROM Loader =====
-  document.getElementById("resume").onclick = () => { if (audioCtx) audioCtx.resume() };
+  document.getElementById("resume").onclick = () => {audioCtx.resume()};
   document.getElementById("rom").onchange = async (e) => {
     loadRomFile(e.target.files[0]);
   };
