@@ -16,7 +16,6 @@ function initAudio() {
     if (!isRunning) { L.fill(0); R.fill(0); return; }
     
     var r = RATIO;
-    while (fifoCnt < 1024 * r) Module._retro_run();
     
     for (var i = 0; i < 1024; i++) {
       var pos = i * r, idx = (fifoHead + (pos | 0)) % 8192, frac = pos % 1;
@@ -45,7 +44,11 @@ function writeAudio(ptr, frames) {
 function audio_cb() {}
 function audio_batch_cb(ptr, frames) { return writeAudio(ptr, frames); }
 function input_poll_cb() {}
-function mainLoop() { Module._retro_run(); while (fifoCnt < 1024 * RATIO * 2) { Module._retro_run() } requestAnimationFrame(mainLoop) }
+function mainLoop() { 
+  Module._retro_run(); 
+  while (fifoCnt < 1024 * RATIO) Module._retro_run();
+  requestAnimationFrame(mainLoop);
+}
 // Virtual pad state
 const padState = {
   up: false, down: false, left: false, right: false,
@@ -165,7 +168,7 @@ async function loadRomFile(file) {
     const ext = file.name.split('.').pop().toLowerCase();
     const core = Object.entries(CORE_CONFIG).find(([_, cfg]) => cfg.ext.split(',').some(e => e.replace('.', '') === ext))?.[0];
     const rom = new Uint8Array(await file.arrayBuffer());
-    await initAudio();
+    initAudio();
     await loadCore(core);
     const romPtr = Module._malloc(rom.length);
     const info = Module._malloc(16);
