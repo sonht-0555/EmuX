@@ -170,7 +170,7 @@ async function loadRomFile(file) {
     Module._retro_load_game(info);
     isRunning = true;
     libCore.mainLoop();
-    //setTimeout(() => { if (audioCtx) audioCtx.resume();}, 3000);
+    setTimeout(() => { audioCtx.resume() }, 3000);
 };
 document.addEventListener("DOMContentLoaded", () => {
 // ===== ROM Loader =====
