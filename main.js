@@ -123,6 +123,7 @@ function video_cb(ptr, w, h, pitch) {
 }
 // ===== Core Loader =====
 function loadCore(core) {
+  initAudio();
   return new Promise((resolve, reject) => {
     const cfg = CORE_CONFIG[core];
     const canvas = document.getElementById("screen");
@@ -159,7 +160,6 @@ async function loadRomFile(file) {
     const ext = file.name.split('.').pop().toLowerCase();
     const core = Object.entries(CORE_CONFIG).find(([_, cfg]) => cfg.ext.split(',').some(e => e.replace('.', '') === ext))?.[0];
     const rom = new Uint8Array(await file.arrayBuffer());
-    initAudio();
     await loadCore(core);
     const romPtr = Module._malloc(rom.length);
     const info = Module._malloc(16);
@@ -170,7 +170,8 @@ async function loadRomFile(file) {
     Module.HEAPU32[(info >> 2) + 3] = 0;
     Module._retro_load_game(info);
     isRunning = true;
-    setTimeout(() => { audioCtx.resume(), libCore.mainLoop() }, 2000);
+    libCore.mainLoop();
+    setTimeout(() => { audioCtx.resume() }, 1000);
 };
 document.addEventListener("DOMContentLoaded", () => {
 // ===== ROM Loader =====
