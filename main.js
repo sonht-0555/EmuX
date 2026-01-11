@@ -3,10 +3,9 @@ const CORE_CONFIG = {
   gba:  { ratio: 65760 / 48000, width: 240, height: 160, ext: '.gba', script: './mgba.js' },
   snes: { ratio: 32040 / 48000, width: 256, height: 224, ext: '.smc,.sfc', script: './snes9x.js' }
 };
-
+var isRunning = false;
 // ===== Audio =====
-var audioCtx, processor, isRunning = false;
-var fifoL = new Int16Array(8192), fifoR = new Int16Array(8192), fifoHead = 0, fifoCnt = 0;
+var audioCtx, processor, fifoL = new Int16Array(8192), fifoR = new Int16Array(8192), fifoHead = 0, fifoCnt = 0;
 function initAudio() {
   if (audioCtx) { audioCtx.resume(); return; }
   audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
@@ -39,36 +38,31 @@ function writeAudio(ptr, frames) {
   fifoCnt += frames;
   return frames;
 }
-// ===== libretro =====
-function audio_cb() {}
-function audio_batch_cb(ptr, frames) { return writeAudio(ptr, frames); }
-function input_poll_cb() {}
-function mainLoop() { 
-  Module._retro_run(); 
-  requestAnimationFrame(mainLoop);
-}
-// Virtual pad state
-const padState = {
-  up: false, down: false, left: false, right: false,
-  a: false, b: false, x: false, y: false,
-  l: false, r: false, start: false, select: false
-};
-// 0: B, 1: Y, 2: Select, 3: Start, 4: Up, 5: Down, 6: Left, 7: Right, 8: A, 9: X, 10: L, 11: R
-const btnMap = {
-  up: 4, down: 5, left: 6, right: 7,
-  a: 8, b: 0, x: 9, y: 1,
-  l: 10, r: 11, start: 3, select: 2
-};
-function input_state_cb(port, device, index, id) {
-  // Only support port 0, device 1 (joypad)
-  if (port !== 0 || device !== 1) return 0;
-  for (const key in btnMap) {
-    if (btnMap[key] === id) return padState[key] ? 1 : 0;
+// ===== Core =====
+const libCore = (() => {
+  function audio_cb() {}
+  function audio_batch_cb(ptr, frames) { return writeAudio(ptr, frames); }
+  function input_poll_cb() {}
+  function env_cb() { return 0 }
+  function mainLoop() { Module._retro_run(); requestAnimationFrame(mainLoop); }
+  return { audio_cb, audio_batch_cb, input_poll_cb, env_cb, mainLoop };
+})();
+// ===== PAD =====
+const libPad = (() => {
+  const padState = { up: false, down: false, left: false, right: false, a: false, b: false, x: false, y: false, l: false, r: false, start: false, select: false };
+  const btnMap = { up: 4, down: 5, left: 6, right: 7, a: 8, b: 0, x: 9, y: 1, l: 10, r: 11, start: 3, select: 2 };
+  function press(btn)   { if (padState.hasOwnProperty(btn)) padState[btn] = true  }
+  function unpress(btn) { if (padState.hasOwnProperty(btn)) padState[btn] = false }
+  function input_state_cb(port, device, index, id) {
+    if (port !== 0 || device !== 1) return 0;
+    for (const key in btnMap) {
+      if (btnMap[key] === id) return padState[key] ? 1 : 0;
+    }
+    return 0;
   }
-  return 0;
-}
-function env_cb() { return 0 }
-// --- WebGL video renderer ---
+  return { press, unpress,input_state_cb }
+})();
+// ===== WebGL Video =====
 let gl = null, glProgram = null, glTexture = null, glBuffer = null, glLoc = {};
 function initWebGL(w, h) {
   const canvas = Module.canvas;
@@ -102,7 +96,6 @@ function initWebGL(w, h) {
 }
 function video_cb(ptr, w, h, pitch) {
   if (!gl) initWebGL(w, h);
-  // Convert RGB565 to RGBA8888
   const pixelData = new Uint16Array(Module.HEAPU8.buffer, ptr, (pitch / 2) * h);
   const gameStride = pitch / 2;
   const rgba = new Uint8Array(w * h * 4);
@@ -139,12 +132,12 @@ function loadCore(core) {
     window.Module = {
       canvas: canvas,
       onRuntimeInitialized() {
-        const envPtr    = Module.addFunction(env_cb, "iii");
+        const envPtr    = Module.addFunction(libCore.env_cb, "iii");
         const videoPtr  = Module.addFunction(video_cb, "viiii");
-        const audioPtr  = Module.addFunction(audio_cb, "vii");
-        const audioBPtr = Module.addFunction(audio_batch_cb, "iii");
-        const pollPtr   = Module.addFunction(input_poll_cb, "v");
-        const statePtr  = Module.addFunction(input_state_cb, "iiiii");
+        const audioPtr  = Module.addFunction(libCore.audio_cb, "vii");
+        const audioBPtr = Module.addFunction(libCore.audio_batch_cb, "iii");
+        const pollPtr   = Module.addFunction(libCore.input_poll_cb, "v");
+        const statePtr  = Module.addFunction(libPad.input_state_cb, "iiiii");
         Module._retro_set_environment(envPtr);
         Module._retro_set_video_refresh(videoPtr);
         Module._retro_set_audio_sample(audioPtr);
@@ -177,7 +170,7 @@ async function loadRomFile(file) {
     Module.HEAPU32[(info >> 2) + 3] = 0;
     Module._retro_load_game(info);
     isRunning = true;
-    mainLoop();
+    libCore.mainLoop();
     setTimeout(() => { if (audioCtx) audioCtx.resume();}, 3000);
 };
 document.addEventListener("DOMContentLoaded", () => {
@@ -186,16 +179,14 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("rom").onchange = async (e) => {
     loadRomFile(e.target.files[0]);
   };
-  // Virtual gamepad event listeners
+  // Virtual gamepad event listeners (dùng press/unpress)
   document.querySelectorAll('.btn-control').forEach(btn => {
     const key = btn.getAttribute('data-btn');
-    // Mouse/touch start
-    btn.addEventListener('mousedown', () => { padState[key] = true; });
-    btn.addEventListener('touchstart', e => { padState[key] = true; e.preventDefault(); });
-    // Mouse/touch end
-    btn.addEventListener('mouseup', () => { padState[key] = false; });
-    btn.addEventListener('mouseleave', () => { padState[key] = false; });
-    btn.addEventListener('touchend', e => { padState[key] = false; e.preventDefault(); });
-    btn.addEventListener('touchcancel', e => { padState[key] = false; e.preventDefault(); });
+    btn.addEventListener('mousedown', () => { libPad.press(key); });
+    btn.addEventListener('touchstart', e => { libPad.press(key); e.preventDefault(); });
+    btn.addEventListener('mouseup', () => { libPad.unpress(key); });
+    btn.addEventListener('mouseleave', () => { libPad.unpress(key); });
+    btn.addEventListener('touchend', e => { libPad.unpress(key); e.preventDefault(); });
+    btn.addEventListener('touchcancel', e => { libPad.unpress(key); e.preventDefault(); });
   });
 });
