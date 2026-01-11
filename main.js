@@ -159,7 +159,6 @@ async function loadRomFile(file) {
     const ext = file.name.split('.').pop().toLowerCase();
     const core = Object.entries(CORE_CONFIG).find(([_, cfg]) => cfg.ext.split(',').some(e => e.replace('.', '') === ext))?.[0];
     const rom = new Uint8Array(await file.arrayBuffer());
-    initAudio();
     await loadCore(core);
     const romPtr = Module._malloc(rom.length);
     const info = Module._malloc(16);
@@ -171,12 +170,12 @@ async function loadRomFile(file) {
     Module._retro_load_game(info);
     isRunning = true;
     libCore.mainLoop();
-    setTimeout(() => { if (audioCtx) audioCtx.resume();}, 3000);
+    //setTimeout(() => { if (audioCtx) audioCtx.resume();}, 3000);
 };
 document.addEventListener("DOMContentLoaded", () => {
 // ===== ROM Loader =====
   document.body.addEventListener('touchstart', initAudio(), { once: true });
-  document.getElementById("resume").onclick = () => { if (audioCtx) audioCtx.close() };
+  document.getElementById("resume").onclick = () => { if (audioCtx) audioCtx.resume() };
   document.getElementById("rom").onchange = async (e) => { loadRomFile(e.target.files[0]) };
   document.querySelectorAll('.btn-control').forEach(btn => {
     const key = btn.getAttribute('data-btn');
