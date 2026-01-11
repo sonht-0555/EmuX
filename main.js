@@ -170,12 +170,11 @@ async function loadRomFile(file) {
     Module.HEAPU32[(info >> 2) + 3] = 0;
     Module._retro_load_game(info);
     isRunning = true;
-    libCore.mainLoop();
     setTimeout(() => { audioCtx.resume() }, 1000);
 };
 document.addEventListener("DOMContentLoaded", () => {
 // ===== ROM Loader =====
-  document.getElementById("resume").onclick = () => { if (audioCtx) audioCtx.resume() };
+  document.getElementById("resume").onclick = () => { libCore.mainLoop(); if (audioCtx) audioCtx.resume(); };
   document.getElementById("rom").onchange = async (e) => { loadRomFile(e.target.files[0]) };
   document.querySelectorAll('.btn-control').forEach(btn => {
     const key = btn.getAttribute('data-btn');
