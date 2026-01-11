@@ -176,7 +176,7 @@ async function loadRomFile(file) {
 document.addEventListener("DOMContentLoaded", () => {
 // ===== ROM Loader =====
   document.body.addEventListener('touchstart', initAudio(), { once: true });
-  document.getElementById("resume").onclick = () => { if (audioCtx) audioCtx.resume() };
+  document.getElementById("resume").onclick = () => { if (audioCtx) audioCtx.close() };
   document.getElementById("rom").onchange = async (e) => { loadRomFile(e.target.files[0]) };
   document.querySelectorAll('.btn-control').forEach(btn => {
     const key = btn.getAttribute('data-btn');
