@@ -162,7 +162,6 @@ async function loadRomFile(file) {
     const ext = file.name.split('.').pop().toLowerCase();
     const core = Object.entries(CORE_CONFIG).find(([_, cfg]) => cfg.ext.split(',').some(e => e.replace('.', '') === ext))?.[0];
     const rom = new Uint8Array(await file.arrayBuffer());
-    libAudio.initAudio();
     await loadCore(core);
     const romPtr = Module._malloc(rom.length);
     const info = Module._malloc(16);
@@ -177,10 +176,9 @@ async function loadRomFile(file) {
 };
 document.addEventListener("DOMContentLoaded", () => {
 // ===== ROM Loader =====
+  document.body.addEventListener('touchstart', libAudio.initAudio(), { once: true });
   document.getElementById("resume").onclick = () => {audioCtx.resume()};
-  document.getElementById("rom").onchange = async (e) => {
-    loadRomFile(e.target.files[0]);
-  };
+  document.getElementById("rom").onchange = async (e) => { loadRomFile(e.target.files[0]) };
   // Virtual gamepad event listeners (dùng press/unpress)
   document.querySelectorAll('.btn-control').forEach(btn => {
     const key = btn.getAttribute('data-btn');
