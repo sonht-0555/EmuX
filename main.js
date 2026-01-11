@@ -46,7 +46,6 @@ function audio_batch_cb(ptr, frames) { return writeAudio(ptr, frames); }
 function input_poll_cb() {}
 function mainLoop() { 
   Module._retro_run(); 
-  while (fifoCnt < 1024 * RATIO) Module._retro_run();
   requestAnimationFrame(mainLoop);
 }
 // Virtual pad state
@@ -180,7 +179,7 @@ async function loadRomFile(file) {
     Module._retro_load_game(info);
     isRunning = true;
     mainLoop();
-    setTimeout(() => { if (audioCtx) audioCtx.resume();}, 3000);
+    //setTimeout(() => { if (audioCtx) audioCtx.resume();}, 3000);
 };
 document.addEventListener("DOMContentLoaded", () => {
 // ===== ROM Loader =====
