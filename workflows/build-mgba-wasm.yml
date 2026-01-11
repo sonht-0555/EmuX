@@ -57,7 +57,9 @@ jobs:
         head -c 8 libmgba.a
 
         emcc \
-        -O3 \
+        -Os \
+        -flto \
+        -s ASSERTIONS=0
         -s WASM=1 \
         -s LEGACY_RUNTIME=1 \
         -s ALLOW_MEMORY_GROWTH=1 \
