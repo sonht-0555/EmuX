@@ -1,80 +1,43 @@
 // ===== 1. CORE CONFIGURATION ===== //
 const CORE_CONFIG = {
-  // Config của bạn đã đúng, giữ nguyên
   gba: { width: 240, height: 160, ext: '.gba', script: './src/core/mgba.js', sampleRate: 65760 },
   snes: { width: 256, height: 224, ext: '.smc,.sfc', script: './src/core/snes9x.js', sampleRate: 32040 }
 };
-
-// ===== 2. AUDIO SYSTEM (RING BUFFER + DYNAMIC RATE CONTROL) ===== //
+var isRunning = false;
 // ===== 2. AUDIO SYSTEM (RING BUFFER + DYNAMIC RATE CONTROL + IOS FIX) ===== //
 const audioSys = new (class RetroAudio {
   constructor() {
     this.audioCtx = null;
     this.workletNode = null;
     this.inputSampleRate = 44100;
-    // Biến để quản lý retry loop trên iOS
     this.recoverTimer = null; 
   }
-
   async init(coreSampleRate) {
     this.inputSampleRate = coreSampleRate || 44100;
     if (this.audioCtx) {
-        // Nếu init lại (load game mới), hãy đảm bảo AudioContext đang chạy
         if (this.audioCtx.state !== 'running') this.audioCtx.resume();
         return; 
     }
-
-    // 1. Khởi tạo Context
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     this.audioCtx = new AudioContext({
       latencyHint: 'interactive', 
       sampleRate: 48000
     });
-
     // --- IOS & SAFARI FIX START ---
-    // Cơ chế tự động hồi phục khi bị Interrupted
-    const tryResume = () => {
-        if (this.audioCtx && this.audioCtx.state !== 'running' && this.audioCtx.state !== 'closed') {
-            this.audioCtx.resume().then(() => {
-                console.log("[Audio] Resumed successfully via interaction/timer");
-            }).catch(e => { /* Kệ lỗi, thử lại sau */ });
-        }
-    };
-
-    // A. Lắng nghe thay đổi trạng thái
-    this.audioCtx.onstatechange = () => {
-        console.log(`[Audio State] Changed to: ${this.audioCtx.state}`);
-        if (this.audioCtx.state === 'interrupted' || this.audioCtx.state === 'suspended') {
-            // Nếu bị ngắt, bắt đầu spam lệnh resume mỗi giây (iOS cần cái này)
-            if (!this.recoverTimer) {
-                this.recoverTimer = setInterval(tryResume, 1000);
-            }
-        } else if (this.audioCtx.state === 'running') {
-            // Nếu đã chạy ngon, tắt timer đi
-            if (this.recoverTimer) {
-                clearInterval(this.recoverTimer);
-                this.recoverTimer = null;
-            }
-        }
-    };
-
-    // B. Khi quay lại tab (ẩn/hiện trình duyệt)
-    document.addEventListener("visibilitychange", () => {
-        if (document.visibilityState === "visible") {
-            tryResume();
-        }
-    });
-
-    // C. "Thần chú" cho iOS: Bất kỳ cú chạm nào vào màn hình cũng sẽ thử kích hoạt lại Audio
-    // Passive true để không chặn scroll
-    const unlockHandler = () => {
-        tryResume();
-        // Không removeEventListener vì trên iOS có thể bị interrupt nhiều lần (cuộc gọi, alarm...)
-        // ta cần cú chạm tiếp theo để cứu nó lần nữa.
-    };
-    ['touchstart', 'touchend', 'click', 'keydown'].forEach(evt => 
-        document.addEventListener(evt, unlockHandler, { passive: true, capture: true })
-    );
+  const tryResume = () => {
+    if (this.audioCtx && this.audioCtx.state !== 'running') this.audioCtx.resume();
+  };
+  this.audioCtx.onstatechange = () => {
+    if (this.audioCtx.state !== 'running') {
+      this.recoverTimer ??= setInterval(tryResume, 1000);
+    } else if (this.recoverTimer) {
+      clearInterval(this.recoverTimer);
+      this.recoverTimer = null;
+    }
+  };
+  ['visibilitychange', 'touchstart', 'touchend', 'click', 'keydown'].forEach(evt =>
+    document.addEventListener(evt, tryResume, { passive: true, capture: true })
+  );
     // --- IOS FIX END ---
 
     const workletCode = `
@@ -170,7 +133,6 @@ const audioSys = new (class RetroAudio {
     return frames;
   }
 })();
-var isRunning = false;
 // ===== 3. CORE INTERFACE ===== //
 const libCore = (() => {
   function audio_cb(l, r) {}
@@ -183,7 +145,7 @@ const libCore = (() => {
   }
   return { audio_cb, audio_batch_cb, input_poll_cb, env_cb, mainLoop };
 })();
-// ===== Gamepad ===== //
+// ===== 3. Gamepad ===== //
 const libPad = (() => {
   const padState = { up: false, down: false, left: false, right: false, a: false, b: false, x: false, y: false, l: false, r: false, start: false, select: false };
   const btnMap = { up: 4, down: 5, left: 6, right: 7, a: 8, b: 0, x: 9, y: 1, l: 10, r: 11, start: 3, select: 2 };
@@ -198,7 +160,7 @@ const libPad = (() => {
   }
   return { press, unpress,input_state_cb }
 })();
-// ===== WebGL ===== //
+// ===== 4. WebGL ===== //
 const libGL = (() => {
   let gl = null, glProgram = null, glTexture = null, glBuffer = null, glLoc = {};
   function initWebGL(w, h) {
@@ -260,7 +222,7 @@ const libGL = (() => {
   }
   return { initWebGL, video_cb }
 })();
-// ===== Core Loader ===== //
+// ===== 5. Core Loader ===== //
 function loadCore(core) {
   return new Promise((resolve, reject) => {
     const cfg = CORE_CONFIG[core];
