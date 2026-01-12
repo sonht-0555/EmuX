@@ -6,45 +6,94 @@ const CORE_CONFIG = {
 };
 
 // ===== 2. AUDIO SYSTEM (RING BUFFER + DYNAMIC RATE CONTROL) ===== //
+// ===== 2. AUDIO SYSTEM (RING BUFFER + DYNAMIC RATE CONTROL + IOS FIX) ===== //
 const audioSys = new (class RetroAudio {
   constructor() {
     this.audioCtx = null;
     this.workletNode = null;
     this.inputSampleRate = 44100;
+    // Biến để quản lý retry loop trên iOS
+    this.recoverTimer = null; 
   }
 
   async init(coreSampleRate) {
     this.inputSampleRate = coreSampleRate || 44100;
-    if (this.audioCtx) return; // Đã init thì thôi
+    if (this.audioCtx) {
+        // Nếu init lại (load game mới), hãy đảm bảo AudioContext đang chạy
+        if (this.audioCtx.state !== 'running') this.audioCtx.resume();
+        return; 
+    }
 
-    this.audioCtx = new (window.AudioContext || window.webkitAudioContext)({
-      latencyHint: 'interactive', // Yêu cầu độ trễ thấp nhất
-      sampleRate: 48000 // Cố định 48kHz cho chuẩn
+    // 1. Khởi tạo Context
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    this.audioCtx = new AudioContext({
+      latencyHint: 'interactive', 
+      sampleRate: 48000
     });
+
+    // --- IOS & SAFARI FIX START ---
+    // Cơ chế tự động hồi phục khi bị Interrupted
+    const tryResume = () => {
+        if (this.audioCtx && this.audioCtx.state !== 'running' && this.audioCtx.state !== 'closed') {
+            this.audioCtx.resume().then(() => {
+                console.log("[Audio] Resumed successfully via interaction/timer");
+            }).catch(e => { /* Kệ lỗi, thử lại sau */ });
+        }
+    };
+
+    // A. Lắng nghe thay đổi trạng thái
+    this.audioCtx.onstatechange = () => {
+        console.log(`[Audio State] Changed to: ${this.audioCtx.state}`);
+        if (this.audioCtx.state === 'interrupted' || this.audioCtx.state === 'suspended') {
+            // Nếu bị ngắt, bắt đầu spam lệnh resume mỗi giây (iOS cần cái này)
+            if (!this.recoverTimer) {
+                this.recoverTimer = setInterval(tryResume, 1000);
+            }
+        } else if (this.audioCtx.state === 'running') {
+            // Nếu đã chạy ngon, tắt timer đi
+            if (this.recoverTimer) {
+                clearInterval(this.recoverTimer);
+                this.recoverTimer = null;
+            }
+        }
+    };
+
+    // B. Khi quay lại tab (ẩn/hiện trình duyệt)
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+            tryResume();
+        }
+    });
+
+    // C. "Thần chú" cho iOS: Bất kỳ cú chạm nào vào màn hình cũng sẽ thử kích hoạt lại Audio
+    // Passive true để không chặn scroll
+    const unlockHandler = () => {
+        tryResume();
+        // Không removeEventListener vì trên iOS có thể bị interrupt nhiều lần (cuộc gọi, alarm...)
+        // ta cần cú chạm tiếp theo để cứu nó lần nữa.
+    };
+    ['touchstart', 'touchend', 'click', 'keydown'].forEach(evt => 
+        document.addEventListener(evt, unlockHandler, { passive: true, capture: true })
+    );
+    // --- IOS FIX END ---
 
     const workletCode = `
       class RetroProcessor extends AudioWorkletProcessor {
         constructor() {
           super();
-          // RING BUFFER: Bộ đệm vòng cố định 32KB (Lũy thừa của 2 để tính toán nhanh)
           this.bufferSize = 32768; 
           this.mask = this.bufferSize - 1;
-          this.buffer = new Float32Array(this.bufferSize * 2); // *2 vì Stereo (L, R nằm liền nhau)
-          
-          this.writePtr = 0; // Con trỏ ghi (Main thread gửi vào)
-          this.readPtr = 0;  // Con trỏ đọc (Loa lấy ra)
-          
-          // Thông số Rate Control
+          this.buffer = new Float32Array(this.bufferSize * 2); 
+          this.writePtr = 0; 
+          this.readPtr = 0;  
           this.baseRatio = 1.0; 
-          this.inputSampleRate = ${this.inputSampleRate}; // Nhận giá trị từ JS main
+          this.inputSampleRate = ${this.inputSampleRate}; 
           
           this.port.onmessage = (e) => {
             if (e.data.type === 'config') {
                this.inputSampleRate = e.data.rate;
-               // Cập nhật Base Ratio (ví dụ: 65760 / 48000 = 1.37)
                this.baseRatio = this.inputSampleRate / sampleRate; 
             } else {
-               // Nhận dữ liệu Audio thô (Float32) từ Main Thread
                const data = e.data;
                for (let i = 0; i < data.length; i++) {
                  this.buffer[this.writePtr] = data[i];
@@ -57,98 +106,37 @@ const audioSys = new (class RetroAudio {
         process(inputs, outputs) {
           const output = outputs[0];
           if (!output || !output.length) return true;
-          
           const L = output[0];
           const R = output[1];
           const outLen = L.length;
 
-          // 1. Tính toán lượng dữ liệu đang có trong kho (Distance)
-          // Vì là Ring Buffer nên phải xử lý trường hợp writePtr quay vòng về 0
           let distance = (this.writePtr - this.readPtr);
           if (distance < 0) distance += (this.bufferSize * 2);
-          
-          // Chuyển về số khung (frames) vì 1 frame = 2 mẫu (L+R)
           const bufferedFrames = distance / 2;
 
-          // 2. DYNAMIC RATE CONTROL (Chìa khóa chống rè)
-          // Mục tiêu: Giữ buffer luôn ở mức an toàn khoảng 2048 mẫu ( ~40ms độ trễ)
+          // Rate Control Logic (Giữ nguyên từ bản cũ của bạn vì nó tốt)
           const targetBuffer = 2048; 
-          let drive = 1.0; // Tốc độ co giãn (1.0 là bình thường)
+          let drive = 1.0; 
+          if (bufferedFrames > 3000) drive = 1.005; 
+          else if (bufferedFrames < 1000) drive = 0.995; 
 
-          // Nếu buffer đầy quá (> 3000) -> Tua nhanh (drive > 1)
-          if (bufferedFrames > 3000) {
-             drive = 1.005; // Tăng tốc 0.5% (Tai người khó nhận ra pitch shift nhỏ này)
-          } 
-          // Nếu buffer cạn quá (< 1000) -> Tua chậm (drive < 1)
-          else if (bufferedFrames < 1000) {
-             drive = 0.995; // Giảm tốc 0.5%
-          }
-
-          // Ratio thực tế áp dụng cho khung hình này
           const effectiveRatio = this.baseRatio * drive;
 
-          // 3. RESAMPLING & OUTPUT (Chạy ngay trong Worklet)
-          // Dùng Linear Interpolation đọc từ Ring Buffer ra Output
-          
-          // Nếu không đủ dữ liệu thì im lặng (tránh lỗi)
           if (bufferedFrames < outLen * effectiveRatio) {
              for (let i=0; i<outLen; i++) { L[i]=0; R[i]=0; }
              return true;
           }
 
-          for (let i = 0; i < outLen; i++) {
-             // Đọc chỉ số thực từ Ring Buffer
-             const offset = this.readPtr;
-             const offsetNext = (offset + 2) & ((this.bufferSize * 2) - 1); // +2 vì nhảy qua cặp L/R
-
-             // Lấy mẫu hiện tại
-             const l0 = this.buffer[offset];
-             const r0 = this.buffer[offset + 1];
-
-             // Lấy mẫu kế tiếp (để nội suy)
-             const l1 = this.buffer[offsetNext];
-             const r1 = this.buffer[offsetNext + 1];
-
-             // Ghi ra loa (chưa nội suy kỹ để tối ưu tốc độ, ở mức này nghe đã ổn)
-             // Nếu muốn xịn hơn thì cần biến 'fraction', nhưng simple resampling đỡ tốn CPU worklet
-             L[i] = l0; 
-             R[i] = r0;
-
-             // Di chuyển con trỏ đọc (Logic Resample nằm ở đây)
-             // Thay vì +2 (1 frame), ta cộng theo tỷ lệ Ratio
-             // Do RingBuffer integer, ta dùng Accumulator giả lập (đơn giản hóa ở mức cơ bản)
-             
-             // --- FIX ĐƠN GIẢN HÓA CHO DỄ HIỂU VÀ MƯỢT ---
-             // Ở đây mình dùng Nearest Neighbor có Rate Control để đảm bảo không bị rè
-             // Vì Linear Interpolation trong vòng lặp biến thiên buffer rất phức tạp
-             
-             // Cập nhật con trỏ đọc
-             // Chúng ta "ăn" buffer nhanh hay chậm tùy vào drive
-             const step = 2 * effectiveRatio; // Bước nhảy số thực
-             
-             // Trick: Worklet chạy vòng lặp fixed, ta cần quản lý index bằng số thực
-             // Để đơn giản cho bạn, ta dùng một biến đếm global cho pha (phase)
-             // Nhưng ở đây ta dùng cách đơn giản nhất: Consuming Buffer
-          }
-          
-          // ĐOẠN TRÊN LÀ LOGIC, CÒN ĐÂY LÀ CODE CHẠY THỰC TẾ ĐỂ FIX RÈ:
-          // Ta dùng thuật toán Resampler đơn giản tích hợp sẵn
-          
           let readIndex = this.readPtr;
-          
           for (let i = 0; i < outLen; i++) {
              const idx = Math.floor(readIndex);
-             const safeIdx = idx & ((this.bufferSize * 2) - 2); // Ensure even index alignment
-             
+             const safeIdx = idx & ((this.bufferSize * 2) - 2);
              L[i] = this.buffer[safeIdx];
              R[i] = this.buffer[safeIdx+1];
-             
-             readIndex += (2 * effectiveRatio); // Nhảy cóc theo tỷ lệ
+             readIndex += (2 * effectiveRatio); 
           }
           
-          // Cập nhật lại con trỏ chính thức
           this.readPtr = Math.floor(readIndex) & ((this.bufferSize * 2) - 1);
-          // Đảm bảo alignment chẵn (Stereo L/R)
           if (this.readPtr % 2 !== 0) this.readPtr = (this.readPtr - 1) & ((this.bufferSize * 2) - 1);
 
           return true;
@@ -161,35 +149,23 @@ const audioSys = new (class RetroAudio {
     await this.audioCtx.audioWorklet.addModule(URL.createObjectURL(blob));
     
     this.workletNode = new AudioWorkletNode(this.audioCtx, 'retro-audio', { outputChannelCount: [2] });
-    
-    // Gửi SampleRate chuẩn vào Worklet
     this.workletNode.port.postMessage({ type: 'config', rate: this.inputSampleRate });
-    
     this.workletNode.connect(this.audioCtx.destination);
-    console.log(`[Audio Pro] Ring Buffer System Active. Core Rate: ${this.inputSampleRate}`);
+    
+    console.log(`[Audio Pro] System Ready with iOS Auto-Heal. Rate: ${this.inputSampleRate}`);
   }
 
-  resume() { if (this.audioCtx?.state === 'suspended') this.audioCtx.resume(); }
+  resume() { 
+      if (this.audioCtx?.state !== 'running') this.audioCtx?.resume(); 
+  }
 
   push(heapBuffer, offset, frames) {
-    if (!this.workletNode) return frames;
-    
-    // Main Thread chỉ làm việc nhẹ nhất: Copy và ném đi
-    // Không tính toán Resample ở đây nữa (chuyển việc nặng cho Worklet)
+    if (!this.workletNode || this.audioCtx.state !== 'running') return frames; // Bỏ qua nếu audio đang chết để tránh tràn RAM
     try {
-      // 1. Lấy dữ liệu Int16
       const int16Data = new Int16Array(heapBuffer, offset, frames * 2);
-      
-      // 2. Convert sang Float32 (Chuẩn Web Audio)
-      // Dùng vòng lặp copy nhanh
       const floatData = new Float32Array(frames * 2);
-      for (let i = 0; i < frames * 2; i++) {
-          floatData[i] = int16Data[i] / 32768.0;
-      }
-      
-      // 3. Gửi sang Worklet (Transfer memory để không tốn RAM copy)
+      for (let i = 0; i < frames * 2; i++) floatData[i] = int16Data[i] / 32768.0;
       this.workletNode.port.postMessage(floatData, [floatData.buffer]);
-      
     } catch (e) { console.error(e); }
     return frames;
   }
