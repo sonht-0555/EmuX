@@ -375,8 +375,8 @@ emuxDB("testKey").then(data => {
 document.addEventListener("DOMContentLoaded", () => {
 // ===== ROM Loader =====
   document.getElementById("resume").onclick = () => {
-    if (audioCtx) audioCtx.resume();
-  }; 
+    audioSys.resume();
+  };
   document.getElementById("rom").onchange = async (e) => { loadRomFile(e.target.files[0]) };
   document.querySelectorAll('.btn-control').forEach(btn => {
     const key = btn.getAttribute('data-btn');
