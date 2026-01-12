@@ -1,56 +1,171 @@
-// ===== Core Config ===== //
+// ===== 1. CONFIGURATION ===== //
 const CORE_CONFIG = {
-  gba:  { ratio: 65760 / 48000, width: 240, height: 160, ext: '.gba', script: './src/core/mgba.js' },
-  snes: { ratio: 32040 / 48000, width: 256, height: 224, ext: '.smc,.sfc', script: './src/core/snes9x.js' }
+  gba: { width: 240, height: 160, ext: '.gba,.gbc,.gb', script: './src/core/mgba.js', sampleRate: 65760 },
+  snes: { width: 256, height: 224, ext: '.smc,.sfc', script: './src/core/snes9x.js', sampleRate: 32040 }
 };
-// ===== Audio ===== //
-var isRunning = false, audioCtx, processor, fifoL = new Int16Array(8192), fifoR = new Int16Array(8192), fifoHead = 0, fifoCnt = 0;
-function initAudio() {
-  if (audioCtx) { audioCtx.resume(); return; }
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
-  processor = audioCtx.createScriptProcessor(1024, 0, 2);
-  processor.onaudioprocess = function(e) {
-    var L = e.outputBuffer.getChannelData(0), R = e.outputBuffer.getChannelData(1);
-    if (!isRunning) { L.fill(0); R.fill(0); return; }
-    var r = RATIO;
-    while (fifoCnt < 1024 * r) Module._retro_run();
-    for (var i = 0; i < 1024; i++) {
-      var pos = i * r, idx = (fifoHead + (pos | 0)) % 8192, frac = pos % 1;
-      L[i] = (fifoL[idx] * (1 - frac) + fifoL[(idx + 1) % 8192] * frac) / 32768;
-      R[i] = (fifoR[idx] * (1 - frac) + fifoR[(idx + 1) % 8192] * frac) / 32768;
-    }
-    fifoHead = (fifoHead + (1024 * r | 0)) % 8192;
-    fifoCnt -= 1024 * r | 0;
-  };
-  processor.connect(audioCtx.destination);
-  audioCtx.resume();
-  // --- IOS & SAFARI FIX START ---
-  let recoverTimer = null;
-  const tryResume = () => (audioCtx && !['running','closed'].includes(audioCtx.state)) && audioCtx.resume().catch(()=>{});
-  audioCtx.onstatechange = () => {
-    if (['interrupted','suspended'].includes(audioCtx.state)) recoverTimer ??= setInterval(tryResume, 1000);
-    else if (audioCtx.state === 'running' && recoverTimer) recoverTimer = clearInterval(recoverTimer), null;
-  };
-  document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && tryResume());
-  ['touchstart','touchend','click','keydown'].forEach(e => document.addEventListener(e, tryResume, {passive:true,capture:true}));
-  // --- IOS & SAFARI FIX END ---
-}
-function writeAudio(ptr, frames) {
-  if (!audioCtx || fifoCnt + frames >= 8192) return frames;
-  var data = new Int16Array(Module.HEAPU8.buffer, ptr, frames * 2);
-  var tail = (fifoHead + fifoCnt) % 8192;
-  for (var i = 0; i < frames; i++) {
-    fifoL[tail] = data[i * 2];
-    fifoR[tail] = data[i * 2 + 1];
-    tail = (tail + 1) % 8192;
+var isRunning = false;
+// ===== 2. AUDIO SYSTEM ===== //
+const libAudio = new (class RetroAudio {
+  constructor() {
+    this.audioCtx = null;
+    this.workletNode = null;
+    this.inputSampleRate = 44100;
+    this.recoverTimer = null; 
   }
-  fifoCnt += frames;
-  return frames;
-}
-// ===== Core ===== //
+  async init(coreSampleRate) {
+    this.inputSampleRate = coreSampleRate || 44100;
+    if (this.audioCtx) {
+        if (this.audioCtx.state !== 'running') this.audioCtx.resume();
+        return; 
+    }
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    this.audioCtx = new AudioContext({
+      latencyHint: 'interactive', 
+      sampleRate: 48000
+    });
+    // --- IOS & SAFARI FIX START ---
+    // Cơ chế tự động hồi phục khi bị Interrupted
+    const tryResume = () => {
+        if (this.audioCtx && this.audioCtx.state !== 'running' && this.audioCtx.state !== 'closed') {
+            this.audioCtx.resume().then(() => {
+                console.log("[Audio] Resumed successfully via interaction/timer");
+            }).catch(e => { /* Kệ lỗi, thử lại sau */ });
+        }
+    };
+
+    // A. Lắng nghe thay đổi trạng thái
+    this.audioCtx.onstatechange = () => {
+        console.log(`[Audio State] Changed to: ${this.audioCtx.state}`);
+        if (this.audioCtx.state === 'interrupted' || this.audioCtx.state === 'suspended') {
+            // Nếu bị ngắt, bắt đầu spam lệnh resume mỗi giây (iOS cần cái này)
+            if (!this.recoverTimer) {
+                this.recoverTimer = setInterval(tryResume, 1000);
+            }
+        } else if (this.audioCtx.state === 'running') {
+            // Nếu đã chạy ngon, tắt timer đi
+            if (this.recoverTimer) {
+                clearInterval(this.recoverTimer);
+                this.recoverTimer = null;
+            }
+        }
+    };
+
+    // B. Khi quay lại tab (ẩn/hiện trình duyệt)
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+            tryResume();
+        }
+    });
+
+    // C. "Thần chú" cho iOS: Bất kỳ cú chạm nào vào màn hình cũng sẽ thử kích hoạt lại Audio
+    // Passive true để không chặn scroll
+    const unlockHandler = () => {
+        tryResume();
+        // Không removeEventListener vì trên iOS có thể bị interrupt nhiều lần (cuộc gọi, alarm...)
+        // ta cần cú chạm tiếp theo để cứu nó lần nữa.
+    };
+    ['touchstart', 'touchend', 'click', 'keydown'].forEach(evt => 
+        document.addEventListener(evt, unlockHandler, { passive: true, capture: true })
+    );
+    // --- IOS FIX END ---
+    
+    const workletCode = `
+      class RetroProcessor extends AudioWorkletProcessor {
+        constructor() {
+          super();
+          this.bufferSize = 32768; 
+          this.mask = this.bufferSize - 1;
+          this.buffer = new Float32Array(this.bufferSize * 2); 
+          this.writePtr = 0; 
+          this.readPtr = 0;  
+          this.baseRatio = 1.0; 
+          this.inputSampleRate = ${this.inputSampleRate}; 
+          
+          this.port.onmessage = (e) => {
+            if (e.data.type === 'config') {
+               this.inputSampleRate = e.data.rate;
+               this.baseRatio = this.inputSampleRate / sampleRate; 
+            } else {
+               const data = e.data;
+               for (let i = 0; i < data.length; i++) {
+                 this.buffer[this.writePtr] = data[i];
+                 this.writePtr = (this.writePtr + 1) & ((this.bufferSize * 2) - 1);
+               }
+            }
+          };
+        }
+
+        process(inputs, outputs) {
+          const output = outputs[0];
+          if (!output || !output.length) return true;
+          const L = output[0];
+          const R = output[1];
+          const outLen = L.length;
+
+          let distance = (this.writePtr - this.readPtr);
+          if (distance < 0) distance += (this.bufferSize * 2);
+          const bufferedFrames = distance / 2;
+
+          // Rate Control Logic (Giữ nguyên từ bản cũ của bạn vì nó tốt)
+          const targetBuffer = 2048; 
+          let drive = 1.0; 
+          if (bufferedFrames > 3000) drive = 1.005; 
+          else if (bufferedFrames < 1000) drive = 0.995; 
+
+          const effectiveRatio = this.baseRatio * drive;
+
+          if (bufferedFrames < outLen * effectiveRatio) {
+             for (let i=0; i<outLen; i++) { L[i]=0; R[i]=0; }
+             return true;
+          }
+
+          let readIndex = this.readPtr;
+          for (let i = 0; i < outLen; i++) {
+             const idx = Math.floor(readIndex);
+             const safeIdx = idx & ((this.bufferSize * 2) - 2);
+             L[i] = this.buffer[safeIdx];
+             R[i] = this.buffer[safeIdx+1];
+             readIndex += (2 * effectiveRatio); 
+          }
+          
+          this.readPtr = Math.floor(readIndex) & ((this.bufferSize * 2) - 1);
+          if (this.readPtr % 2 !== 0) this.readPtr = (this.readPtr - 1) & ((this.bufferSize * 2) - 1);
+
+          return true;
+        }
+      }
+      registerProcessor('retro-audio', RetroProcessor);
+    `;
+
+    const blob = new Blob([workletCode], { type: 'application/javascript' });
+    await this.audioCtx.audioWorklet.addModule(URL.createObjectURL(blob));
+    
+    this.workletNode = new AudioWorkletNode(this.audioCtx, 'retro-audio', { outputChannelCount: [2] });
+    this.workletNode.port.postMessage({ type: 'config', rate: this.inputSampleRate });
+    this.workletNode.connect(this.audioCtx.destination);
+    
+    console.log(`[Audio Pro] System Ready with iOS Auto-Heal. Rate: ${this.inputSampleRate}`);
+  }
+
+  resume() { 
+      if (this.audioCtx?.state !== 'running') this.audioCtx?.resume(); 
+  }
+
+  push(heapBuffer, offset, frames) {
+    if (!this.workletNode || this.audioCtx.state !== 'running') return frames; // Bỏ qua nếu audio đang chết để tránh tràn RAM
+    try {
+      const int16Data = new Int16Array(heapBuffer, offset, frames * 2);
+      const floatData = new Float32Array(frames * 2);
+      for (let i = 0; i < frames * 2; i++) floatData[i] = int16Data[i] / 32768.0;
+      this.workletNode.port.postMessage(floatData, [floatData.buffer]);
+    } catch (e) { console.error(e); }
+    return frames;
+  }
+})();
+// ===== 3. CORE INTERFACE ===== //
 const libCore = (() => {
-  function audio_cb() {}
-  function audio_batch_cb(ptr, frames) { return writeAudio(ptr, frames); }
+  function audio_cb(l, r) {}
+  function audio_batch_cb(ptr, frames) { return libAudio.push(Module.HEAPU8.buffer, ptr, frames); }
   function input_poll_cb() {}
   function env_cb() { return 0 }
   function mainLoop() { 
@@ -59,7 +174,7 @@ const libCore = (() => {
   }
   return { audio_cb, audio_batch_cb, input_poll_cb, env_cb, mainLoop };
 })();
-// ===== Gamepad ===== //
+// ===== 3. GAMEPAD ===== //
 const libPad = (() => {
   const padState = { up: false, down: false, left: false, right: false, a: false, b: false, x: false, y: false, l: false, r: false, start: false, select: false };
   const btnMap = { up: 4, down: 5, left: 6, right: 7, a: 8, b: 0, x: 9, y: 1, l: 10, r: 11, start: 3, select: 2 };
@@ -74,7 +189,7 @@ const libPad = (() => {
   }
   return { press, unpress,input_state_cb }
 })();
-// ===== WebGL ===== //
+// ===== 4. WEBGL ===== //
 const libGL = (() => {
   let gl = null, glProgram = null, glTexture = null, glBuffer = null, glLoc = {};
   function initWebGL(w, h) {
@@ -136,7 +251,7 @@ const libGL = (() => {
   }
   return { initWebGL, video_cb }
 })();
-// ===== Core Loader ===== //
+// ===== 5. LOADER ===== //
 function loadCore(core) {
   return new Promise((resolve, reject) => {
     const cfg = CORE_CONFIG[core];
@@ -185,9 +300,10 @@ async function initGame(rom) {
 async function loadRomFile(file) {
   const ext = file.name.split('.').pop().toLowerCase();
   const core = Object.entries(CORE_CONFIG).find(([_, cfg]) => cfg.ext.split(',').some(e => e.replace('.', '') === ext))?.[0];
+  const cfg = CORE_CONFIG[core];
   const rom = new Uint8Array(await file.arrayBuffer());
   await loadCore(core);
-  initAudio();
+  await libAudio.init(cfg.sampleRate);
   await initGame(rom);
 }
 function emuxDB(data, name) {
@@ -225,9 +341,6 @@ emuxDB("testKey").then(data => {
 });
 document.addEventListener("DOMContentLoaded", () => {
 // ===== ROM Loader =====
-  document.getElementById("resume").onclick = () => {
-    if (audioCtx) audioCtx.resume();
-  }; 
   document.getElementById("rom").onchange = async (e) => { loadRomFile(e.target.files[0]) };
   document.querySelectorAll('.btn-control').forEach(btn => {
     const key = btn.getAttribute('data-btn');
