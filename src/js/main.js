@@ -1,7 +1,6 @@
 // ===== 1. CONFIGURATION ===== //
 const CORE_CONFIG = {
-  gba: { width: 240, height: 160, ext: '.gba', script: './src/core/mgba.js', sampleRate: 65760 },
-  gbc: { width: 160, height: 144, ext: '.gbc,.gb', script: './src/core/mgba.js', sampleRate: 65760 },
+  gba: { width: 240, height: 160, ext: '.gba,.gbc,.gb', script: './src/core/mgba.js', sampleRate: 65760 },
   snes: { width: 256, height: 224, ext: '.smc,.sfc', script: './src/core/snes9x.js', sampleRate: 32040 }
 };
 var isRunning = false;
@@ -286,51 +285,15 @@ function loadCore(core) {
     document.body.appendChild(script);
   });
 }
-// Thay thế hàm initGame cũ bằng hàm này
 async function initGame(rom) {
   const romPtr = Module._malloc(rom.length);
-  
-  // 1. Load ROM vào bộ nhớ
-  Module.HEAPU8.set(rom, romPtr);
-  
-  // 2. Tạo struct retro_game_info
   const info = Module._malloc(16);
-  Module.HEAPU32[(info >> 2) + 0] = 0;          // path (null)
-  Module.HEAPU32[(info >> 2) + 1] = romPtr;     // data pointer
-  Module.HEAPU32[(info >> 2) + 2] = rom.length; // size
-  Module.HEAPU32[(info >> 2) + 3] = 0;          // meta (null)
-  
-  // 3. Gọi lệnh Load Game của Core
-  const loadResult = Module._retro_load_game(info);
-  
-  if (!loadResult) {
-      console.error("Lỗi: Core không load được ROM này!");
-      return;
-  }
-
-  // ===== ĐOẠN QUAN TRỌNG NHẤT: LẤY SAMPLE RATE THỰC TẾ ===== //
-  // Struct retro_system_av_info cấu trúc như sau:
-  // geometry (4 ints = 16 bytes) + timing (fps double = 8 bytes) + sample_rate (double = 8 bytes)
-  // => Sample Rate nằm ở offset 24 (16 + 8)
-  
-  const avInfo = Module._malloc(32); // Cấp phát đủ bộ nhớ cho struct
-  Module._retro_get_system_av_info(avInfo);
-  
-  // Đọc dữ liệu kiểu Double (Float64) tại offset 24
-  // Dịch bit >> 3 (chia 8) để lấy index cho mảng HEAPF64
-  const realSampleRate = Module.HEAPF64[(avInfo + 24) >> 3];
-  
-  console.log(`[Core Info] Detected Sample Rate: ${realSampleRate} Hz`);
-  
-  // Giải phóng bộ nhớ tạm
-  Module._free(avInfo);
-  Module._free(info);
-  // Không free romPtr ngay vì core có thể vẫn cần dùng hoặc đã copy rồi (tùy core), 
-  // nhưng thường an toàn để nguyên hoặc free nếu chắc chắn core đã copy.
-
-  // 4. Khởi tạo Audio với con số CHÍNH XÁC vừa lấy được
-  await audioSys.init(realSampleRate);
-
+  Module.HEAPU8.set(rom, romPtr);
+  Module.HEAPU32[(info >> 2) + 0] = 0;
+  Module.HEAPU32[(info >> 2) + 1] = romPtr;
+  Module.HEAPU32[(info >> 2) + 2] = rom.length;
+  Module.HEAPU32[(info >> 2) + 3] = 0;
+  Module._retro_load_game(info);
   isRunning = true;
   libCore.mainLoop();
 }
