@@ -26,23 +26,46 @@ const libAudio = new (class RetroAudio {
     // --- IOS & SAFARI FIX START ---
     // Cơ chế tự động hồi phục khi bị Interrupted
     const tryResume = () => {
-      if (this.audioCtx && this.audioCtx.state !== 'running' && this.audioCtx.state !== 'closed') {
-        this.audioCtx.resume().catch(() => {});
-      }
+        if (this.audioCtx && this.audioCtx.state !== 'running' && this.audioCtx.state !== 'closed') {
+            this.audioCtx.resume().then(() => {
+                console.log("[Audio] Resumed successfully via interaction/timer");
+            }).catch(e => { /* Kệ lỗi, thử lại sau */ });
+        }
     };
+
+    // A. Lắng nghe thay đổi trạng thái
     this.audioCtx.onstatechange = () => {
-      if (['interrupted', 'suspended'].includes(this.audioCtx.state)) {
-        this.recoverTimer ??= setInterval(tryResume, 1000);
-      } else if (this.audioCtx.state === 'running' && this.recoverTimer) {
-        clearInterval(this.recoverTimer);
-        this.recoverTimer = null;
-      }
+        console.log(`[Audio State] Changed to: ${this.audioCtx.state}`);
+        if (this.audioCtx.state === 'interrupted' || this.audioCtx.state === 'suspended') {
+            // Nếu bị ngắt, bắt đầu spam lệnh resume mỗi giây (iOS cần cái này)
+            if (!this.recoverTimer) {
+                this.recoverTimer = setInterval(tryResume, 1000);
+            }
+        } else if (this.audioCtx.state === 'running') {
+            // Nếu đã chạy ngon, tắt timer đi
+            if (this.recoverTimer) {
+                clearInterval(this.recoverTimer);
+                this.recoverTimer = null;
+            }
+        }
     };
+
+    // B. Khi quay lại tab (ẩn/hiện trình duyệt)
     document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible") tryResume();
+        if (document.visibilityState === "visible") {
+            tryResume();
+        }
     });
-    ['touchstart', 'touchend', 'click', 'keydown'].forEach(evt =>
-      document.addEventListener(evt, tryResume, { passive: true, capture: true })
+
+    // C. "Thần chú" cho iOS: Bất kỳ cú chạm nào vào màn hình cũng sẽ thử kích hoạt lại Audio
+    // Passive true để không chặn scroll
+    const unlockHandler = () => {
+        tryResume();
+        // Không removeEventListener vì trên iOS có thể bị interrupt nhiều lần (cuộc gọi, alarm...)
+        // ta cần cú chạm tiếp theo để cứu nó lần nữa.
+    };
+    ['touchstart', 'touchend', 'click', 'keydown'].forEach(evt => 
+        document.addEventListener(evt, unlockHandler, { passive: true, capture: true })
     );
     // --- IOS FIX END ---
     
@@ -50,7 +73,7 @@ const libAudio = new (class RetroAudio {
       class RetroProcessor extends AudioWorkletProcessor {
         constructor() {
           super();
-          this.bufferSize = 65536; // tăng lên gấp đôi
+          this.bufferSize = 32768; 
           this.mask = this.bufferSize - 1;
           this.buffer = new Float32Array(this.bufferSize * 2); 
           this.writePtr = 0; 
@@ -84,10 +107,10 @@ const libAudio = new (class RetroAudio {
           const bufferedFrames = distance / 2;
 
           // Rate Control Logic (Giữ nguyên từ bản cũ của bạn vì nó tốt)
-          const targetBuffer = 4096; // tăng lên gấp đôi
+          const targetBuffer = 2048; 
           let drive = 1.0; 
-          if (bufferedFrames > 6000) drive = 1.005;
-          else if (bufferedFrames < 2000) drive = 0.995; 
+          if (bufferedFrames > 3000) drive = 1.005; 
+          else if (bufferedFrames < 1000) drive = 0.995; 
 
           const effectiveRatio = this.baseRatio * drive;
 
