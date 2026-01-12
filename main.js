@@ -11,7 +11,7 @@ function initAudio() {
   processor = audioCtx.createScriptProcessor(1024, 0, 2);
   processor.onaudioprocess = function(e) {
     var L = e.outputBuffer.getChannelData(0), R = e.outputBuffer.getChannelData(1);
-    if (!isRunning || fifoCnt < 1024) { L.fill(0); R.fill(0); return; }
+    if (!isRunning) { L.fill(0); R.fill(0); return; }
     var r = RATIO;
     for (var i = 0; i < 1024; i++) {
       var pos = i * r, idx = (fifoHead + (pos | 0)) % 8192, frac = pos % 1;
@@ -42,15 +42,9 @@ const libCore = (() => {
   function audio_batch_cb(ptr, frames) { return writeAudio(ptr, frames); }
   function input_poll_cb() {}
   function env_cb() { return 0 }
-  function mainLoop() {
-    if (isRunning) {
-      if (fifoCnt < 2048) {
-        Module._retro_run();
-        Module._retro_run();
-      } else if (fifoCnt < 4096) {
-        Module._retro_run();
-      }
-    }
+  function mainLoop() { 
+    Module._retro_run();
+    if (fifoCnt < 1024 * RATIO) {Module._retro_run()}
     requestAnimationFrame(mainLoop);
   }
   return { audio_cb, audio_batch_cb, input_poll_cb, env_cb, mainLoop };
@@ -134,6 +128,7 @@ const libGL = (() => {
 })();
 // ===== Core Loader ===== //
 function loadCore(core) {
+  initAudio();
   return new Promise((resolve, reject) => {
     const cfg = CORE_CONFIG[core];
     const canvas = document.getElementById("screen");
@@ -182,12 +177,11 @@ async function initGame(rom) {
   }, 1000);
 }
 async function loadRomFile(file) {
-  initAudio();
   const ext = file.name.split('.').pop().toLowerCase();
   const core = Object.entries(CORE_CONFIG).find(([_, cfg]) => cfg.ext.split(',').some(e => e.replace('.', '') === ext))?.[0];
   const rom = new Uint8Array(await file.arrayBuffer());
   await loadCore(core);
-  initGame(rom);
+  await initGame(rom);
 }
 function emuxDB(data, name) {
   const DB_NAME = 'EmuxDB';
