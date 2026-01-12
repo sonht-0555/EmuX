@@ -58,8 +58,6 @@ jobs:
 
         emcc \
         -Os \
-        -flto \
-        -s ASSERTIONS=0
         -s WASM=1 \
         -s LEGACY_RUNTIME=1 \
         -s ALLOW_MEMORY_GROWTH=1 \
@@ -88,6 +86,7 @@ jobs:
           "_retro_set_audio_sample_batch",
           "_retro_set_input_poll",
           "_retro_set_input_state",
+          "_retro_get_system_av_info",
           "_malloc",
           "_free"
         ]' \
