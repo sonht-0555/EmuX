@@ -1,11 +1,12 @@
-// ===== 1. CORE CONFIGURATION ===== //
+// ===== 1. CONFIGURATION ===== //
 const CORE_CONFIG = {
   gba: { width: 240, height: 160, ext: '.gba', script: './src/core/mgba.js', sampleRate: 65760 },
+  gbc: { width: 320, height: 288, ext: '.gbc,.gb', script: './src/core/mgba.js', sampleRate: 65760 },
   snes: { width: 256, height: 224, ext: '.smc,.sfc', script: './src/core/snes9x.js', sampleRate: 32040 }
 };
 var isRunning = false;
-// ===== 2. AUDIO SYSTEM (RING BUFFER + DYNAMIC RATE CONTROL + IOS FIX) ===== //
-const audioSys = new (class RetroAudio {
+// ===== 2. AUDIO SYSTEM ===== //
+const libAudio = new (class RetroAudio {
   constructor() {
     this.audioCtx = null;
     this.workletNode = null;
@@ -136,7 +137,7 @@ const audioSys = new (class RetroAudio {
 // ===== 3. CORE INTERFACE ===== //
 const libCore = (() => {
   function audio_cb(l, r) {}
-  function audio_batch_cb(ptr, frames) { return audioSys.push(Module.HEAPU8.buffer, ptr, frames); }
+  function audio_batch_cb(ptr, frames) { return libAudio.push(Module.HEAPU8.buffer, ptr, frames); }
   function input_poll_cb() {}
   function env_cb() { return 0 }
   function mainLoop() { 
@@ -145,7 +146,7 @@ const libCore = (() => {
   }
   return { audio_cb, audio_batch_cb, input_poll_cb, env_cb, mainLoop };
 })();
-// ===== 3. Gamepad ===== //
+// ===== 3. GAMEPAD ===== //
 const libPad = (() => {
   const padState = { up: false, down: false, left: false, right: false, a: false, b: false, x: false, y: false, l: false, r: false, start: false, select: false };
   const btnMap = { up: 4, down: 5, left: 6, right: 7, a: 8, b: 0, x: 9, y: 1, l: 10, r: 11, start: 3, select: 2 };
@@ -160,7 +161,7 @@ const libPad = (() => {
   }
   return { press, unpress,input_state_cb }
 })();
-// ===== 4. WebGL ===== //
+// ===== 4. WEBGL ===== //
 const libGL = (() => {
   let gl = null, glProgram = null, glTexture = null, glBuffer = null, glLoc = {};
   function initWebGL(w, h) {
@@ -222,7 +223,7 @@ const libGL = (() => {
   }
   return { initWebGL, video_cb }
 })();
-// ===== 5. Core Loader ===== //
+// ===== 5. LOADER ===== //
 function loadCore(core) {
   return new Promise((resolve, reject) => {
     const cfg = CORE_CONFIG[core];
@@ -274,7 +275,7 @@ async function loadRomFile(file) {
   const cfg = CORE_CONFIG[core];
   const rom = new Uint8Array(await file.arrayBuffer());
   await loadCore(core);
-  await audioSys.init(cfg.sampleRate);
+  await libAudio.init(cfg.sampleRate);
   await initGame(rom);
 }
 function emuxDB(data, name) {
@@ -312,9 +313,6 @@ emuxDB("testKey").then(data => {
 });
 document.addEventListener("DOMContentLoaded", () => {
 // ===== ROM Loader =====
-  document.getElementById("resume").onclick = () => {
-    audioSys.resume();
-  };
   document.getElementById("rom").onchange = async (e) => { loadRomFile(e.target.files[0]) };
   document.querySelectorAll('.btn-control').forEach(btn => {
     const key = btn.getAttribute('data-btn');
