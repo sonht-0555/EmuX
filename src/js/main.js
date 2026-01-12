@@ -13,6 +13,7 @@ function initAudio() {
     var L = e.outputBuffer.getChannelData(0), R = e.outputBuffer.getChannelData(1);
     if (!isRunning) { L.fill(0); R.fill(0); return; }
     var r = RATIO;
+    while (fifoCnt < 1024 * r) Module._retro_run();
     for (var i = 0; i < 1024; i++) {
       var pos = i * r, idx = (fifoHead + (pos | 0)) % 8192, frac = pos % 1;
       L[i] = (fifoL[idx] * (1 - frac) + fifoL[(idx + 1) % 8192] * frac) / 32768;
@@ -44,7 +45,6 @@ const libCore = (() => {
   function env_cb() { return 0 }
   function mainLoop() { 
     Module._retro_run();
-    if (fifoCnt < 1024 * RATIO) {Module._retro_run()}
     requestAnimationFrame(mainLoop);
   }
   return { audio_cb, audio_batch_cb, input_poll_cb, env_cb, mainLoop };
@@ -128,7 +128,6 @@ const libGL = (() => {
 })();
 // ===== Core Loader ===== //
 function loadCore(core) {
-  initAudio();
   return new Promise((resolve, reject) => {
     const cfg = CORE_CONFIG[core];
     const canvas = document.getElementById("screen");
@@ -172,15 +171,13 @@ async function initGame(rom) {
   Module._retro_load_game(info);
   isRunning = true;
   libCore.mainLoop();
-  setTimeout(() => {
-    if (audioCtx) audioCtx.resume();
-  }, 1000);
 }
 async function loadRomFile(file) {
   const ext = file.name.split('.').pop().toLowerCase();
   const core = Object.entries(CORE_CONFIG).find(([_, cfg]) => cfg.ext.split(',').some(e => e.replace('.', '') === ext))?.[0];
   const rom = new Uint8Array(await file.arrayBuffer());
   await loadCore(core);
+  initAudio();
   await initGame(rom);
 }
 function emuxDB(data, name) {

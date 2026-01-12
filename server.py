@@ -10,5 +10,5 @@ PORT = 5173
 httpd = HTTPServer(("0.0.0.0", PORT), COIHandler)
 print(f"🚀 Server is running: http://localhost:{PORT}")
 httpd.serve_forever()
-# python3 ./builder/server.py
-# py -3 .\builder\server.py
+# python3 ./server.py
+# py -3 .\server.py
