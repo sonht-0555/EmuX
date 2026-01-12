@@ -1,7 +1,7 @@
 // ===== 1. CONFIGURATION ===== //
 const CORE_CONFIG = {
   gba: { width: 240, height: 160, ext: '.gba', script: './src/core/mgba.js', sampleRate: 65760 },
-  gbc: { width: 320, height: 288, ext: '.gbc,.gb', script: './src/core/mgba.js', sampleRate: 65760 },
+  gbc: { width: 160, height: 144, ext: '.gbc,.gb', script: './src/core/mgba.js', sampleRate: 44100 },
   snes: { width: 256, height: 224, ext: '.smc,.sfc', script: './src/core/snes9x.js', sampleRate: 32040 }
 };
 var isRunning = false;
