@@ -171,6 +171,7 @@ async function loadRomFile(file) {
     Module.HEAPU32[(info >> 2) + 3] = 0;
     Module._retro_load_game(info);
     isRunning = true;
+    libCore.mainLoop();
 };
 document.addEventListener("DOMContentLoaded", () => {
 // ===== ROM Loader =====
