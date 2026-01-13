@@ -13,10 +13,7 @@ function initAudio() {
     var L = e.outputBuffer.getChannelData(0), R = e.outputBuffer.getChannelData(1);
     if (!isRunning) { L.fill(0); R.fill(0); return; }
     var r = RATIO;
-    while (fifoCnt < 1024 * r) {
-      if (audioCtx) audioCtx.resume();
-      Module._retro_run();
-    }
+    while (fifoCnt < 1024 * r) { Module._retro_run() }
     for (var i = 0; i < 1024; i++) {
       var pos = i * r, idx = (fifoHead + (pos | 0)) % 8192, frac = pos % 1;
       L[i] = (fifoL[idx] * (1 - frac) + fifoL[(idx + 1) % 8192] * frac) / 32768;
@@ -26,8 +23,14 @@ function initAudio() {
     fifoCnt -= 1024 * r | 0;
   };
   processor.connect(audioCtx.destination);
-  audioCtx.resume();
-  ['touchstart','touchend','click','keydown'].forEach(e => document.addEventListener(e, () => { if (audioCtx) audioCtx.resume() }, {passive:true, capture:true}))}
+  ['touchstart','touchend','click','keydown'].forEach(e =>
+    document.addEventListener(e, () => {
+      if (audioCtx && (audioCtx.state === 'interrupted' || audioCtx.state === 'suspended')) {
+        audioCtx.resume();
+      }
+    }, { passive: true, capture: true })
+  );
+}
 function writeAudio(ptr, frames) {
   if (!audioCtx || fifoCnt + frames >= 8192) return frames;
   var data = new Int16Array(Module.HEAPU8.buffer, ptr, frames * 2);
