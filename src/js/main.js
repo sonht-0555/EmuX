@@ -1,7 +1,7 @@
 // ===== Core Config =====
 const CORE_CONFIG = {
   gba:  { ratio: 65760 / 48000, width: 240, height: 160, ext: '.gba', script: './src/core/mgba.js' },
-  gbc: { ratio: 41943 / 48000, width: 160, height: 144, ext: '.gb,.gbc', script: './src/core/mgba.js' },
+  gbc: { ratio: 131072 / 48000, width: 160, height: 144, ext: '.gb,.gbc', script: './src/core/mgba.js' },
   snes: { ratio: 32040 / 48000, width: 256, height: 224, ext: '.smc,.sfc', script: './src/core/snes9x.js' }
 };
 var isRunning = false;
