@@ -1,0 +1,106 @@
+name: Build Gambatte WASM (GB/GBC)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Emscripten
+      uses: mymindstorm/setup-emsdk@v14
+      with:
+        version: 3.1.47
+        actions-cache-folder: emsdk-cache
+
+    - name: Clone Gambatte with submodules
+      run: |
+        git clone --depth 1 https://github.com/libretro/gambatte-libretro.git
+        cd gambatte-libretro
+        
+        # Clone libretro-common nếu chưa có
+        if [ ! -d "libretro-common" ]; then
+          git clone --depth 1 https://github.com/libretro/libretro-common.git
+        fi
+
+    - name: Build Gambatte core objects
+      run: |
+        cd gambatte-libretro
+        
+        # Build chỉ compile objects, không link
+        emmake make -f Makefile.libretro platform=emscripten -j$(nproc) || true
+        
+        echo "=== Core built ==="
+        ls -lh gambatte_libretro_emscripten.bc
+
+    - name: Build libretro-common objects
+      run: |
+        cd gambatte-libretro/libretro-common
+        
+        # Compile các file cần thiết
+        CFLAGS="-O2 -fPIC"
+        
+        emcc $CFLAGS -c file/file_path.c -o file_path.o -Iinclude
+        emcc $CFLAGS -c file/file_path_io.c -o file_path_io.o -Iinclude
+        emcc $CFLAGS -c streams/file_stream.c -o file_stream.o -Iinclude
+        emcc $CFLAGS -c vfs/vfs_implementation.c -o vfs_implementation.o -Iinclude
+        emcc $CFLAGS -c compat/compat_strl.c -o compat_strl.o -Iinclude
+        emcc $CFLAGS -c string/stdstring.c -o stdstring.o -Iinclude
+        emcc $CFLAGS -c compat/compat_strcasestr.c -o compat_strcasestr.o -Iinclude
+        
+        echo "=== libretro-common objects ==="
+        ls -lh *.o
+
+    - name: Link everything to WASM
+      run: |
+        cd gambatte-libretro
+        
+        # Link core + libretro-common objects
+        emcc -O3 \
+          -s WASM=1 \
+          -s MODULARIZE=1 \
+          -s EXPORT_NAME="'Gambatte'" \
+          -s ALLOW_MEMORY_GROWTH=1 \
+          -s INITIAL_MEMORY=16777216 \
+          -s MAXIMUM_MEMORY=33554432 \
+          -s ALLOW_TABLE_GROWTH=1 \
+          -s ENVIRONMENT=web \
+          -s FILESYSTEM=1 \
+          -s EXPORTED_RUNTIME_METHODS='["addFunction","removeFunction","cwrap","ccall","FS","HEAPU8","HEAPU32","HEAP32","getValue","setValue"]' \
+          -s EXPORTED_FUNCTIONS='["_retro_init","_retro_deinit","_retro_run","_retro_load_game","_retro_unload_game","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_retro_get_system_av_info","_retro_get_system_info","_retro_reset","_retro_serialize_size","_retro_serialize","_retro_unserialize","_retro_api_version","_malloc","_free"]' \
+          -s RESERVED_FUNCTION_POINTERS=32 \
+          -s NO_EXIT_RUNTIME=1 \
+          gambatte_libretro_emscripten.bc \
+          libretro-common/*.o \
+          -o gambatte_libretro.js
+
+    - name: Verify
+      run: |
+        cd gambatte-libretro
+        
+        if [ -f gambatte_libretro.wasm ]; then
+          echo "✅ Gambatte WASM build successful!"
+          ls -lh gambatte_libretro.{js,wasm}
+          
+          # Check exports
+          wasm-objdump -x gambatte_libretro.wasm | grep "retro_" | head -10
+        else
+          echo "❌ Build failed"
+          exit 1
+        fi
+
+    - name: Upload
+      uses: actions/upload-artifact@v4
+      with:
+        name: gambatte-wasm-core
+        path: |
+          gambatte-libretro/gambatte_libretro.js
+          gambatte-libretro/gambatte_libretro.wasm
+        retention-days: 30

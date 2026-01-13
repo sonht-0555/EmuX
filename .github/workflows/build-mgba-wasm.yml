@@ -57,7 +57,7 @@ jobs:
         head -c 8 libmgba.a
 
         emcc \
-        -Os \
+        -O3 \
         -s WASM=1 \
         -s LEGACY_RUNTIME=1 \
         -s ALLOW_MEMORY_GROWTH=1 \
@@ -70,6 +70,7 @@ jobs:
           "cwrap",
           "ccall",
           "FS",
+          "HEAPF64",
           "HEAPU8",
           "HEAPU32",
           "HEAP32"
