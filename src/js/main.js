@@ -174,14 +174,7 @@ async function loadRomFile(file) {
 };
 document.addEventListener("DOMContentLoaded", () => {
 // ===== ROM Loader =====
-  document.getElementById("resume").onclick = () => {
-    const ptr = Module._malloc(64);
-    Module._retro_get_system_av_info(ptr);
-    const sample_rate = Module.HEAPF64[(ptr + 32) >> 3];
-    const fps = Module.HEAPF64[(ptr + 24) >> 3];
-    Module._free(ptr);
-    return { sample_rate, fps };
-  };
+  document.getElementById("resume").onclick = () => { audioCtx && audioCtx.resume();};
   document.getElementById("rom").onchange = async (e) => { loadRomFile(e.target.files[0]) };
   document.querySelectorAll('.btn-control').forEach(btn => {
     const key = btn.getAttribute('data-btn');
