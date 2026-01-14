@@ -1,6 +1,5 @@
 // ===== Core =====
-  function env_cb() { return 0 }
-  async function loadRomFile(file) {
+async function loadRomFile(file) {
   // await initAudio();
   // setRatio(CORE_CONFIG[core].ratio);
   // setRunning(true)
@@ -8,6 +7,10 @@
   await initCore(file);
   await initGame(file);
   if (isRunning === true) document.getElementById("rom").style.display = 'none';
+  setTimeout(() => {
+    document.getElementById("audio-status").innerText =
+      (audioCtx && audioCtx.state === 'suspended') ? "Audio OFF" : "Audio ON";
+  }, 2000);
 }
 document.addEventListener("DOMContentLoaded", () => {
 // ===== ROM Loader =====

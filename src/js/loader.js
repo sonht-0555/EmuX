@@ -1,3 +1,12 @@
+// ===== LibEnvironment =====
+function env_cb() { return 0 }
+// ===== Core =====
+const CORE_CONFIG = {
+  gba:  { ratio: 65536 / 48000, width: 240, height: 160, ext: '.gba', script: './src/core/mgba.js' },
+  gbc: { ratio: 131072 / 48000, width: 160, height: 144, ext: '.gb,.gbc', script: './src/core/mgba.js' },
+  snes: { ratio: 32040 / 48000, width: 256, height: 224, ext: '.smc,.sfc', script: './src/core/snes9x.js' }
+};
+var isRunning = false;
 async function initCore(file) {
   const ext = file.name.split('.').pop().toLowerCase();
   const core = Object.entries(CORE_CONFIG).find(([_, cfg]) => cfg.ext.split(',').some(e => e.replace('.', '') === ext))?.[0];
