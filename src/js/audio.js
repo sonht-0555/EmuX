@@ -4,9 +4,8 @@ const CORE_CONFIG = {
   snes: { ratio: 32040 / 48000, width: 256, height: 224, ext: '.smc,.sfc', script: './src/core/snes9x.js' }
 };
 var isRunning = false;
-// ===== Audio =====
 var audioCtx, processor, fifoL = new Int16Array(8192), fifoR = new Int16Array(8192), fifoHead = 0, fifoCnt = 0;
-function initAudio() {
+async function initAudio() {
   if (audioCtx) { audioCtx.resume(); return; }
   audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
   processor = audioCtx.createScriptProcessor(1024, 0, 2);
@@ -26,7 +25,7 @@ function initAudio() {
   processor.connect(audioCtx.destination);
   audioCtx.resume();
 }
-function writeAudio(ptr, frames) {
+async function writeAudio(ptr, frames) {
   if (!audioCtx || fifoCnt + frames >= 8192) return frames;
   var data = new Int16Array(Module.HEAPU8.buffer, ptr, frames * 2);
   var tail = (fifoHead + fifoCnt) % 8192;
@@ -38,4 +37,5 @@ function writeAudio(ptr, frames) {
   fifoCnt += frames;
   return frames;
 }
-function audio_batch_cb(ptr, frames) { return writeAudio(ptr, frames); }
+function audio_batch_cb(ptr, frames) { return writeAudio(ptr, frames) }
+function audio_cb(l, r) {}
