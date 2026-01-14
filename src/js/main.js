@@ -119,8 +119,9 @@ async function loadRomFile(file) {
   const core = Object.entries(CORE_CONFIG).find(([_, cfg]) => cfg.ext.split(',').some(e => e.replace('.', '') === ext))?.[0];
   if (!core) return;
   const rom = new Uint8Array(await file.arrayBuffer());
-  await initAudio();
-  setRatio(CORE_CONFIG[core].ratio);
+  initAudio();
+  // await initAudio();
+  // setRatio(CORE_CONFIG[core].ratio);
   await loadCore(core);
   const romPtr = Module._malloc(rom.length);
   const info = Module._malloc(16);
@@ -130,8 +131,10 @@ async function loadRomFile(file) {
   Module.HEAPU32[(info >> 2) + 2] = rom.length;
   Module.HEAPU32[(info >> 2) + 3] = 0;
   Module._retro_load_game(info);
-  setRunning(true);
+  isRunning = true;
+  //setRunning(true);
   libCore.mainLoop();
+  if (isRunning === true) document.getElementById("rom").style.display = 'none';
 }
 document.addEventListener("DOMContentLoaded", () => {
 // ===== ROM Loader =====
