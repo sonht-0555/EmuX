@@ -3,9 +3,7 @@ async function loadRomFile(file) {
   // await initAudio();
   // setRatio(CORE_CONFIG[core].ratio);
   // setRunning(true)
-  await initAudio();
   await initCore(file);
-  await initGame(file);
   if (isRunning === true) document.getElementById("rom").style.display = 'none';
   setTimeout(() => {
     document.getElementById("audio-status").innerText =
