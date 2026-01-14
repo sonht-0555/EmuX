@@ -1,52 +1,10 @@
-// ===== Core Config =====
-const CORE_CONFIG = {
-  gba:  { ratio: 65536 / 48000, width: 240, height: 160, ext: '.gba', script: './src/core/mgba.js' },
-  gbc: { ratio: 131072 / 48000, width: 160, height: 144, ext: '.gb,.gbc', script: './src/core/mgba.js' },
-  snes: { ratio: 32040 / 48000, width: 256, height: 224, ext: '.smc,.sfc', script: './src/core/snes9x.js' }
-};
-var isRunning = false;
-// ===== Audio =====
-var audioCtx, processor, fifoL = new Int16Array(8192), fifoR = new Int16Array(8192), fifoHead = 0, fifoCnt = 0;
-function initAudio() {
-  if (audioCtx) { audioCtx.resume(); return; }
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
-  processor = audioCtx.createScriptProcessor(1024, 0, 2);
-  processor.onaudioprocess = function(e) {
-    var L = e.outputBuffer.getChannelData(0), R = e.outputBuffer.getChannelData(1);
-    if (!isRunning) { L.fill(0); R.fill(0); return; }
-    var r = RATIO;
-    while (fifoCnt < 1024 * r) Module._retro_run();
-    for (var i = 0; i < 1024; i++) {
-      var pos = i * r, idx = (fifoHead + (pos | 0)) % 8192, frac = pos % 1;
-      L[i] = (fifoL[idx] * (1 - frac) + fifoL[(idx + 1) % 8192] * frac) / 32768;
-      R[i] = (fifoR[idx] * (1 - frac) + fifoR[(idx + 1) % 8192] * frac) / 32768;
-    }
-    fifoHead = (fifoHead + (1024 * r | 0)) % 8192;
-    fifoCnt -= 1024 * r | 0;
-  };
-  processor.connect(audioCtx.destination);
-  audioCtx.resume();
-}
-function writeAudio(ptr, frames) {
-  if (!audioCtx || fifoCnt + frames >= 8192) return frames;
-  var data = new Int16Array(Module.HEAPU8.buffer, ptr, frames * 2);
-  var tail = (fifoHead + fifoCnt) % 8192;
-  for (var i = 0; i < frames; i++) {
-    fifoL[tail] = data[i * 2];
-    fifoR[tail] = data[i * 2 + 1];
-    tail = (tail + 1) % 8192;
-  }
-  fifoCnt += frames;
-  return frames;
-}
 // ===== Core =====
 const libCore = (() => {
   function audio_cb() {}
-  function audio_batch_cb(ptr, frames) { return writeAudio(ptr, frames); }
   function input_poll_cb() {}
   function env_cb() { return 0 }
   function mainLoop() { Module._retro_run(); requestAnimationFrame(mainLoop); }
-  return { audio_cb, audio_batch_cb, input_poll_cb, env_cb, mainLoop };
+  return { audio_cb, input_poll_cb, env_cb, mainLoop };
 })();
 // ===== PAD =====
 const libPad = (() => {
@@ -136,7 +94,7 @@ function loadCore(core) {
         const envPtr    = Module.addFunction(libCore.env_cb, "iii");
         const videoPtr  = Module.addFunction(video_cb, "viiii");
         const audioPtr  = Module.addFunction(libCore.audio_cb, "vii");
-        const audioBPtr = Module.addFunction(libCore.audio_batch_cb, "iii");
+        const audioBPtr = Module.addFunction(audio_batch_cb, "iii");
         const pollPtr   = Module.addFunction(libCore.input_poll_cb, "v");
         const statePtr  = Module.addFunction(libPad.input_state_cb, "iiiii");
         Module._retro_set_environment(envPtr);
@@ -157,25 +115,27 @@ function loadCore(core) {
   });
 }
 async function loadRomFile(file) {
-    const ext = file.name.split('.').pop().toLowerCase();
-    const core = Object.entries(CORE_CONFIG).find(([_, cfg]) => cfg.ext.split(',').some(e => e.replace('.', '') === ext))?.[0];
-    const rom = new Uint8Array(await file.arrayBuffer());
-    initAudio();
-    await loadCore(core);
-    const romPtr = Module._malloc(rom.length);
-    const info = Module._malloc(16);
-    Module.HEAPU8.set(rom, romPtr);
-    Module.HEAPU32[(info >> 2) + 0] = 0;
-    Module.HEAPU32[(info >> 2) + 1] = romPtr;
-    Module.HEAPU32[(info >> 2) + 2] = rom.length;
-    Module.HEAPU32[(info >> 2) + 3] = 0;
-    Module._retro_load_game(info);
-    isRunning = true;
-    libCore.mainLoop();
-};
+  const ext = file.name.split('.').pop().toLowerCase();
+  const core = Object.entries(CORE_CONFIG).find(([_, cfg]) => cfg.ext.split(',').some(e => e.replace('.', '') === ext))?.[0];
+  if (!core) return;
+  const rom = new Uint8Array(await file.arrayBuffer());
+  await initAudio();
+  setRatio(CORE_CONFIG[core].ratio);
+  await loadCore(core);
+  const romPtr = Module._malloc(rom.length);
+  const info = Module._malloc(16);
+  Module.HEAPU8.set(rom, romPtr);
+  Module.HEAPU32[(info >> 2) + 0] = 0;
+  Module.HEAPU32[(info >> 2) + 1] = romPtr;
+  Module.HEAPU32[(info >> 2) + 2] = rom.length;
+  Module.HEAPU32[(info >> 2) + 3] = 0;
+  Module._retro_load_game(info);
+  setRunning(true);
+  libCore.mainLoop();
+}
 document.addEventListener("DOMContentLoaded", () => {
 // ===== ROM Loader =====
-  document.getElementById("resume").onclick = () => { audioCtx && audioCtx.resume();};
+  document.getElementById("resume").onclick = () => { audioCtx && audioCtx.resume(); setRunning(true);};
   document.getElementById("rom").onchange = async (e) => { loadRomFile(e.target.files[0]) };
   document.querySelectorAll('.btn-control').forEach(btn => {
     const key = btn.getAttribute('data-btn');
