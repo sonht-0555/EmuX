@@ -1,25 +1,34 @@
 let value = 5, startY = 0, swiping = false, lastTap = 0, number = 1, active = null, tap = 0;
+const activePointers = new Map();
 function handleButton(press, element) {
     const parts = element?.getAttribute('data')?.split('-').slice(1) || [];
     parts.forEach(part => press ? buttonPress(part) : buttonUnpress(part));
 }
-function setState(element) {
-    if (element === active) return;
-    active && handleButton(false, active);
-    active = element || null;
-    handleButton(true, element);
+function setState(pointerId, element) {
+    const current = activePointers.get(pointerId);
+    if (element === current) return;
+    
+    current && handleButton(false, current);
+    
+    if (element) {
+        activePointers.set(pointerId, element);
+        handleButton(true, element);
+    } else {
+        activePointers.delete(pointerId);
+    }
 }
 document.addEventListener("DOMContentLoaded", function() {
     document.onpointerdown = e => {
-        setState(e.target.closest('[data]'));
+        setState(e.pointerId, e.target.closest('[data]'));
     };
     document.onpointermove = e => {
-        active && (() => {
-            const element = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data]');
-            element && element !== active &&
-                active.getAttribute('data').split('-')[0] === element.getAttribute('data').split('-')[0] &&
-                setState(element);
-        })();
+        const active = activePointers.get(e.pointerId);
+        if (!active) return;
+        const element = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data]');
+        if (element && element !== active &&
+            active.getAttribute('data').split('-')[0] === element.getAttribute('data').split('-')[0]) {
+            setState(e.pointerId, element);
+        }
     };
     canvas.onpointerdown = e => {
         const r = canvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
@@ -66,14 +75,15 @@ document.addEventListener("DOMContentLoaded", function() {
             tap = 0;
         }, 300);
     };
-    ['pointerup', 'pointercancel'].forEach(type => addEventListener(type, () => { setState(null); swiping = false; joy.style.opacity = "0"}));
+    ['pointerup', 'pointercancel'].forEach(type => addEventListener(type, e => { setState(e.pointerId, null); swiping = false; joy.style.opacity = "0"}));
     joy.onpointerdown = () => {joy.style.opacity = "1"};
     // visibility
-    invis.onpointermove  = () => {notifi("pa","use.", "double tap to resume."), Main.pauseGame()};
+    invis.onpointermove  = () => {notifi("pa","use.", "double tap to resume."), isRunning = false};
     page00.onpointerdown = () => {
         if (Date.now() - lastTap < 300) {
             page00.hidden = true; 
-            Main.resumeGame();
+            isRunning = true;
+            audioCtx && audioCtx.resume();
         }
         lastTap = Date.now();
     };

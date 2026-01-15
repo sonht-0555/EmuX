@@ -21,13 +21,13 @@ async function initCore(file) {
   cfg = Object.values(CORE_CONFIG).find(c => c.ext.includes(ext));
   if (!cfg) return;
   return new Promise((resolve, reject) => {
+    isRunning = true;
     const canvas = document.getElementById("canvas");
     canvas.width = cfg.width;
     canvas.height = cfg.height;
     gameView(file.name, cfg)
     initAudio(cfg);
     window.Module = { canvas, onRuntimeInitialized() {
-        isRunning = true;
         const romPtr = Module._malloc(rom.length);
         const info = Module._malloc(16);
         [ [Module._retro_set_environment, env_cb, "iii"],
