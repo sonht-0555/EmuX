@@ -6,7 +6,6 @@ const CORE_CONFIG = {
   gbc:  { ratio: 131072 / 48000, width: 160, height: 144, ext: '.gb,.gbc' , script: './src/core/mgba.js'   },
   snes: { ratio: 32040  / 48000, width: 256, height: 224, ext: '.smc,.sfc', script: './src/core/snes9x.js' }
 };
-var isRunning = false;
 async function initCore(file) {
   let ext = file.name.split('.').pop().toLowerCase(), rom, cfg;
   if (ext === 'zip') {
@@ -24,10 +23,9 @@ async function initCore(file) {
     const canvas = document.getElementById("canvas");
     canvas.width = cfg.width;
     canvas.height = cfg.height;
-    gameView(file.name, cfg)
     initAudio(cfg);
+    gameView(file.name, cfg)
     window.Module = { canvas, onRuntimeInitialized() {
-        isRunning = true;
         const romPtr = Module._malloc(rom.length);
         const info = Module._malloc(16);
         [ [Module._retro_set_environment, env_cb, "iii"],
@@ -41,7 +39,7 @@ async function initCore(file) {
         Module.HEAPU8.set(rom, romPtr);
         Module.HEAPU32.set([0, romPtr, rom.length, 0], info >> 2);
         Module._retro_load_game(info);
-        (function loop() { Module._retro_run(), requestAnimationFrame(loop) })();
+        (function loop() { Module._retro_run(); if (fifoCnt < 1024 * cfg.ratio) { Module._retro_run() }; requestAnimationFrame(loop) })();
         rom = null;
         resolve();
       }

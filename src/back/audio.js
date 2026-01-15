@@ -9,9 +9,7 @@ async function initAudio(cfg) {
   processor = audioCtx.createScriptProcessor(1024, 0, 2);
   processor.onaudioprocess = function(e) {
     var L = e.outputBuffer.getChannelData(0), R = e.outputBuffer.getChannelData(1);
-    if (!isRunning) { L.fill(0); R.fill(0); return; }
     var r = cfg.ratio;
-    while (fifoCnt < 1024 * r) Module._retro_run();
     for (var i = 0; i < 1024; i++) {
       var pos = i * r, idx = (fifoHead + (pos | 0)) % 8192, frac = pos % 1;
       L[i] = (fifoL[idx] * (1 - frac) + fifoL[(idx + 1) % 8192] * frac) / 32768;
@@ -21,7 +19,7 @@ async function initAudio(cfg) {
     fifoCnt -= 1024 * r | 0;
   };
   processor.connect(audioCtx.destination);
-  await audioCtx.resume();
+  audioCtx.resume();
 }
 async function writeAudio(ptr, frames) {
   if (!audioCtx || fifoCnt + frames >= 8192) return frames;
