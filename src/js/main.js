@@ -6,7 +6,7 @@ async function loadRomFile(file) {
   await initCore(file);
   if (isRunning === true) document.getElementById("rom").style.display = 'none';
   setTimeout(() => {
-    document.getElementById("audio-status").innerText =
+    document.getElementById("mess").innerText =
       (audioCtx && audioCtx.state === 'suspended') ? "Audio OFF" : "Audio ON";
   }, 2000);
 }

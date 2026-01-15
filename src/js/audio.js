@@ -1,16 +1,16 @@
 // ===== LibAudio =====
-function audio_batch_cb(ptr, frames) { return writeAudio(ptr, frames) }
-function audio_cb(l, r) {}
+function audio_batch_cb(ptr, frames) { return writeAudio(ptr, frames) };
+function audio_cb(l, r) {};
 // ===== Audio =====
 var audioCtx, processor, fifoL = new Int16Array(8192), fifoR = new Int16Array(8192), fifoHead = 0, fifoCnt = 0;
-async function initAudio() {
+async function initAudio(cfg) {
   if (audioCtx) { audioCtx.resume(); return; }
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000, latencyHint: 'interactive' });
   processor = audioCtx.createScriptProcessor(1024, 0, 2);
   processor.onaudioprocess = function(e) {
     var L = e.outputBuffer.getChannelData(0), R = e.outputBuffer.getChannelData(1);
     if (!isRunning) { L.fill(0); R.fill(0); return; }
-    var r = RATIO;
+    var r = cfg.ratio;
     while (fifoCnt < 1024 * r) Module._retro_run();
     for (var i = 0; i < 1024; i++) {
       var pos = i * r, idx = (fifoHead + (pos | 0)) % 8192, frac = pos % 1;
@@ -21,7 +21,7 @@ async function initAudio() {
     fifoCnt -= 1024 * r | 0;
   };
   processor.connect(audioCtx.destination);
-  audioCtx.resume();
+  await audioCtx.resume();
 }
 async function writeAudio(ptr, frames) {
   if (!audioCtx || fifoCnt + frames >= 8192) return frames;

@@ -1,4 +1,4 @@
-name: Build libretro mGBA WASM
+name: Build libretro Snes9x WASM
 
 on:
   push:
@@ -19,39 +19,31 @@ jobs:
         version: latest
         actions-cache-folder: emsdk-cache
 
-    - name: Clone libretro mGBA
+    - name: Clone libretro Snes9x
       run: |
-        git clone https://github.com/libretro/mgba.git
-        cd mgba
+        git clone https://github.com/libretro/snes9x.git
+        cd snes9x
         git submodule update --init --recursive
 
     - name: Build libretro core (emscripten)
       run: |
-        cd mgba
-        make -f Makefile.libretro \
+        cd snes9x/libretro
+        make \
           platform=emscripten \
           CC=emcc \
           CXX=em++ \
           AR=emar \
-          RANLIB=emranlib \
-          STRIP=llvm-strip \
-          HAVE_OPENGL=0 \
-          HAVE_OPENGLES=0 \
-          HAVE_SDL=0 \
-          HAVE_THREADS=0 \
-          HAVE_PTHREADS=0 \
-          HAVE_NETWORKING=0 \
-          HAVE_FFMPEG=0 \
-          HAVE_MMAP=0 \
-          HAVE_DYNAREC=0 \
-          HAVE_ZLIB=1 \
-          COLOR_16_BIT=0 \
-          COLOR_5_6_5=0
+          RANLIB=emranlib
 
     - name: Link WASM + JS
       run: |
-        cd mgba
-        mv mgba_libretro_emscripten.bc libmgba.a
+        cd snes9x/libretro
+
+        # Rename output file
+        mv snes9x_libretro_emscripten.bc libsnes9x.a
+
+        file libsnes9x.a
+        head -c 8 libsnes9x.a
 
         emcc \
         -O3 \
@@ -60,14 +52,12 @@ jobs:
         -s ALLOW_MEMORY_GROWTH=1 \
         -s ALLOW_TABLE_GROWTH=1 \
         -s ENVIRONMENT=web \
-        -s USE_ZLIB=1 \
         -s EXPORTED_RUNTIME_METHODS='[
           "addFunction",
           "removeFunction",
           "cwrap",
           "ccall",
           "FS",
-          "HEAPF64",
           "HEAPU8",
           "HEAPU32",
           "HEAP32"
@@ -84,18 +74,16 @@ jobs:
           "_retro_set_audio_sample_batch",
           "_retro_set_input_poll",
           "_retro_set_input_state",
-          "_retro_get_system_av_info",
-          "_retro_set_controller_port_device",
           "_malloc",
           "_free"
         ]' \
-        -Wl,--whole-archive libmgba.a -Wl,--no-whole-archive \
-        -o mgba.js
+        -Wl,--whole-archive libsnes9x.a -Wl,--no-whole-archive \
+        -o snes9x.js
 
     - name: Upload WASM artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: mgba-wasm
+        name: snes9x-wasm
         path: |
-          mgba/mgba.js
-          mgba/mgba.wasm
+          snes9x/libretro/snes9x.js
+          snes9x/libretro/snes9x.wasm
