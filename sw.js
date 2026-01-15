@@ -1,4 +1,4 @@
-let revision = 'EmuX 1.65';
+let revision = 'EmuX 1.67';
 var urlsToCache = [
     './src/core/mgba.js',
     './src/core/mgba.wasm',

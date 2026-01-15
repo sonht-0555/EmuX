@@ -2,20 +2,29 @@
 function env_cb() { return 0 };
 // ===== Core =====
 const CORE_CONFIG = {
-  gba:  { ratio: 65536  / 48000, width: 240, height: 160, ext: '.gba,.zip', script: './src/core/mgba.js'   },
+  gba:  { ratio: 65536  / 48000, width: 240, height: 160, ext: '.gba', script: './src/core/mgba.js'   },
   gbc:  { ratio: 131072 / 48000, width: 160, height: 144, ext: '.gb,.gbc' , script: './src/core/mgba.js'   },
   snes: { ratio: 32040  / 48000, width: 256, height: 224, ext: '.smc,.sfc', script: './src/core/snes9x.js' }
 };
 var isRunning = false;
 async function initCore(file) {
-const ext = file.name.split('.').pop().toLowerCase(),
-      cfg = Object.values(CORE_CONFIG).find(c => c.ext.replace(/\./g, '').split(',').includes(ext)),
-      rom = new Uint8Array(await file.arrayBuffer());
+  let ext = file.name.split('.').pop().toLowerCase(), rom, cfg;
+  if (ext === 'zip') {
+    const zip = await JSZip.loadAsync(await file.arrayBuffer());
+    const n = Object.keys(zip.files).find(n => /\.(gba|gbc|gb|smc|sfc)$/i.test(n));
+    if (!n) return;
+    ext = n.split('.').pop().toLowerCase();
+    rom = await zip.files[n].async('uint8array');
+  } else {
+    rom = new Uint8Array(await file.arrayBuffer());
+  }
+  cfg = Object.values(CORE_CONFIG).find(c => c.ext.includes(ext));
   if (!cfg) return;
   return new Promise((resolve, reject) => {
-    const canvas = document.getElementById("screen");
+    const canvas = document.getElementById("canvas");
     canvas.width = cfg.width;
     canvas.height = cfg.height;
+    gameView(file.name, cfg)
     initAudio(cfg);
     window.Module = { canvas, onRuntimeInitialized() {
         isRunning = true;
@@ -33,6 +42,7 @@ const ext = file.name.split('.').pop().toLowerCase(),
         Module.HEAPU32.set([0, romPtr, rom.length, 0], info >> 2);
         Module._retro_load_game(info);
         (function loop() { Module._retro_run(), requestAnimationFrame(loop) })();
+        rom = null;
         resolve();
       }
     };

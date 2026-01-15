@@ -13,7 +13,12 @@ async function loadRomFile(file) {
 document.addEventListener("DOMContentLoaded", () => {
 // ===== ROM Loader =====
   document.getElementById("resume").onclick = () => { audioCtx && audioCtx.resume() };
-  document.getElementById("rom").onchange = async (e) => { loadRomFile(e.target.files[0]) };
+  document.getElementById("rom").onchange = async (e) => { 
+    const file = e.target.files[0];
+    //const arrayBuffer = await file.arrayBuffer();
+    // await emuxDB(arrayBuffer, file.name);
+    loadRomFile(file);
+  };
   document.querySelectorAll('.btn-control').forEach(btn => {
     const key = btn.getAttribute('data-btn');
     btn.addEventListener('mousedown', () => { press(key); });
