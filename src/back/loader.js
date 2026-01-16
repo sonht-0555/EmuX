@@ -41,7 +41,7 @@ async function initCore(file) {
         Module.HEAPU8.set(rom, romPtr);
         Module.HEAPU32.set([0, romPtr, rom.length, 0], info >> 2);
         Module._retro_load_game(info);
-        (function loop() { Module._retro_run(), requestAnimationFrame(loop) })();
+        (function loop() { Module._retro_run(); if (fifoCnt < 1024 * cfg.ratio) Module._retro_run(); requestAnimationFrame(loop) })();
         rom = null;
         resolve();
       }
