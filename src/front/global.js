@@ -55,7 +55,8 @@ async function gameView(romName, cfg) {
     [gameName, gameType] = [romName.slice(0, -4), romName.slice(-3)];
     [gameWidth, gameHeight] = cfg ? [cfg.width, cfg.height] : [160, 144];    integer = Math.min(6, Math.floor((window.innerWidth * window.devicePixelRatio) / gameWidth));
     display.style.height = `${Math.ceil(gameHeight * (integer/window.devicePixelRatio)) + 10}px`;
-    display.style.width  = `${gameWidth  * (integer/window.devicePixelRatio)}px`;
+    display.style.width  = `${Math.ceil(gameWidth  * (integer/window.devicePixelRatio))}px`;
+    screen.style.width   = `${gameWidth * (integer/window.devicePixelRatio)}px`;
     screen.style.setProperty("--size", `${integer}px`);
     // notification
     title1.textContent = romName;

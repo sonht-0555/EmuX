@@ -1,56 +1,67 @@
-function emuxDB(data, name) {
-  const DB_NAME = 'EmuxDB';
-  const STORE_NAME = 'data';
-  return new Promise((resolve, reject) => {
-    const openReq = indexedDB.open(DB_NAME, 1);
-    openReq.onupgradeneeded = () => openReq.result.createObjectStore(STORE_NAME);
-    openReq.onsuccess = () => {
-      const db = openReq.result;
-      const tx = db.transaction(STORE_NAME, name ? 'readwrite' : 'readonly');
-      const store = tx.objectStore(STORE_NAME);
-      if (name) {
-        store.put(data, name);
-        tx.oncomplete = () => { db.close(); resolve(true); };
-        tx.onerror = reject;
-      } else {
-        const getReq = store.get(data);
-        getReq.onsuccess = () => { db.close(); resolve(getReq.result); };
-        getReq.onerror = reject;
-      }
-    };
-    openReq.onerror = reject;
-  });
-}
-async function getRomFileNames(extensions) {
-  if (typeof extensions === 'string') extensions = extensions.split(',').map(e => e.trim().toLowerCase());
-  const DB_NAME = 'EmuxDB';
-  const STORE_NAME = 'data';
-  return new Promise((resolve, reject) => {
-    const openReq = indexedDB.open(DB_NAME, 1);
-    openReq.onsuccess = () => {
-      const db = openReq.result;
-      const tx = db.transaction(STORE_NAME, 'readonly');
-      const store = tx.objectStore(STORE_NAME);
-      const names = [];
-      const req = store.openKeyCursor();
-      req.onsuccess = e => {
-        const cursor = e.target.result;
-        if (cursor) {
-          const key = cursor.key;
-          if (extensions.some(ext => key.toLowerCase().endsWith('.' + ext))) names.push(key);
-          cursor.continue();
-        } else {
-          db.close();
-          resolve(names);
-        }
-      };
-      req.onerror = reject;
-    };
-    openReq.onerror = reject;
+const DB_NAME = 'EmuxDB';
+const STORES = {
+  games: ['nes','sfc','smc','gba','gb','gbc','bin','rom'],
+  saves: ['sav','srm','sram'],
+  states: ['ss1','ss2','ss3','ss4','ss5','ss6','ss7','ss8','ss9','ss0']
+};
+
+const allStoreNames = () => Object.keys(STORES);
+const storeForFilename = (fn) => {
+  if (!fn || typeof fn !== 'string') return 'games';
+  const p = fn.split('.'); if (p.length < 2) return 'games';
+  const ext = p.pop().toLowerCase();
+  return allStoreNames().find(s => STORES[s].includes(ext)) || 'games';
+};
+
+async function openDBWithStore() {
+  const open = () => new Promise((r,j)=>{ const rq = indexedDB.open(DB_NAME); rq.onsuccess = e => r(e.target.result); rq.onerror = j; });
+  const db = await open();
+  const miss = allStoreNames().filter(s => !db.objectStoreNames.contains(s));
+  if (!miss.length) return db;
+  const v = db.version + 1; db.close();
+  return new Promise((r,j)=> {
+    const rq = indexedDB.open(DB_NAME, v);
+    rq.onupgradeneeded = e => { const d = e.target.result; miss.forEach(s => { if (!d.objectStoreNames.contains(s)) d.createObjectStore(s); }); };
+    rq.onsuccess = e => r(e.target.result);
+    rq.onerror = j;
   });
 }
 
-document.addEventListener("DOMContentLoaded", async () => {
-//const names = await getRomFileNames("gba, gbc, zip, smc, sfc");
-//console.log(names);
-});
+async function emuxDB(dataOrKey, name) {
+  const db = await openDBWithStore();
+  const key = name || dataOrKey;
+  const storeName = storeForFilename(String(key));
+  const tx = db.transaction(storeName, name ? 'readwrite' : 'readonly');
+  const store = tx.objectStore(storeName);
+  return new Promise((res, rej) => {
+    if (name) {
+      store.put(dataOrKey, name);
+      tx.oncomplete = () => { db.close(); res(true); };
+      tx.onerror = e => { db.close(); rej(e); };
+    } else {
+      const rq = store.get(dataOrKey);
+      rq.onsuccess = () => { db.close(); res(rq.result); };
+      rq.onerror = e => { db.close(); rej(e); };
+    }
+  });
+}
+
+async function listStore(storeName) {
+  const db = await openDBWithStore();
+  const getKeys = s => new Promise((r,j) => {
+    if (!db.objectStoreNames.contains(s)) return r([]);
+    const rq = db.transaction(s, 'readonly').objectStore(s).getAllKeys();
+    rq.onsuccess = () => r(rq.result.map(k => String(k)));
+    rq.onerror = j;
+  });
+  if (!storeName) {
+    const out = {};
+    for (const s of allStoreNames()) out[s] = await getKeys(s);
+    db.close();
+    return out;
+  } else {
+    const keys = await getKeys(storeName);
+    db.close();
+    return keys;
+  }
+}

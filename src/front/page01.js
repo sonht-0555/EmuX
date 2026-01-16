@@ -1,10 +1,3 @@
-//inputGame
-async function inputGame(file) {
-    await initCore(file);
-    //await timer(true);
-    list.hidden = false, list01.hidden = true, list02.hidden = true;
-    //listGame();
-}
 //listGame
 function showFileGroups(gameName) {
     const fileGroups = [
@@ -32,11 +25,12 @@ function showFileGroups(gameName) {
         };
     });
 }
+//listGame
 async function listGame() {
-    list.innerHTML = Main.listFiles("games")
+    list.innerHTML = (await listStore('games'))
         .map(gameFileName => `<rom><name>${gameFileName}</name><more></more></rom>`).join('');
     list.querySelectorAll('name').forEach(gameNameElement => {
-        gameNameElement.onclick = () => Main.loadGame(gameNameElement.textContent);
+        gameNameElement.onclick = () => loadGame(gameNameElement.textContent);
     });
     list.querySelectorAll('more').forEach(btn => {
         btn.onclick = () => {
@@ -65,29 +59,20 @@ function optionClick(text) {
 }
 //DOMContentLoaded
 document.addEventListener("DOMContentLoaded", function() {
-   /* if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js')
-        });
+   if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js') });
         navigator.serviceWorker.addEventListener('message', function (event) {
         if (event.data.msg === "Updating...") {
             ver.textContent = "The system is updating...";
             isReload = true;
-            setTimeout(() => {location.reload()},4000);
+            setTimeout(() => {location.reload()},2000);
             }
         });
-    }*/
+    }
     ver.textContent = gameVer;
-    //setTimeout(() => {if(!isReload){verSetting(),listGame()}},2000);
-    romInput.addEventListener("change", async function(e) {
-        const file = e.target.files[0];
-        //const arrayBuffer = await file.arrayBuffer();
-        //await emuxDB(arrayBuffer, file.name);
-        inputGame(file);
-    })
-    vertical.addEventListener("click", function() {
-        verSetting();
-    })
+    setTimeout(() => {if(!isReload){verSetting(),listGame()}},1000);
+    romInput.addEventListener("change", function(e) { inputGame(e) })
+    vertical.addEventListener("click",  function(e) { verSetting() })
     logo.addEventListener("click", function() {
         list.hidden = false, list01.hidden = true, list02.hidden = true;
         listGame();

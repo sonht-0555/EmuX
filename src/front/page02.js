@@ -46,15 +46,6 @@ document.addEventListener("DOMContentLoaded", function() {
             startY = e.clientY;
         }
     };
-    f.onpointerdown = () => {
-        if (Date.now() - lastTap < 300) {
-            number = number === 1 ? 2 : 1;
-            Main.fastForward(number);
-            f.classList.toggle("active");
-            message(`[${number}x] Speed!`);
-        }
-        lastTap = Date.now();
-    };
     state.onpointerdown = () => {
         tap++;
         setTimeout(() => {
@@ -83,9 +74,8 @@ document.addEventListener("DOMContentLoaded", function() {
         if (Date.now() - lastTap < 300) {
             page00.hidden = true; 
             isRunning = true;
-            audioCtx && audioCtx.resume();
+            if (audioCtx && (audioCtx.state === 'suspended' || audioCtx.state === 'interrupted')) { audioCtx.resume() }
         }
         lastTap = Date.now();
     };
-    //document.onvisibilitychange = () => !document.hidden && (page00.hidden = true);
 });

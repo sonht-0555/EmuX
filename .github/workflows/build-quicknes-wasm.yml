@@ -1,0 +1,89 @@
+name: Build libretro QuickNES WASM
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Emscripten
+      uses: mymindstorm/setup-emsdk@v14
+      with:
+        version: latest
+        actions-cache-folder: emsdk-cache
+
+    - name: Clone libretro QuickNES
+      run: |
+        git clone https://github.com/libretro/QuickNES_Core.git
+        cd QuickNES_Core
+        git submodule update --init --recursive
+
+    - name: Build libretro core (emscripten)
+      run: |
+        cd QuickNES_Core
+        make \
+          platform=emscripten \
+          CC=emcc \
+          CXX=em++ \
+          AR=emar \
+          RANLIB=emranlib \
+          STRIP=llvm-strip
+
+    - name: Link WASM + JS
+      run: |
+        cd QuickNES_Core
+        mv quicknes_libretro_emscripten.bc libquicknes.a
+
+        emcc \
+        -O3 \
+        -s WASM=1 \
+        -s LEGACY_RUNTIME=1 \
+        -s ALLOW_MEMORY_GROWTH=1 \
+        -s ALLOW_TABLE_GROWTH=1 \
+        -s ENVIRONMENT=web \
+        -s USE_ZLIB=1 \
+        -s EXPORTED_RUNTIME_METHODS='[
+          "addFunction",
+          "removeFunction",
+          "cwrap",
+          "ccall",
+          "FS",
+          "HEAPF64",
+          "HEAPU8",
+          "HEAPU32",
+          "HEAP32"
+        ]' \
+        -s EXPORTED_FUNCTIONS='[
+          "_retro_init",
+          "_retro_deinit",
+          "_retro_run",
+          "_retro_load_game",
+          "_retro_unload_game",
+          "_retro_set_environment",
+          "_retro_set_video_refresh",
+          "_retro_set_audio_sample",
+          "_retro_set_audio_sample_batch",
+          "_retro_set_input_poll",
+          "_retro_set_input_state",
+          "_retro_get_system_av_info",
+          "_retro_set_controller_port_device",
+          "_malloc",
+          "_free"
+        ]' \
+        -Wl,--whole-archive libquicknes.a -Wl,--no-whole-archive \
+        -o quicknes.js
+
+    - name: Upload WASM artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: quicknes-wasm
+        path: |
+          QuickNES_Core/quicknes.js
+          QuickNES_Core/quicknes.wasm
