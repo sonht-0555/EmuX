@@ -10,6 +10,7 @@ async function initAudio(cfg) {
   processor.onaudioprocess = function(e) {
     var L = e.outputBuffer.getChannelData(0), R = e.outputBuffer.getChannelData(1);
     var r = cfg.ratio;
+    while (fifoCnt < 1024 * r && Module && typeof Module._retro_run === 'function') { Module._retro_run() }
     for (var i = 0; i < 1024; i++) {
       var pos = i * r, idx = (fifoHead + (pos | 0)) % 8192, frac = pos % 1;
       L[i] = (fifoL[idx] * (1 - frac) + fifoL[(idx + 1) % 8192] * frac) / 32768;
