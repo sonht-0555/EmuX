@@ -41,7 +41,7 @@ async function initCore(file) {
         Module.HEAPU8.set(rom, romPtr);
         Module.HEAPU32.set([0, romPtr, rom.length, 0], info >> 2);
         Module._retro_load_game(info);
-        (function loop() { Module._retro_run(); if (fifoCnt < 1024 * cfg.ratio) Module._retro_run(); requestAnimationFrame(loop) })();
+          (function loop() { if (isRunning) { Module._retro_run(), requestAnimationFrame(loop) } })();
         rom = null;
         resolve();
       }
@@ -51,5 +51,10 @@ async function initCore(file) {
     script.onload = () => {};
     script.onerror = reject;
     document.body.appendChild(script);
+    if (window.audioCtx && ['suspended', 'interrupted'].includes(window.audioCtx.state)) {
+      notifi("pa", "use.", "Tap or click to resume audio.");
+    } else {
+      isRunning = true;
+    }
   });
 }
