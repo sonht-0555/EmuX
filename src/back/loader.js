@@ -1,11 +1,11 @@
 // ===== LibEnvironment =====
-function env_cb() { return 0 };
+function env_cb(cmd, data) { return 0 };
 // ===== Core =====
 const CORE_CONFIG = {
   gba: { ratio: 65536 / 48000, width: 240, height: 160, ext: '.gba', script: './src/core/mgba.js' },
   gbc: { ratio: 131072 / 48000, width: 160, height: 144, ext: '.gb,.gbc', script: './src/core/mgba.js' },
   snes: { ratio: 32040 / 48000, width: 256, height: 224, ext: '.smc,.sfc', script: './src/core/snes9x.js' },
-  nes: { ratio: 29780 / 48000, width: 256, height: 240, ext: '.nes', script: './src/core/fceumm.js' }
+  nes: { ratio: 29780 / 48000, width: 256, height: 240, ext: '.nes', script: './src/core/nes.js' }
 };
 var isRunning = false;
 async function initCore(file) {

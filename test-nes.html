@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>EmuX - Nestopia WASM Test</title>
+    <style>
+        body {
+            background: #1a1a1a;
+            color: white;
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        canvas {
+            background: black;
+            border: 2px solid #ed1c24;
+            box-shadow: 0 0 20px rgba(237, 28, 36, 0.4);
+        }
+
+        #log {
+            margin-top: 20px;
+            width: 80%;
+            background: #000;
+            padding: 10px;
+            height: 200px;
+            overflow-y: scroll;
+            border: 1px solid #333;
+            font-family: monospace;
+        }
+
+        .success {
+            color: #00ff00;
+        }
+
+        .error {
+            color: #ff0000;
+        }
+
+        .info {
+            color: #0088ff;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>QuickNES Test</h1>
+    <input type="file" id="romInput" accept=".nes" />
+    <hr>
+    <canvas id="canvas" width="256" height="240"></canvas>
+    <div id="log"></div>
+    <script>
+        const logEl = document.getElementById('log');
+        function log(msg, type = 'info') {
+            const div = document.createElement('div');
+            div.className = type;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            logEl.appendChild(div);
+            logEl.scrollTop = logEl.scrollHeight;
+            console.log(msg);
+        }
+
+        // Libretro Constants (Aligning with QuickNES observed behavior)
+        const ENV = {
+            SET_PIXEL_FORMAT: 10,       // Old ID for this core
+            SET_INPUT_DESCRIPTORS: 11,  // Old ID for this core
+            GET_SYSTEM_DIRECTORY: 9,
+            GET_VARIABLE: 15,
+            GET_VARIABLE_UPDATE: 17,
+            GET_LOG_INTERFACE: 27,
+            GET_CORE_ASSETS_DIRECTORY: 14,
+            GET_SAVE_DIRECTORY: 15,
+            GET_INPUT_BITMASKS: 16,
+            GET_CORE_OPTIONS_VERSION: 52,
+            GET_MESSAGE_INTERFACE_VERSION: 39,
+            GET_THROTTLE_STATE: 59,
+            GET_SAVESTATE_CONTEXT: 70,
+            GET_AUDIO_VIDEO_ENABLE: 65587,
+            GET_AUDIO_VIDEO_ENABLE_ALT: 65583,
+            SET_MEMORY_MAPS: 65572,      // 36 | 0x10000 (Experimental)
+            SET_MESSAGE: 65574           // 38 | 0x10000
+        };
+
+        // Callback Setup
+        let logCallbackPtr = null;
+
+        function allocateString(str) {
+            const bytes = new TextEncoder().encode(str + '\0');
+            const ptr = Module._malloc(bytes.length);
+            Module.HEAPU8.set(bytes, ptr);
+            return ptr;
+        }
+
+        function env_cb(cmd, data) {
+            if (cmd === ENV.GET_VARIABLE_UPDATE || cmd === ENV.GET_AUDIO_VIDEO_ENABLE_ALT) {
+                // Return 0/1 silently to avoid spamming the log
+                if (cmd === ENV.GET_AUDIO_VIDEO_ENABLE_ALT) {
+                    Module.HEAP32[data >> 2] = 0x7;
+                    return 1;
+                }
+                return 0;
+            }
+
+            let cmdName = Object.keys(ENV).find(k => ENV[k] === cmd) || "UNKNOWN";
+            log(`Env CB: ${cmdName} (${cmd})`, 'info');
+
+            if (cmd === ENV.SET_MEMORY_MAPS) {
+                log(`  -> Core provided memory maps`, 'success');
+                return 1;
+            }
+
+            if (cmd === ENV.SET_PIXEL_FORMAT) {
+                const format = Module.HEAP32[data >> 2];
+                log(`  -> Core set pixel format: ${format}`, 'success');
+                return 1;
+            }
+
+            if (cmd === ENV.SET_INPUT_DESCRIPTORS) {
+                log(`  -> Core set input descriptors`, 'success');
+                return 1;
+            }
+
+            if (cmd === ENV.GET_VARIABLE || cmd === 15) {
+                try {
+                    const keyPtr = Module.HEAPU32[data >> 2];
+                    if (keyPtr) {
+                        const key = Module.UTF8ToString(keyPtr);
+                        log(`  -> Variable Key: ${key}`);
+                    }
+                } catch (e) { /* Ignore if not a string */ }
+                // Return 0 to use defaults for variables if not handled
+                return 0;
+            }
+
+            if ((cmd === ENV.GET_LOG_INTERFACE || cmd === 27) && logCallbackPtr) {
+                Module.HEAPU32[data >> 2] = logCallbackPtr;
+                log('  -> Provided LOG_INTERFACE', 'success');
+                return 1;
+            }
+
+            if (cmd === ENV.GET_SYSTEM_DIRECTORY || cmd === ENV.GET_CORE_ASSETS_DIRECTORY || cmd === ENV.GET_SAVE_DIRECTORY) {
+                // Return a dummy path "." for various directory requests
+                // This needs to be static or allocated once
+                if (!env_cb.dotPtr) {
+                    env_cb.dotPtr = allocateString(".");
+                }
+                Module.HEAPU32[data >> 2] = env_cb.dotPtr;
+                log(`  -> Provided dummy directory: '.'`, 'success');
+                return 1;
+            }
+
+            if (cmd === ENV.SET_PIXEL_FORMAT) {
+                const format = Module.HEAP32[data >> 2];
+                log(`  -> Core set pixel format: ${format}`);
+                return 1;
+            }
+
+            if (cmd === ENV.GET_AUDIO_VIDEO_ENABLE) {
+                Module.HEAP32[data >> 2] = 0x7; // All enabled
+                return 1;
+            }
+
+            if (cmd === ENV.SET_MESSAGE) {
+                const msgPtr = Module.HEAPU32[data >> 2];
+                const msg = Module.UTF8ToString(msgPtr);
+                log(`[CORE MSG] ${msg}`);
+                return 1;
+            }
+
+            return 0;
+        }
+
+        let audioCtx = null;
+        let lastFrameTime = 0;
+        let lastAudioTime = 0;
+
+        function video_cb(data, w, h, p) {
+            if (!data) return;
+            const now = Date.now();
+            if (now - lastFrameTime > 2000) {
+                log(`Video CB: ${w}x${h}, pitch: ${p}`, 'info');
+                lastFrameTime = now;
+            }
+
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            if (canvas.width !== w || canvas.height !== h) {
+                canvas.width = w;
+                canvas.height = h;
+            }
+            const imgData = ctx.createImageData(w, h);
+
+            try {
+                // Access 16-bit RGB565 pixels
+                // If HEAPU16 is missing (old build), we use HEAPU8 and shift
+                const heap = Module.HEAPU16 || new Uint16Array(Module.HEAPU8.buffer);
+                const src = heap.subarray(data >> 1, (data >> 1) + (w * h));
+
+                for (let i = 0; i < w * h; i++) {
+                    const pixel = src[i];
+                    // RGB565 to RGB888
+                    const r = (pixel >> 11) << 3;
+                    const g = ((pixel >> 5) & 0x3f) << 2;
+                    const b = (pixel & 0x1f) << 3;
+                    imgData.data[i * 4] = r;
+                    imgData.data[i * 4 + 1] = g;
+                    imgData.data[i * 4 + 2] = b;
+                    imgData.data[i * 4 + 3] = 255;
+                }
+                ctx.putImageData(imgData, 0, 0);
+            } catch (e) {
+                if (now - lastFrameTime > 2000) log(`Video Render Error: ${e.message}`, 'error');
+            }
+        }
+
+        function audio_batch_cb(data, frames) {
+            if (!audioCtx) return frames;
+
+            const now = Date.now();
+            if (now - lastAudioTime > 5000) {
+                log(`Audio Batch: ${frames} frames`, 'info');
+                lastAudioTime = now;
+            }
+
+            // Simple mono sink for testing
+            const samples = new Int16Array(Module.HEAPU8.buffer, data, frames);
+            const buffer = audioCtx.createBuffer(1, frames, 44100);
+            const channel = buffer.getChannelData(0);
+            for (let i = 0; i < frames; i++) {
+                channel[i] = samples[i] / 32768;
+            }
+
+            const source = audioCtx.createBufferSource();
+            source.buffer = buffer;
+            source.connect(audioCtx.destination);
+            source.start();
+
+            return frames;
+        }
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                log('Audio Context initialized!', 'success');
+            }
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function audio_cb(left, right) { }
+        function input_poll_cb() { }
+        function input_state_cb(port, device, index, id) { return 0; }
+
+        let romData = null;
+
+        window.Module = {
+            canvas: document.getElementById('canvas'),
+            onRuntimeInitialized: function () {
+                log('Runtime initialized!', 'success');
+
+                // Create a real logging function the core can call
+                logCallbackPtr = Module.addFunction((level, msgPtr) => {
+                    const msg = Module.UTF8ToString(msgPtr);
+                    log(`[CORE] ${msg}`, level <= 1 ? 'error' : 'info');
+                }, "vii");
+
+                // Standard Libretro setup with concierge style
+                [
+                    ['_retro_set_environment', env_cb, "iii"],
+                    ['_retro_set_video_refresh', video_cb, "viiii"],
+                    ['_retro_set_audio_sample', audio_cb, "vii"],
+                    ['_retro_set_audio_sample_batch', audio_batch_cb, "iii"],
+                    ['_retro_set_input_poll', input_poll_cb, "v"],
+                    ['_retro_set_input_state', input_state_cb, "iiiii"]
+                ].forEach(([name, cb, sig]) => {
+                    log(`Registering ${name}...`);
+                    const ptr = Module.addFunction(cb, sig);
+                    Module[name](ptr);
+                });
+
+                log('Initializing core...');
+                Module._retro_init();
+                log('Core initialized!', 'success');
+
+                document.getElementById('romInput').addEventListener('change', async (e) => {
+                    initAudio(); // Initialize audio on user interaction
+                    const file = e.target.files[0];
+                    if (!file) return;
+
+                    log(`Reading ROM: ${file.name} (${file.size} bytes)...`);
+                    const buffer = await file.arrayBuffer();
+                    const rom = new Uint8Array(buffer);
+
+                    // Allocate memory for data and info struct
+                    const romPtr = Module._malloc(rom.length);
+                    const info = Module._malloc(16);
+                    const pathPtr = allocateString(file.name); // Using our helper function
+
+                    Module.HEAPU8.set(rom, romPtr);
+
+                    // struct retro_game_info { const char* path, const void* data, size_t size, const char* meta }
+                    Module.HEAPU32[info >> 2] = pathPtr;
+                    Module.HEAPU32[(info >> 2) + 1] = romPtr;
+                    Module.HEAPU32[(info >> 2) + 2] = rom.length;
+                    Module.HEAPU32[(info >> 2) + 3] = 0; // meta
+
+                    log(`Calling retro_load_game with data at ${romPtr}...`);
+                    try {
+                        const success = Module._retro_load_game(info);
+                        if (success) {
+                            log('Game loaded successfully!', 'success');
+                            (function loop() {
+                                Module._retro_run();
+                                requestAnimationFrame(loop);
+                            })();
+                        } else {
+                            log('FAILED to load game! (Core returned false)', 'error');
+                        }
+                    } catch (err) {
+                        log(`CRASH during execution: ${err.message}`, 'error');
+                    }
+                });
+
+                log('Ready. Select a .nes file.', 'info');
+            }
+        };
+    </script>
+    <script src="src/core/nes.js"></script>
+</body>
+
+</html>
