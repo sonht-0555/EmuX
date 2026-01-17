@@ -55,6 +55,7 @@ jobs:
           "FS",
           "HEAPF64",
           "HEAPU8",
+          "HEAP16",
           "HEAPU16",
           "HEAPU32",
           "HEAP32"
