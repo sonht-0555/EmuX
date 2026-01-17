@@ -1,45 +1,42 @@
-name: Build libretro QuickNES WASM
-
+name: Build QuickNES WASM
 on:
-  push:
-    branches: [ main ]
-  pull_request:
+  workflow_dispatch:
 
 jobs:
-  build:
+  build_wasm:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
     - name: Setup Emscripten
       uses: mymindstorm/setup-emsdk@v14
       with:
-        version: latest
-        actions-cache-folder: emsdk-cache
+        version: 3.1.46
+        actions-cache-folder: 'emsdk-cache'
 
-    - name: Clone libretro QuickNES
+    - name: Get QuickNES source
       run: |
-        git clone https://github.com/libretro/QuickNES_Core.git
-        cd QuickNES_Core
-        git submodule update --init --recursive
+        git clone https://github.com/libretro/QuickNES libretro-quicknes
+        cd libretro-quicknes
 
     - name: Build libretro core (emscripten)
       run: |
-        cd QuickNES_Core
-        make \
-          platform=emscripten \
+        cd libretro-quicknes
+        make platform=emscripten \
           CC=emcc \
           CXX=em++ \
           AR=emar \
-          RANLIB=emranlib \
-          STRIP=llvm-strip
+          # QuickNES Makefile might force .bc extension, which is actually an archive in static build
 
     - name: Link WASM + JS
       run: |
-        cd QuickNES_Core
-        mv quicknes_libretro_emscripten.bc libquicknes.a
+        cd libretro-quicknes
+        ls -lh
+
+        # Rename user output to .a if it exists as .bc
+        if [ -f quicknes_libretro_emscripten.bc ]; then
+          mv quicknes_libretro_emscripten.bc libquicknes.a
+        fi
 
         emcc \
         -O3 \
@@ -47,6 +44,7 @@ jobs:
         -s LEGACY_RUNTIME=1 \
         -s ALLOW_MEMORY_GROWTH=1 \
         -s ALLOW_TABLE_GROWTH=1 \
+        -s EMULATE_FUNCTION_POINTER_CASTS=1 \
         -s ENVIRONMENT=web \
         -s USE_ZLIB=1 \
         -s EXPORTED_RUNTIME_METHODS='[
@@ -85,5 +83,5 @@ jobs:
       with:
         name: quicknes-wasm
         path: |
-          QuickNES_Core/quicknes.js
-          QuickNES_Core/quicknes.wasm
+          libretro-quicknes/quicknes.js
+          libretro-quicknes/quicknes.wasm

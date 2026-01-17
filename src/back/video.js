@@ -11,8 +11,8 @@ function initWebGL(width, height) {
   gl.linkProgram(glProgram); gl.useProgram(glProgram);
   glBuffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, glBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,1,1]), gl.STATIC_DRAW);
-  glLocations = {attribute: gl.getAttribLocation(glProgram, 'a'), texture: gl.getUniformLocation(glProgram, 't')};
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+  glLocations = { attribute: gl.getAttribLocation(glProgram, 'a'), texture: gl.getUniformLocation(glProgram, 't') };
   gl.enableVertexAttribArray(glLocations.attribute);
   gl.vertexAttribPointer(glLocations.attribute, 2, gl.FLOAT, false, 0, 0);
   glTexture = gl.createTexture();

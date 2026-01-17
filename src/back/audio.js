@@ -1,13 +1,13 @@
 // ===== LibAudio =====
 function audio_batch_cb(ptr, frames) { return writeAudio(ptr, frames) };
-function audio_cb(l, r) {};
+function audio_cb(l, r) { };
 // ===== Audio =====
 var audioCtx, processor, fifoL = new Int16Array(8192), fifoR = new Int16Array(8192), fifoHead = 0, fifoCnt = 0;
 async function initAudio(cfg) {
   if (audioCtx) { audioCtx.resume(); return; }
   audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000, latencyHint: 'interactive' });
   processor = audioCtx.createScriptProcessor(1024, 0, 2);
-  processor.onaudioprocess = function(e) {
+  processor.onaudioprocess = function (e) {
     var L = e.outputBuffer.getChannelData(0), R = e.outputBuffer.getChannelData(1);
     if (!isRunning) { L.fill(0); R.fill(0); return; }
     var r = cfg.ratio;
