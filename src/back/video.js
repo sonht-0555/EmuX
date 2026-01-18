@@ -27,28 +27,17 @@ function initWebGL(width, height) {
 }
 function video_cb(pointer, width, height, pitch) {
   if (!gl) initWebGL(width, height);
+  const src = new Uint16Array(Module.HEAPU8.buffer, pointer, (pitch >> 1) * height);
+  const stride = pitch >> 1;
   let di = 0;
-  if (pitch === width * 4) {
-    const src = new Uint32Array(Module.HEAPU8.buffer, pointer, width * height);
-    for (let i = 0; i < src.length; i++) {
-      const c = src[i];
-      rgbaBuffer[di++] = (c >> 16) & 0xFF;
-      rgbaBuffer[di++] = (c >> 8) & 0xFF;
-      rgbaBuffer[di++] = c & 0xFF;
+  for (let y = 0; y < height; y++) {
+    let si = y * stride;
+    for (let x = 0; x < width; x++, si++) {
+      const c = src[si];
+      rgbaBuffer[di++] = r5to8[c >> 11];
+      rgbaBuffer[di++] = g6to8[(c >> 5) & 0x3F];
+      rgbaBuffer[di++] = b5to8[c & 0x1F];
       rgbaBuffer[di++] = 255;
-    }
-  } else {
-    const src = new Uint16Array(Module.HEAPU8.buffer, pointer, (pitch / 2) * height);
-    const stride = pitch / 2;
-    for (let y = 0; y < height; y++) {
-      let si = y * stride;
-      for (let x = 0; x < width; x++, si++) {
-        const c = src[si];
-        rgbaBuffer[di++] = r5to8[c >> 11];
-        rgbaBuffer[di++] = g6to8[(c >> 5) & 0x3F];
-        rgbaBuffer[di++] = b5to8[c & 0x1F];
-        rgbaBuffer[di++] = 255;
-      }
     }
   }
   gl.bindTexture(gl.TEXTURE_2D, glTexture);

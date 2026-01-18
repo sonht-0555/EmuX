@@ -1,6 +1,8 @@
 function env_cb(cmd, data) {
   switch (cmd) {
-    case 1: case 10: return 1; // Pixel Format
+    case 1: case 10: // SET_PIXEL_FORMAT
+      if (data) Module.pixelFormat = Module.HEAP32[data >> 2];
+      return 1;
     case 11:         // SET_INPUT_DESCRIPTORS
     case 16:         // GET_INPUT_BITMASKS
       return 1;
@@ -23,7 +25,7 @@ const CORE_CONFIG = {
   gba: { ratio: 65536 / 48000, width: 240, height: 160, ext: '.gba', script: './src/core/mgba.js' },
   gbc: { ratio: 131072 / 48000, width: 160, height: 144, ext: '.gb,.gbc', script: './src/core/mgba.js' },
   snes: { ratio: 32040 / 48000, width: 256, height: 224, ext: '.smc,.sfc', script: './src/core/snes9x.js' },
-  nes: { ratio: 44100 / 48000, width: 256, height: 240, ext: '.nes', script: './src/core/nestopia.js' },
+  nes: { ratio: 44100 / 48000, width: 256, height: 240, ext: '.nes', script: './src/core/nes.js' },
   genesis: { ratio: 48000 / 48000, width: 320, height: 224, ext: '.md,.gen', script: './src/core/genesis.js' },
   neogeo: { ratio: 44100 / 48000, width: 160, height: 152, ext: '.ngc,.ngp', script: './src/core/neogeo.js' }
 };
