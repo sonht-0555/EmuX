@@ -27,21 +27,30 @@ const CORE_CONFIG = {
   snes: { ratio: 32040 / 48000, width: 256, height: 224, ext: '.smc,.sfc', script: './src/core/snes9x.js' },
   nes: { ratio: 44100 / 48000, width: 256, height: 240, ext: '.nes', script: './src/core/nes.js' },
   genesis: { ratio: 48000 / 48000, width: 320, height: 224, ext: '.md,.gen', script: './src/core/genesis.js' },
-  neogeo: { ratio: 44100 / 48000, width: 160, height: 152, ext: '.ngc,.ngp', script: './src/core/neogeo.js' }
+  neogeo: { ratio: 44100 / 48000, width: 160, height: 152, ext: '.ngc,.ngp', script: './src/core/neogeo.js' },
+  fbneo: { ratio: 44100 / 48000, width: 320, height: 224, ext: '.zip,.neo', script: './src/core/fbneo.js' },
+  mame2003: { ratio: 44100 / 48000, width: 320, height: 240, ext: '.zip', script: './src/core/mame2003_libretro.js' }
 };
 var isRunning = false;
 async function initCore(file) {
   let ext = file.name.split('.').pop().toLowerCase(), rom, cfg;
-  if (ext === 'zip') {
+
+  // Decide core first to handle arcade ZIPs correctly
+  cfg = Object.values(CORE_CONFIG).find(c => c.ext.includes(ext));
+  if (!cfg) return;
+
+  if (ext === 'zip' && !['mame2003', 'fbneo'].includes(cfg.script.split('/').pop().split('.')[0])) {
     const zip = await JSZip.loadAsync(await file.arrayBuffer());
-    const n = Object.keys(zip.files).find(n => /\.(gba|gbc|gb|smc|sfc)$/i.test(n));
+    const n = Object.keys(zip.files).find(n => /\.(gba|gbc|gb|smc|sfc|nes|gen|md)$/i.test(n));
     if (!n) return;
     ext = n.split('.').pop().toLowerCase();
     rom = await zip.files[n].async('uint8array');
+    // Re-check config based on the internal extension
+    cfg = Object.values(CORE_CONFIG).find(c => c.ext.includes(ext));
   } else {
     rom = new Uint8Array(await file.arrayBuffer());
   }
-  cfg = Object.values(CORE_CONFIG).find(c => c.ext.includes(ext));
+
   if (!cfg) return;
   return new Promise((resolve, reject) => {
     const canvas = document.getElementById("canvas");
