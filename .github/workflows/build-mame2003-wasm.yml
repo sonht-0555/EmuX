@@ -24,35 +24,26 @@ jobs:
     - name: Clone MAME 2003
       run: git clone --depth 1 https://github.com/libretro/mame2003-libretro.git
 
-    - name: Build MAME 2003
+    - name: Prepare Dependencies
       run: |
         cd mame2003-libretro
-        # Use CC/CXX overrides to ensure emscripten is used
-        emmake make -f Makefile platform=emscripten -j$(nproc)
-        
-        # Surgically compile missing libretro-common files if they weren't included
-        # Some cores exclude these on emscripten platform but they are needed for standalone WASM
-        COMMON_DIR=$(find . -name "libretro-common" -type d | head -n 1)
-        if [ -z "$COMMON_DIR" ]; then
-           git clone --depth 1 https://github.com/libretro/libretro-common.git libretro-common
-           COMMON_DIR="libretro-common"
+        # Ensure libretro-common exists (either as submodule or clone)
+        if [ ! -d "src/libretro/libretro-common" ]; then
+          git clone --depth 1 https://github.com/libretro/libretro-common.git src/libretro/libretro-common
         fi
-        
-        echo "Using libretro-common at: $COMMON_DIR"
-        INCLUDE_FLAGS="-I. -Isrc -Isrc/libretro -I$COMMON_DIR/include -DHAVE_VFS -DHAVE_STDINT_H -DHAVE_STDLIB_H"
-        
-        emcc -O3 $INCLUDE_FLAGS -c $COMMON_DIR/crypto/md5.c -o md5.fix.o || true
-        emcc -O3 $INCLUDE_FLAGS -c $COMMON_DIR/file/file_path.c -o file_path.fix.o || true
-        emcc -O3 $INCLUDE_FLAGS -c $COMMON_DIR/streams/interface_stream.c -o interface_stream.fix.o || true
-        emcc -O3 $INCLUDE_FLAGS -c $COMMON_DIR/streams/file_stream.c -o file_stream.fix.o || true
-        emcc -O3 $INCLUDE_FLAGS -c $COMMON_DIR/vfs/vfs_implementation.c -o vfs_implementation.fix.o || true
+
+    - name: Build MAME 2003 (DEBUG MODE)
+      run: |
+        cd mame2003-libretro
+        # Use DEBUG=1 and append flags to avoid breaking internal include paths
+        emmake make -f Makefile platform=emscripten -j$(nproc) DEBUG=1 \
+          EXTRA_CFLAGS="-O0 -g2 -fsanitize=undefined -fno-common" \
+          EXTRA_LDFLAGS="-O0 -g2 -fsanitize=undefined -s ASSERTIONS=2 -s DEMANGLE_SUPPORT=1 -s ALIASING_FUNCTION_POINTERS=0"
       
     - name: Link WASM + JS (DEBUG MODE)
       run: |
         cd mame2003-libretro
-        
-        # Link ALL found object files + the newly compiled fixes
-        # DEBUG FLAGS: -O0 -g for debug info, ASSERTIONS=2 for runtime checks
+        # Link using emcc directly to ensure all WASM/JS specific flags are applied
         emcc \
         -O0 -g \
         $(find . -name "*.o" ! -name ".*") \
