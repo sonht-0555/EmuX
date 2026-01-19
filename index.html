@@ -2,17 +2,41 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-fullscreen">
   <title>NES Emulator</title>
+  <style>
+    body { 
+      margin: 0; 
+      padding: 10px;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    canvas {
+      image-rendering: pixelated;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: crisp-edges;
+      /* Hardware acceleration */
+      transform: translateZ(0);
+      -webkit-transform: translateZ(0);
+      /* Tối ưu compositing */
+      will-change: transform;
+    }
+    #gameContainer {
+      /* Isolate layer để tránh repaints */
+      isolation: isolate;
+      contain: layout style paint;
+    }
+  </style>
 </head>
 <body>
-  <h1>NES Emulator với Nostalgist.js</h1>
+  <h1>NES Emulator - Mobile Optimized</h1>
   
   <input type="file" id="romFile" accept=".nes">
   <button id="loadBtn">Tải Game</button>
   
   <div id="gameContainer"></div>
-  
   <div id="status"></div>
 
   <script type="module">
@@ -22,29 +46,27 @@
     const loadBtn = document.getElementById('loadBtn');
     const gameContainer = document.getElementById('gameContainer');
     const status = document.getElementById('status');
-
+    
     let nostalgist = null;
-    let audioUnlocked = false;
 
-    async function unlockAudio() {
-      if (audioUnlocked) return;
-      try {
-        let ctx = window._emuxAudioCtx;
-        if (!ctx) {
-          ctx = new (window.AudioContext || window.webkitAudioContext)();
-          window._emuxAudioCtx = ctx;
-        }
-        if (ctx.state === 'suspended') {
-          await ctx.resume();
-        }
-        audioUnlocked = true;
-      } catch (e) {
-        // Không làm gì nếu lỗi
+    // Mobile optimization config
+    const mobileConfig = {
+      element: gameContainer,
+      size: { width: 512, height: 480 },
+      
+      // Bật hardware acceleration
+      respondToGlobalEvents: false, // Chỉ handle events trên canvas
+      
+      // Tối ưu rendering
+      style: {
+        imageRendering: 'pixelated',
+        // Force GPU layer
+        transform: 'translateZ(0)',
+        willChange: 'transform'
       }
-    }
+    };
 
     loadBtn.addEventListener('click', async () => {
-      await unlockAudio();
       const file = romFile.files[0];
       
       if (!file) {
@@ -60,23 +82,39 @@
       try {
         status.textContent = 'Đang tải game...';
         
-        // Dọn dẹp instance cũ nếu có
         if (nostalgist) {
           nostalgist.exit();
           gameContainer.innerHTML = '';
         }
 
-        // Đọc file
         const arrayBuffer = await file.arrayBuffer();
         const romData = new Uint8Array(arrayBuffer);
 
-        // Khởi tạo Nostalgist
-        nostalgist = await Nostalgist.nes(romData, {
-          element: gameContainer,
-          size: { width: 512, height: 480 }
-        });
+        // Request high performance mode (nếu browser hỗ trợ)
+        if ('requestIdleCallback' in window) {
+          // Ngăn browser throttle
+          const keepAlive = () => {
+            requestIdleCallback(keepAlive, { timeout: 1000 });
+          };
+          keepAlive();
+        }
 
-        status.textContent = `Game "${file.name}" đã tải thành công! Dùng phím mũi tên + Z/X để chơi`;
+        nostalgist = await Nostalgist.nes(romData, mobileConfig);
+
+        // Force canvas use hardware acceleration
+        const canvas = gameContainer.querySelector('canvas');
+        if (canvas) {
+          canvas.style.transform = 'translateZ(0)';
+          canvas.style.willChange = 'transform';
+          
+          // Prevent context loss
+          canvas.addEventListener('webglcontextlost', (e) => {
+            e.preventDefault();
+            console.warn('WebGL context lost, attempting restore...');
+          });
+        }
+
+        status.textContent = `"${file.name}" đã tải! Dùng phím mũi tên + Z/X`;
         
       } catch (error) {
         status.textContent = 'Lỗi: ' + error.message;
@@ -84,12 +122,72 @@
       }
     });
 
-    // Dọn dẹp khi đóng trang
-    window.addEventListener('beforeunload', () => {
+    // Giữ screen wake lock (ngăn màn hình tắt)
+    let wakeLock = null;
+    const requestWakeLock = async () => {
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLock = await navigator.wakeLock.request('screen');
+          console.log('Wake Lock active');
+        }
+      } catch (err) {
+        console.log('Wake Lock not supported:', err);
+      }
+    };
+
+    // Auto pause khi tab không active
+    document.addEventListener('visibilitychange', async () => {
+      if (!nostalgist) return;
+      
+      if (document.hidden) {
+        nostalgist.pause();
+        if (wakeLock) {
+          await wakeLock.release();
+          wakeLock = null;
+        }
+      } else {
+        nostalgist.resume();
+        await requestWakeLock();
+      }
+    });
+
+    // Request wake lock khi load game
+    loadBtn.addEventListener('click', requestWakeLock);
+
+    // Prevent iOS scroll bounce
+    let startY = 0;
+    document.addEventListener('touchstart', (e) => {
+      startY = e.touches[0].pageY;
+    }, { passive: false });
+
+    document.addEventListener('touchmove', (e) => {
+      const deltaY = e.touches[0].pageY - startY;
+      const isScrollingUp = deltaY > 0;
+      const isScrollingDown = deltaY < 0;
+      
+      if ((isScrollingUp && window.scrollY === 0) || 
+          (isScrollingDown && window.scrollY >= document.body.scrollHeight - window.innerHeight)) {
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    // Cleanup
+    window.addEventListener('beforeunload', async () => {
       if (nostalgist) {
         nostalgist.exit();
       }
+      if (wakeLock) {
+        await wakeLock.release();
+      }
     });
+
+    // Performance monitoring (optional)
+    if (typeof performance !== 'undefined' && performance.memory) {
+      setInterval(() => {
+        const used = (performance.memory.usedJSHeapSize / 1048576).toFixed(2);
+        console.log(`Memory: ${used} MB`);
+      }, 5000);
+    }
   </script>
 </body>
 </html>
