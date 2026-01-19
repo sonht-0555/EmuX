@@ -204,9 +204,10 @@
                         Module.HEAP32[(gameInfoPtr >> 2) + 2] = romData.length;   // size
                         Module.HEAP32[(gameInfoPtr >> 2) + 3] = 0;                // meta (NULL)
 
-                        // Register callbacks (critical!)
-                        // Function signature strings: 'v'=void, 'i'=int, etc.
-                        // These match what Emscripten's `addFunction` expects.
+                        // Register callbacks
+                        // Note: Some cores are picky about return types. 
+                        // If 'iii' fails, sometimes 'viii' (returning void) is expected by some emscripten versions 
+                        // even if the C side says bool.
                         const callbacks = [
                             ['retro_set_environment', env_cb, "iii"],
                             ['retro_set_video_refresh', video_cb, "viiii"],
@@ -216,12 +217,25 @@
                             ['retro_set_input_state', input_state_cb, "iiiii"]
                         ];
 
+                        console.log("Registering callbacks...");
                         callbacks.forEach(([name, cb, sig]) => {
-                            const fn = Module['_' + name]; // e.g. _retro_set_environment
+                            const fn = Module['_' + name];
                             if (fn) {
-                                // addFunction returns a function pointer index
-                                const fp = Module.addFunction(cb, sig);
-                                fn(fp);
+                                try {
+                                    const fp = Module.addFunction(cb, sig);
+                                    console.log(`Calling ${name} with fp: ${fp} (sig: ${sig})`);
+                                    fn(fp);
+                                } catch (e) {
+                                    console.error(`Failed to register ${name}:`, e);
+                                    // Try fallback signature if common mismatch
+                                    if (sig === "iii") {
+                                        console.log(`Retrying ${name} with 'viii' (void return)...`);
+                                        const fp = Module.addFunction(cb, "viii");
+                                        fn(fp);
+                                    } else {
+                                        throw e;
+                                    }
+                                }
                             } else {
                                 console.warn(`Function ${name} not found in Module exports`);
                             }

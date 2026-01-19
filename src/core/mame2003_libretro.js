@@ -1124,6 +1124,12 @@ var warnOnce = text => {
  }
 };
 
+/** @type {function(...*):?} */ function _GetRegister() {
+ abort("missing function: GetRegister");
+}
+
+_GetRegister.stub = true;
+
 /** @type {function(...*):?} */ function _MD5_Final() {
  abort("missing function: MD5_Final");
 }
@@ -1141,6 +1147,12 @@ _MD5_Init.stub = true;
 }
 
 _MD5_Update.stub = true;
+
+/** @type {function(...*):?} */ function _SetRegister() {
+ abort("missing function: SetRegister");
+}
+
+_SetRegister.stub = true;
 
 var ___assert_fail = (condition, filename, line, func) => {
  abort(`Assertion failed: ${UTF8ToString(condition)}, at: ` + [ filename ? UTF8ToString(filename) : "unknown filename", line, func ? UTF8ToString(func) : "unknown function" ]);
@@ -3863,6 +3875,30 @@ var _abort = () => {
  abort("native code called abort()");
 };
 
+/** @type {function(...*):?} */ function _cpu_read32() {
+ abort("missing function: cpu_read32");
+}
+
+_cpu_read32.stub = true;
+
+/** @type {function(...*):?} */ function _cpu_read8() {
+ abort("missing function: cpu_read8");
+}
+
+_cpu_read8.stub = true;
+
+/** @type {function(...*):?} */ function _cpu_write32() {
+ abort("missing function: cpu_write32");
+}
+
+_cpu_write32.stub = true;
+
+/** @type {function(...*):?} */ function _cpu_write8() {
+ abort("missing function: cpu_write8");
+}
+
+_cpu_write8.stub = true;
+
 var _emscripten_date_now = () => Date.now();
 
 var _emscripten_memcpy_js = (dest, src, num) => HEAPU8.copyWithin(dest, src, src + num);
@@ -4019,35 +4055,71 @@ function _fd_write(fd, iov, iovcnt, pnum) {
  }
 }
 
-/** @type {function(...*):?} */ function _memstream_close() {
- abort("missing function: memstream_close");
+/** @type {function(...*):?} */ function _filestream_exists() {
+ abort("missing function: filestream_exists");
 }
 
-_memstream_close.stub = true;
+_filestream_exists.stub = true;
 
-/** @type {function(...*):?} */ function _memstream_gets() {
- abort("missing function: memstream_gets");
+/** @type {function(...*):?} */ function _filestream_vfs_init() {
+ abort("missing function: filestream_vfs_init");
 }
 
-_memstream_gets.stub = true;
+_filestream_vfs_init.stub = true;
 
-/** @type {function(...*):?} */ function _memstream_read() {
- abort("missing function: memstream_read");
+/** @type {function(...*):?} */ function _intfstream_close() {
+ abort("missing function: intfstream_close");
 }
 
-_memstream_read.stub = true;
+_intfstream_close.stub = true;
 
-/** @type {function(...*):?} */ function _memstream_rewind() {
- abort("missing function: memstream_rewind");
+/** @type {function(...*):?} */ function _intfstream_gets() {
+ abort("missing function: intfstream_gets");
 }
 
-_memstream_rewind.stub = true;
+_intfstream_gets.stub = true;
 
-/** @type {function(...*):?} */ function _memstream_write() {
- abort("missing function: memstream_write");
+/** @type {function(...*):?} */ function _intfstream_open_file() {
+ abort("missing function: intfstream_open_file");
 }
 
-_memstream_write.stub = true;
+_intfstream_open_file.stub = true;
+
+/** @type {function(...*):?} */ function _intfstream_open_rzip_file() {
+ abort("missing function: intfstream_open_rzip_file");
+}
+
+_intfstream_open_rzip_file.stub = true;
+
+/** @type {function(...*):?} */ function _intfstream_read() {
+ abort("missing function: intfstream_read");
+}
+
+_intfstream_read.stub = true;
+
+/** @type {function(...*):?} */ function _intfstream_rewind() {
+ abort("missing function: intfstream_rewind");
+}
+
+_intfstream_rewind.stub = true;
+
+/** @type {function(...*):?} */ function _intfstream_write() {
+ abort("missing function: intfstream_write");
+}
+
+_intfstream_write.stub = true;
+
+/** @type {function(...*):?} */ function _path_basedir() {
+ abort("missing function: path_basedir");
+}
+
+_path_basedir.stub = true;
+
+/** @type {function(...*):?} */ function _path_basename() {
+ abort("missing function: path_basename");
+}
+
+_path_basename.stub = true;
 
 /** @type {function(...*):?} */ function _path_is_directory() {
  abort("missing function: path_is_directory");
@@ -4067,17 +4139,11 @@ _path_is_valid.stub = true;
 
 _path_mkdir.stub = true;
 
-/** @type {function(...*):?} */ function _string_to_lower() {
- abort("missing function: string_to_lower");
+/** @type {function(...*):?} */ function _path_remove_extension() {
+ abort("missing function: path_remove_extension");
 }
 
-_string_to_lower.stub = true;
-
-/** @type {function(...*):?} */ function _strlcpy_retro__() {
- abort("missing function: strlcpy_retro__");
-}
-
-_strlcpy_retro__.stub = true;
+_path_remove_extension.stub = true;
 
 var uleb128Encode = (n, target) => {
  assert(n < 16384);
@@ -4506,9 +4572,11 @@ function checkIncomingModuleAPI() {
 }
 
 var wasmImports = {
+ /** @export */ GetRegister: _GetRegister,
  /** @export */ MD5_Final: _MD5_Final,
  /** @export */ MD5_Init: _MD5_Init,
  /** @export */ MD5_Update: _MD5_Update,
+ /** @export */ SetRegister: _SetRegister,
  /** @export */ __assert_fail: ___assert_fail,
  /** @export */ __handle_stack_overflow: ___handle_stack_overflow,
  /** @export */ __syscall_fcntl64: ___syscall_fcntl64,
@@ -4520,6 +4588,10 @@ var wasmImports = {
  /** @export */ _tzset_js: __tzset_js,
  /** @export */ abort: _abort,
  /** @export */ alignfault: alignfault,
+ /** @export */ cpu_read32: _cpu_read32,
+ /** @export */ cpu_read8: _cpu_read8,
+ /** @export */ cpu_write32: _cpu_write32,
+ /** @export */ cpu_write8: _cpu_write8,
  /** @export */ emscripten_date_now: _emscripten_date_now,
  /** @export */ emscripten_memcpy_js: _emscripten_memcpy_js,
  /** @export */ emscripten_resize_heap: _emscripten_resize_heap,
@@ -4528,17 +4600,22 @@ var wasmImports = {
  /** @export */ fd_read: _fd_read,
  /** @export */ fd_seek: _fd_seek,
  /** @export */ fd_write: _fd_write,
- /** @export */ memstream_close: _memstream_close,
- /** @export */ memstream_gets: _memstream_gets,
- /** @export */ memstream_read: _memstream_read,
- /** @export */ memstream_rewind: _memstream_rewind,
- /** @export */ memstream_write: _memstream_write,
+ /** @export */ filestream_exists: _filestream_exists,
+ /** @export */ filestream_vfs_init: _filestream_vfs_init,
+ /** @export */ intfstream_close: _intfstream_close,
+ /** @export */ intfstream_gets: _intfstream_gets,
+ /** @export */ intfstream_open_file: _intfstream_open_file,
+ /** @export */ intfstream_open_rzip_file: _intfstream_open_rzip_file,
+ /** @export */ intfstream_read: _intfstream_read,
+ /** @export */ intfstream_rewind: _intfstream_rewind,
+ /** @export */ intfstream_write: _intfstream_write,
+ /** @export */ path_basedir: _path_basedir,
+ /** @export */ path_basename: _path_basename,
  /** @export */ path_is_directory: _path_is_directory,
  /** @export */ path_is_valid: _path_is_valid,
  /** @export */ path_mkdir: _path_mkdir,
- /** @export */ segfault: segfault,
- /** @export */ string_to_lower: _string_to_lower,
- /** @export */ strlcpy_retro__: _strlcpy_retro__
+ /** @export */ path_remove_extension: _path_remove_extension,
+ /** @export */ segfault: segfault
 };
 
 var wasmExports = createWasm();
@@ -4550,8 +4627,6 @@ var _malloc = Module["_malloc"] = createExportWrapper("malloc");
 var _free = Module["_free"] = createExportWrapper("free");
 
 var _fflush = Module["_fflush"] = createExportWrapper("fflush");
-
-var ___errno_location = createExportWrapper("__errno_location");
 
 var _retro_init = Module["_retro_init"] = createExportWrapper("retro_init");
 
@@ -4576,6 +4651,8 @@ var _retro_set_audio_sample_batch = Module["_retro_set_audio_sample_batch"] = cr
 var _retro_set_input_poll = Module["_retro_set_input_poll"] = createExportWrapper("retro_set_input_poll");
 
 var _retro_set_input_state = Module["_retro_set_input_state"] = createExportWrapper("retro_set_input_state");
+
+var ___errno_location = createExportWrapper("__errno_location");
 
 var _emscripten_get_sbrk_ptr = createExportWrapper("emscripten_get_sbrk_ptr");
 
@@ -4627,9 +4704,9 @@ var dynCall_viiid = Module["dynCall_viiid"] = createExportWrapper("dynCall_viiid
 
 var dynCall_iiiii = Module["dynCall_iiiii"] = createExportWrapper("dynCall_iiiii");
 
-var dynCall_viiiii = Module["dynCall_viiiii"] = createExportWrapper("dynCall_viiiii");
-
 var dynCall_viiiiiiii = Module["dynCall_viiiiiiii"] = createExportWrapper("dynCall_viiiiiiii");
+
+var dynCall_viiiii = Module["dynCall_viiiii"] = createExportWrapper("dynCall_viiiii");
 
 var dynCall_viiiiiii = Module["dynCall_viiiiiii"] = createExportWrapper("dynCall_viiiiiii");
 

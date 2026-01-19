@@ -35,17 +35,17 @@ jobs:
     - name: Build MAME 2003 (DEBUG MODE)
       run: |
         cd mame2003-libretro
-        # Use DEBUG=1 and append flags to avoid breaking internal include paths
+        # Use DEBUG=1 and -O1 for better stability in debug mode than -O0
         emmake make -f Makefile platform=emscripten -j$(nproc) DEBUG=1 \
-          EXTRA_CFLAGS="-O0 -g2 -fsanitize=undefined -fno-common" \
-          EXTRA_LDFLAGS="-O0 -g2 -fsanitize=undefined -s ASSERTIONS=2 -s DEMANGLE_SUPPORT=1 -s ALIASING_FUNCTION_POINTERS=0"
-      
+          EXTRA_CFLAGS="-O1 -g2 -fno-common" \
+          EXTRA_LDFLAGS="-O1 -g2 -s ASSERTIONS=2 -s DEMANGLE_SUPPORT=1"
+
     - name: Link WASM + JS (DEBUG MODE)
       run: |
         cd mame2003-libretro
-        # Link using emcc directly to ensure all WASM/JS specific flags are applied
+        # Link using matching flags and include necessary emscripten settings
         emcc \
-        -O0 -g \
+        -O1 -g2 \
         $(find . -name "*.o" ! -name ".*") \
         -s WASM=1 \
         -s USE_ZLIB=1 \
@@ -59,7 +59,6 @@ jobs:
         -s EMULATE_FUNCTION_POINTER_CASTS=1 \
         -s ASSERTIONS=2 \
         -s DEMANGLE_SUPPORT=1 \
-        -s SAFE_HEAP=1 \
         -s STACK_OVERFLOW_CHECK=2 \
         -s EXPORTED_RUNTIME_METHODS='["addFunction","removeFunction","ccall","cwrap","FS","HEAPU8","HEAPU16","HEAP16","HEAP32","HEAPU32","UTF8ToString","getValue","setValue","stringToUTF8"]' \
         -s EXPORTED_FUNCTIONS='["_retro_init","_retro_deinit","_retro_run","_retro_load_game","_retro_unload_game","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_retro_get_system_av_info","_malloc","_free"]' \
