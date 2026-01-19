@@ -1,0 +1,137 @@
+name: Build FBNeo WASM
+
+on:
+  push:
+    paths:
+      - '.github/workflows/build-fbneo-wasm.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Emscripten 3.1.74
+      uses: mymindstorm/setup-emsdk@v14
+      with:
+        version: 3.1.74
+        actions-cache-folder: 'emsdk-cache-fbneo'
+
+    - name: Clone FBNeo and libretro-common
+      run: |
+        git clone --depth 1 https://github.com/libretro/FBNeo.git
+        git clone --depth 1 https://github.com/libretro/libretro-common.git
+
+    - name: Build FBNeo
+      run: |
+        cd FBNeo/src/burner/libretro
+        
+        # Compile libretro-common utilities that FBNeo needs
+        echo "Compiling libretro-common utilities..."
+        LIBRETRO_COMMON=../../../../libretro-common
+        
+        # Compile string utilities
+        emcc -c $LIBRETRO_COMMON/string/stdstring.c -o stdstring.o -I$LIBRETRO_COMMON/include
+        emcc -c $LIBRETRO_COMMON/file/file_path.c -o file_path.o -I$LIBRETRO_COMMON/include
+        emcc -c $LIBRETRO_COMMON/compat/compat_strl.c -o compat_strl.o -I$LIBRETRO_COMMON/include
+        
+        # Build core
+        echo "Building FBNeo core..."
+        emmake make -f Makefile platform=emscripten -j$(nproc)
+        
+        # Find the output file
+        CORE_FILE=""
+        for f in fbneo_libretro_emscripten.bc fbneo_libretro_emscripten.a; do
+          if [ -f "$f" ]; then
+            CORE_FILE="$f"
+            break
+          fi
+        done
+        
+        if [ -z "$CORE_FILE" ]; then
+          echo "ERROR: No output file found"
+          ls -la fbneo_libretro_emscripten.* || true
+          exit 1
+        fi
+        
+        # Check if it's an archive
+        FILE_TYPE=$(file "$CORE_FILE")
+        echo "Found: $CORE_FILE"
+        echo "Type: $FILE_TYPE"
+        
+        # Link to WASM
+        echo "Linking to WASM..."
+        
+        # If it's an archive, extract and link all object files
+        if echo "$FILE_TYPE" | grep -q "archive"; then
+          echo "Detected archive file, extracting objects..."
+          mkdir -p fbneo_objects
+          cd fbneo_objects
+          emar x "../$CORE_FILE"
+          echo "Extracted $(ls *.o | wc -l) object files"
+          
+          # Link all object files including libretro-common utilities
+          emcc \
+          *.o ../stdstring.o ../file_path.o ../compat_strl.o \
+          -O3 \
+          -s WASM=1 \
+          -s USE_ZLIB=1 \
+          -s ALLOW_MEMORY_GROWTH=1 \
+          -s INITIAL_MEMORY=268435456 \
+          -s ENVIRONMENT=web \
+          -s MODULARIZE=0 \
+          -s EXPORT_NAME="Module" \
+          -s FORCE_FILESYSTEM=1 \
+          -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","ccall","cwrap"]' \
+          -s EXPORTED_FUNCTIONS='["_retro_init","_retro_deinit","_retro_run","_retro_load_game","_retro_unload_game","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_retro_get_system_av_info","_malloc","_free","_string_to_lower"]' \
+          -s ALLOW_TABLE_GROWTH=1 \
+          -s ERROR_ON_UNDEFINED_SYMBOLS=0 \
+          -s ASSERTIONS=1 \
+          -o ../../../../../src/core/fbneo_libretro.js
+          
+          cd ..
+        else
+          echo "Detected bitcode file"
+          emcc \
+          "$CORE_FILE" \
+          -O3 \
+          -s WASM=1 \
+          -s USE_ZLIB=1 \
+          -s ALLOW_MEMORY_GROWTH=1 \
+          -s INITIAL_MEMORY=268435456 \
+          -s ENVIRONMENT=web \
+          -s MODULARIZE=0 \
+          -s EXPORT_NAME="Module" \
+          -s FORCE_FILESYSTEM=1 \
+          -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","ccall","cwrap"]' \
+          -s EXPORTED_FUNCTIONS='["_retro_init","_retro_deinit","_retro_run","_retro_load_game","_retro_unload_game","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_retro_get_system_av_info","_malloc","_free","_string_to_lower"]' \
+          -s ALLOW_TABLE_GROWTH=1 \
+          -s ERROR_ON_UNDEFINED_SYMBOLS=0 \
+          -s ASSERTIONS=1 \
+          -o ../../../../src/core/fbneo_libretro.js
+        fi
+        
+        # Verify the output
+        echo "=== Build Verification ==="
+        if grep -q "dynCall_iii" ../../../../src/core/fbneo_libretro.js; then
+          echo "✓ SUCCESS: Found dynCall_iii (standard 32-bit ABI)"
+        else
+          echo "✗ FAILURE: dynCall_iii not found"
+          echo "Available dynCall signatures:"
+          grep -o "dynCall_[a-z]*" ../../../../src/core/fbneo_libretro.js | sort | uniq
+          exit 1
+        fi
+        
+        echo "Build completed successfully!"
+        ls -lh ../../../../src/core/fbneo_libretro.*
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: fbneo-wasm
+        path: src/core/fbneo_libretro.*

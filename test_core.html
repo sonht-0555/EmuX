@@ -3,327 +3,156 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MAME2003 WASM Test</title>
+    <title>MAME2003 WASM Debug</title>
     <style>
         body {
             font-family: sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
             background: #222;
             color: #fff;
+            padding: 20px;
         }
 
         canvas {
             border: 2px solid #555;
             background: #000;
-            image-rendering: pixelated;
-            max-width: 100%;
         }
 
-        #controls {
-            margin: 20px;
+        #status {
+            margin: 10px 0;
+            color: #0f0;
+        }
+
+        #log {
+            font-family: monospace;
+            font-size: 12px;
+            background: #000;
             padding: 10px;
-            background: #333;
-            border-radius: 8px;
+            height: 200px;
+            overflow-y: scroll;
+            border: 1px solid #444;
         }
     </style>
 </head>
 
 <body>
-    <h1>MAME2003 Core Test</h1>
-
-    <div id="controls">
-        <label for="romInput">Load ROM (.zip): </label>
-        <input type="file" id="romInput" accept=".zip">
-    </div>
-
-    <canvas id="canvas" width="320" height="240"></canvas>
+    <h1>MAME2003 Debugging</h1>
+    <input type="file" id="romInput" accept=".zip">
     <div id="status">Waiting for ROM...</div>
+    <div id="log"></div>
+    <canvas id="canvas" width="320" height="240"></canvas>
 
     <script>
-        const CORE_PATH = 'src/core/mame2003_libretro.js';
-        let isRunning = false;
+        const logger = (msg, color = '#fff') => {
+            const l = document.getElementById('log');
+            const d = document.createElement('div');
+            d.style.color = color;
+            d.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            l.appendChild(d);
+            l.scrollTop = l.scrollHeight;
+            console.log(msg);
+        };
 
-        // --- LIBRETRO CALLBACKS ---
-
-        // Environment callback: handles core requests like "set pixel format" (10)
-        // Environment callback: handles core requests like "set pixel format" (10)
         function env_cb(cmd, data) {
-            console.log('env_cb called:', cmd);
+            logger(`env_cb called: cmd=${cmd} (0x${cmd.toString(16)}), data=${data} (0x${(data || 0).toString(16)})`);
+            // Some cores might pass data as a 64-bit int or shifted if there's an ABI mismatch
+            if (cmd > 0xFFFF) {
+                logger(`  !! Extreme cmd value detected. This strongly suggests an ABI mismatch (e.g. 32-bit vs 64-bit or calling convention error).`, "#f00");
+            }
             switch (cmd) {
-                case 1:  // SET_PIXEL_FORMAT
-                case 10: // SET_PIXEL_FORMAT (1=0RGB1555, 2=XRGB8888, 3=RGB565)
-                    console.log("Core requested Pixel Format:", Module.HEAP32[data >> 2]);
-                    // Luôn trả về true để core vui
+                case 1: // SET_ROTATION
                     return 1;
-                case 3:  // GET_CAN_DUPE
-                    Module.HEAP8[data] = 1;
+                case 2: // GET_CAN_DUPE
+                    if (data) Module.HEAP8[data] = 1;
                     return 1;
-                case 9: // GET_SYSTEM_DIRECTORY
-                    const sysDir = "/home/web_user/retroarch/system";
-                    try { if (!Module.FS.analyzePath(sysDir).exists) Module.FS.mkdirTree(sysDir); } catch (e) { }
-
-                    const dirPtr = Module._malloc(sysDir.length + 1);
-                    Module.stringToUTF8(sysDir, dirPtr, sysDir.length + 1);
-                    console.log("Core requested Directory, returning:", sysDir);
-
-                    Module.HEAP32[data >> 2] = dirPtr;
+                case 8: // GET_SYSTEM_DIRECTORY
+                case 9: // GET_SAVE_DIRECTORY
+                case 31: // GET_CORE_ASSETS_DIRECTORY
+                    const dir = "/home/web_user/retroarch";
+                    try { if (!Module.FS.analyzePath(dir).exists) Module.FS.mkdirTree(dir); } catch (e) { }
+                    const ptr = Module._malloc(dir.length + 1);
+                    Module.stringToUTF8(dir, ptr, dir.length + 1);
+                    Module.HEAP32[data >> 2] = ptr;
+                    logger(`  -> provided directory: ${dir}`);
                     return 1;
-                case 31: // GET_SAVE_DIRECTORY
-                    const saveDir = "/home/web_user/retroarch/saves";
-                    try { if (!Module.FS.analyzePath(saveDir).exists) Module.FS.mkdirTree(saveDir); } catch (e) { }
-                    const savePtr = Module._malloc(saveDir.length + 1);
-                    Module.stringToUTF8(saveDir, savePtr, saveDir.length + 1);
-                    Module.HEAP32[data >> 2] = savePtr;
+                case 10: // SET_PIXEL_FORMAT
+                    const fmt = Module.HEAP32[data >> 2];
+                    logger(`  -> Core requested pixel format: ${fmt}`);
                     return 1;
-                case 6: // SET_INPUT_DESCRIPTORS
-                    return 1;
-                case 31: // GET_VFS_INTERFACE
-                    // Đây là cái quan trọng! MAME có thể cần VFS.
-                    // Nhưng nếu build static, có thể nó dùng internal 
-                    return 0;
                 default:
-                    // Log unknown commands
-                    // console.log("Unhandled env cmd:", cmd);
                     return 0;
             }
         }
 
-        // Video refresh callback: draws the frame to the canvas
-        function video_cb(data, width, height, pitch) {
-            if (!Module.ctx) return;
+        function video_cb(data, w, h, p) { if (Module.ctx) Module.ctx.fillRect(0, 0, 10, 10); }
+        function audio_cb(l, r) { }
+        function audio_batch_cb(d, f) { return f; }
+        function input_poll_cb() { }
+        function input_state_cb(p, d, i, id) { return 0; }
 
-            // Adjust canvas size if needed (only once or when changed)
-            if (Module.lastW !== width || Module.lastH !== height) {
-                Module.canvas.width = width;
-                Module.canvas.height = height;
-                Module.lastW = width;
-                Module.lastH = height;
-                Module.imageData = Module.ctx.createImageData(width, height);
-            }
-
-            // data is a pointer to the frame buffer in WASM memory (HEAPU16 typically for MAME2003)
-            // MAME2003 often uses RGB565 or XRGB8888. 
-            // We need to check what pixel format was set, but for a simple test we can try to guess or hardcode.
-            // Let's assume standard behavior. typically MAME2003 is XRGB8888 or RGB565.
-
-            // For now, let's try assuming 16-bit RGB565 (common in libretro) or 32-bit.
-            // Pitch / width = bytes per pixel roughly.
-            const bpp = pitch / width;
-
-            const imgData = Module.imageData;
-            const dst = imgData.data;
-
-            if (bpp === 2) {
-                // RGB565
-                const src = Module.HEAPU16.subarray(data >> 1, (data + pitch * height) >> 1);
-                let i = 0;
-                for (let y = 0; y < height; y++) {
-                    for (let x = 0; x < width; x++) {
-                        // Correctly calculate index based on pitch (which is in bytes)
-                        const srcIdx = (y * (pitch >> 1)) + x;
-                        const pixel = src[srcIdx];
-
-                        // Extract RGB565: RRRRR GGGGGG BBBBB
-                        const r = (pixel >> 11) & 0x1F;
-                        const g = (pixel >> 5) & 0x3F;
-                        const b = pixel & 0x1F;
-
-                        // Scale to 8-bit
-                        dst[i++] = (r * 255 / 31) | 0;
-                        dst[i++] = (g * 255 / 63) | 0;
-                        dst[i++] = (b * 255 / 31) | 0;
-                        dst[i++] = 255; // Alpha
-                    }
-                }
-            } else if (bpp === 4) {
-                // XRGB8888
-                const src = Module.HEAPU32.subarray(data >> 2, (data + pitch * height) >> 2);
-                let i = 0;
-                for (let y = 0; y < height; y++) {
-                    for (let x = 0; x < width; x++) {
-                        const srcIdx = (y * (pitch >> 2)) + x;
-                        const pixel = src[srcIdx];
-
-                        // XRGB8888 format
-                        dst[i++] = (pixel >> 16) & 0xFF; // R
-                        dst[i++] = (pixel >> 8) & 0xFF;  // G
-                        dst[i++] = pixel & 0xFF;         // B
-                        dst[i++] = 255;                  // A
-                    }
-                }
-            }
-
-            Module.ctx.putImageData(imgData, 0, 0);
-        }
-
-        function audio_cb(left, right) {
-            // Stub: Audio processing would go here
-        }
-        function audio_batch_cb(data, frames) {
-            // Stub: Batch audio processing
-            return frames;
-        }
-        function input_poll_cb() {
-            // Stub: Poll input (keyboard/gamepad)
-        }
-        function input_state_cb(port, device, index, id) {
-            // Stub: Return state of input
-            return 0;
-        }
-
-        // --- LOADER LOGIC ---
-
-        document.getElementById('romInput').addEventListener('change', async function (e) {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            document.getElementById('status').innerText = "Loading core and ROM...";
-
+        document.getElementById('romInput').addEventListener('change', async (e) => {
+            const file = e.target.files[0]; if (!file) return;
             const buffer = await file.arrayBuffer();
             const romData = new Uint8Array(buffer);
 
-            // Setup the Module global that emscripten looks for
             window.Module = {
                 canvas: document.getElementById('canvas'),
                 ctx: document.getElementById('canvas').getContext('2d'),
-
-                locateFile: function (path, scriptDirectory) {
-                    if (path.endsWith('.wasm')) {
-                        return 'src/core/mame2003_libretro.wasm';
-                    }
-                    return path;
-                },
-
-                onRuntimeInitialized: function () {
-                    console.log("WASM Initialized");
-                    document.getElementById('status').innerText = "Core Loaded. initializing game...";
+                locateFile: (p) => p.endsWith('.wasm') ? 'src/core/mame2003_libretro.wasm' : p,
+                onRuntimeInitialized: async function () {
+                    logger("WASM Initialized", "#0f0");
 
                     try {
-                        // Allocate filename in WASM memory
-                        const filename = "game.zip"; // MAME usually cares about the internal name inside ZIP, but let's try generic
-                        // Actually, libretro MAME2003 might need the specific driver name if it relies on filename.
-                        // But often it probes content or we must trust it handles the generic name if passed via memory? 
-                        // Note: MAME2003 IS picky about filenames if using 'load_game'. 
-                        // It usually looks up drivers by filename (e.g. pacman.zip).
-                        // WE MUST USE THE REAL FILENAME from the input file
+                        const namePtr = Module._malloc(file.name.length + 1);
+                        Module.stringToUTF8(file.name, namePtr, file.name.length + 1);
+                        const romPtr = Module._malloc(romData.length);
+                        Module.HEAPU8.set(romData, romPtr);
+                        const info = Module._malloc(16);
+                        Module.HEAP32[(info >> 2) + 0] = namePtr;
+                        Module.HEAP32[(info >> 2) + 1] = romPtr;
+                        Module.HEAP32[(info >> 2) + 2] = romData.length;
+                        Module.HEAP32[(info >> 2) + 3] = 0;
 
-                        const realName = file.name; // e.g., "pacman.zip"
-                        const fileNameBytes = new TextEncoder().encode(realName + '\0');
-                        const fileNamePtr = Module._malloc(fileNameBytes.length);
-                        Module.HEAPU8.set(fileNameBytes, fileNamePtr);
+                        logger("Registering callbacks...");
+                        Module._retro_set_environment(Module.addFunction(env_cb, "iii"));
+                        Module._retro_set_video_refresh(Module.addFunction(video_cb, "viiii"));
+                        Module._retro_set_audio_sample(Module.addFunction(audio_cb, "vii"));
+                        Module._retro_set_audio_sample_batch(Module.addFunction(audio_batch_cb, "iii"));
+                        Module._retro_set_input_poll(Module.addFunction(input_poll_cb, "v"));
+                        Module._retro_set_input_state(Module.addFunction(input_state_cb, "iiiii"));
 
-                        // Allocate ROM data
-                        const romDataPtr = Module._malloc(romData.length);
-                        Module.HEAPU8.set(romData, romDataPtr);
-
-                        // retro_game_info struct (path, data, size, meta)
-                        // defined roughly as: const char *path; const void *data; size_t size; const char *meta;
-                        // 4 pointers/size_t (32-bitwasm = 4 bytes each) -> 16 bytes
-                        const gameInfoPtr = Module._malloc(16);
-
-                        // Write struct members to memory (pointers are 32-bit integers in HEAP32)
-                        Module.HEAP32[(gameInfoPtr >> 2) + 0] = fileNamePtr;      // path
-                        Module.HEAP32[(gameInfoPtr >> 2) + 1] = romDataPtr;       // data
-                        Module.HEAP32[(gameInfoPtr >> 2) + 2] = romData.length;   // size
-                        Module.HEAP32[(gameInfoPtr >> 2) + 3] = 0;                // meta (NULL)
-
-                        // Register callbacks
-                        // Note: Some cores are picky about return types. 
-                        // If 'iii' fails, sometimes 'viii' (returning void) is expected by some emscripten versions 
-                        // even if the C side says bool.
-                        const callbacks = [
-                            ['retro_set_environment', env_cb, "iii"],
-                            ['retro_set_video_refresh', video_cb, "viiii"],
-                            ['retro_set_audio_sample', audio_cb, "vii"],
-                            ['retro_set_audio_sample_batch', audio_batch_cb, "iii"],
-                            ['retro_set_input_poll', input_poll_cb, "v"],
-                            ['retro_set_input_state', input_state_cb, "iiiii"]
-                        ];
-
-                        console.log("Registering callbacks...");
-
-                        // Đăng ký từng callback một cách đơn giản nhất
-                        const envFp = Module.addFunction(env_cb, "iii");
-                        console.log("env_cb fp:", envFp);
-                        Module._retro_set_environment(envFp);
-
-                        const videoFp = Module.addFunction(video_cb, "viiii");
-                        Module._retro_set_video_refresh(videoFp);
-
-                        const audioFp = Module.addFunction(audio_cb, "vii");
-                        Module._retro_set_audio_sample(audioFp);
-
-                        const audioBatchFp = Module.addFunction(audio_batch_cb, "iii");
-                        Module._retro_set_audio_sample_batch(audioBatchFp);
-
-                        const inputPollFp = Module.addFunction(input_poll_cb, "v");
-                        Module._retro_set_input_poll(inputPollFp);
-
-                        const inputStateFp = Module.addFunction(input_state_cb, "iiiii");
-                        Module._retro_set_input_state(inputStateFp);
-
-                        console.log("All callbacks registered!");
-
-                        // Boot the core
-                        console.log("Initializing core...");
+                        logger("Initializing core...");
                         Module._retro_init();
 
-                        console.log("Writing ROM to virtual FS...");
-                        const romPath = "/game.zip";
-                        Module.FS.writeFile(romPath, romData);
+                        logger("Testing retro_load_game with ccall...");
 
-                        console.log("Loading game from FS...");
-                        // Cập nhật struct: Chỉ dùng Path, Data để NULL
-                        const pathPtr = Module._malloc(romPath.length + 1);
-                        Module.stringToUTF8(romPath, pathPtr, romPath.length + 1);
-
-                        Module.HEAP32[(gameInfoPtr >> 2) + 0] = pathPtr;       // path
-                        Module.HEAP32[(gameInfoPtr >> 2) + 1] = 0;             // data = NULL (force core to load from file)
-                        Module.HEAP32[(gameInfoPtr >> 2) + 2] = 0;             // size = 0
-                        Module.HEAP32[(gameInfoPtr >> 2) + 3] = 0;             // meta
-
-                        const loadResult = Module._retro_load_game(gameInfoPtr);
-                        console.log("retro_load_game result:", loadResult);
-
-                        if (loadResult) { // Usually true/1 on success, but check core specific
-                            document.getElementById('status').innerText = "Game Running!";
-
-                            // Start the loop
-                            const loop = () => {
-                                Module._retro_run();
+                        // Using ccall is more robust as it handles type conversion and 
+                        // sometimes avoids direct table call signature traps.
+                        try {
+                            const res = Module.ccall('retro_load_game', 'number', ['number'], [info]);
+                            if (res) {
+                                logger(`Success! Game loaded successfully. Result: ${res}`, "#0f0");
+                                document.getElementById('status').innerText = "Running!";
+                                const loop = () => { Module._retro_run(); requestAnimationFrame(loop); };
                                 requestAnimationFrame(loop);
-                            };
-                            requestAnimationFrame(loop);
-                        } else {
-                            document.getElementById('status').innerText = "Failed to load game (Result: " + loadResult + ")";
+                            } else {
+                                logger("Failed to load game (core returned 0)", "#f00");
+                                document.getElementById('status').innerText = "Load failed (Check ROM/BIOS)";
+                            }
+                        } catch (e) {
+                            logger(`ccall failed: ${e.message}`, "#f00");
+                            if (e.message.includes("signature mismatch")) {
+                                logger("CRITICAL: Still a signature mismatch. Please ensure you have downloaded the LATEST .wasm and .js from GitHub Actions (built after 10:15 AM) and cleared your browser cache (Cmd+Shift+R).", "#ff0");
+                            }
                         }
-
-                    } catch (err) {
-                        console.error(err);
-                        let msg = "Error: " + err.message;
-                        if (err.message && err.message.includes("Unable to grow wasm table")) {
-                            msg = "BUILD ERROR: The core was built without allowing dynamic functions.<br>" +
-                                "Please rebuild with <code>-s ALLOW_TABLE_GROWTH=1</code> in your Emscripten flags.";
-                        }
-                        document.getElementById('status').innerHTML = msg;
+                    } catch (e) {
+                        logger("Global error: " + e.message, "#f00");
                     }
                 },
-                print: function (text) { console.log("[Core]", text); },
-                printErr: function (text) { console.warn("[Core Err]", text); }
             };
 
-            // Dynamically load the core script
-            if (!document.querySelector(`script[src="${CORE_PATH}"]`)) {
-                const script = document.createElement('script');
-                script.src = CORE_PATH;
-                document.body.appendChild(script);
-            } else {
-                // If loaded, we might need a manual triggering if it doesn't re-init.
-                // Simpler to just refresh page for this test setup.
-            }
+            const script = document.createElement('script');
+            script.src = 'src/core/mame2003_libretro.js';
+            document.body.appendChild(script);
         });
     </script>
 </body>

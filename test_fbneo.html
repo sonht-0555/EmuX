@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>FBNeo WASM Test</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            background: #222;
+            color: #fff;
+            padding: 20px;
+        }
+
+        canvas {
+            border: 2px solid #555;
+            background: #000;
+            image-rendering: pixelated;
+        }
+
+        #status {
+            margin: 10px 0;
+            color: #0f0;
+        }
+
+        #log {
+            font-family: monospace;
+            font-size: 12px;
+            background: #000;
+            padding: 10px;
+            height: 200px;
+            overflow-y: scroll;
+            border: 1px solid #444;
+        }
+
+        .info {
+            background: #333;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>FBNeo Core Test</h1>
+
+    <div class="info">
+        <strong>FBNeo</strong> - Final Burn Neo arcade emulator<br>
+        Supports 6,000+ arcade games (CPS1, CPS2, CPS3, Neo Geo, etc.)<br>
+        <small>ROM format: .zip (MAME 0.187+ or FBNeo romset)</small>
+    </div>
+
+    <input type="file" id="romInput" accept=".zip">
+    <div id="status">Waiting for ROM...</div>
+    <div id="log"></div>
+    <canvas id="canvas" width="320" height="240"></canvas>
+
+    <script>
+        const logger = (msg, color = '#fff') => {
+            const l = document.getElementById('log');
+            const d = document.createElement('div');
+            d.style.color = color;
+            d.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            l.appendChild(d);
+            l.scrollTop = l.scrollHeight;
+            console.log(msg);
+        };
+
+        function env_cb(cmd, data) {
+            logger(`env_cb: cmd=${cmd} (0x${cmd.toString(16)})`);
+            switch (cmd) {
+                case 1: // SET_ROTATION
+                    return 1;
+                case 2: // GET_CAN_DUPE
+                    if (data) Module.HEAP8[data] = 1;
+                    return 1;
+                case 8: // GET_SYSTEM_DIRECTORY
+                case 9: // GET_SAVE_DIRECTORY
+                case 31: // GET_CORE_ASSETS_DIRECTORY
+                    const dir = "/home/web_user/retroarch";
+                    try { if (!Module.FS.analyzePath(dir).exists) Module.FS.mkdirTree(dir); } catch (e) { }
+                    const ptr = Module._malloc(dir.length + 1);
+                    Module.stringToUTF8(dir, ptr, dir.length + 1);
+                    Module.HEAP32[data >> 2] = ptr;
+                    logger(`  -> provided directory: ${dir}`);
+                    return 1;
+                case 10: // SET_PIXEL_FORMAT
+                    const fmt = Module.HEAP32[data >> 2];
+                    logger(`  -> pixel format: ${fmt}`);
+                    return 1;
+                default:
+                    return 0;
+            }
+        }
+
+        function video_cb(data, w, h, p) {
+            if (!Module.ctx) return;
+            if (Module.lastW !== w || Module.lastH !== h) {
+                Module.canvas.width = w;
+                Module.canvas.height = h;
+                Module.lastW = w;
+                Module.lastH = h;
+                Module.imageData = Module.ctx.createImageData(w, h);
+                logger(`Video: ${w}x${h}`, "#0ff");
+            }
+            const bpp = p / w;
+            const imgData = Module.imageData;
+            const dst = imgData.data;
+            if (bpp === 2) {
+                const src = Module.HEAPU16.subarray(data >> 1, (data + p * h) >> 1);
+                let i = 0;
+                for (let y = 0; y < h; y++) {
+                    for (let x = 0; x < w; x++) {
+                        const pixel = src[(y * (p >> 1)) + x];
+                        dst[i++] = ((pixel >> 11) & 0x1F) * 255 / 31;
+                        dst[i++] = ((pixel >> 5) & 0x3F) * 255 / 63;
+                        dst[i++] = (pixel & 0x1F) * 255 / 31;
+                        dst[i++] = 255;
+                    }
+                }
+            } else if (bpp === 4) {
+                const src = Module.HEAPU32.subarray(data >> 2, (data + p * h) >> 2);
+                let i = 0;
+                for (let y = 0; y < h; y++) {
+                    for (let x = 0; x < w; x++) {
+                        const pixel = src[(y * (p >> 2)) + x];
+                        dst[i++] = (pixel >> 16) & 0xFF;
+                        dst[i++] = (pixel >> 8) & 0xFF;
+                        dst[i++] = pixel & 0xFF;
+                        dst[i++] = 255;
+                    }
+                }
+            }
+            Module.ctx.putImageData(imgData, 0, 0);
+        }
+
+        function audio_cb(l, r) { }
+        function audio_batch_cb(d, f) { return f; }
+        function input_poll_cb() { }
+        function input_state_cb(p, d, i, id) { return 0; }
+
+        document.getElementById('romInput').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            logger(`Loading: ${file.name}`, "#0ff");
+            const buffer = await file.arrayBuffer();
+            const romData = new Uint8Array(buffer);
+
+            window.Module = {
+                canvas: document.getElementById('canvas'),
+                ctx: document.getElementById('canvas').getContext('2d'),
+                locateFile: (p) => p.endsWith('.wasm') ? 'src/core/fbneo_libretro.wasm' : p,
+
+                preRun: [function () {
+                    // Inject string_to_lower function before WASM runs
+                    Module['string_to_lower'] = function (str_ptr) {
+                        if (!str_ptr) return 0;
+                        try {
+                            const str = Module.UTF8ToString(str_ptr);
+                            const lower = str.toLowerCase();
+                            const len = Module.lengthBytesUTF8(lower) + 1;
+                            const ptr = Module._malloc(len);
+                            Module.stringToUTF8(lower, ptr, len);
+                            logger(`string_to_lower: "${str}" -> "${lower}"`, "#888");
+                            return ptr;
+                        } catch (e) {
+                            console.error('string_to_lower error:', e);
+                            return str_ptr;
+                        }
+                    };
+                    // Also define with underscore prefix for C name mangling
+                    Module['_string_to_lower'] = Module['string_to_lower'];
+                }],
+
+                onRuntimeInitialized: async function () {
+                    logger("WASM Initialized", "#0f0");
+                    try {
+                        const namePtr = Module._malloc(file.name.length + 1);
+                        Module.stringToUTF8(file.name, namePtr, file.name.length + 1);
+                        const romPtr = Module._malloc(romData.length);
+                        Module.HEAPU8.set(romData, romPtr);
+                        const info = Module._malloc(16);
+                        Module.HEAP32[(info >> 2) + 0] = namePtr;
+                        Module.HEAP32[(info >> 2) + 1] = romPtr;
+                        Module.HEAP32[(info >> 2) + 2] = romData.length;
+                        Module.HEAP32[(info >> 2) + 3] = 0;
+
+                        logger("Registering callbacks...");
+                        Module._retro_set_environment(Module.addFunction(env_cb, "iii"));
+                        Module._retro_set_video_refresh(Module.addFunction(video_cb, "viiii"));
+                        Module._retro_set_audio_sample(Module.addFunction(audio_cb, "vii"));
+                        Module._retro_set_audio_sample_batch(Module.addFunction(audio_batch_cb, "iii"));
+                        Module._retro_set_input_poll(Module.addFunction(input_poll_cb, "v"));
+                        Module._retro_set_input_state(Module.addFunction(input_state_cb, "iiiii"));
+
+                        logger("Initializing core...");
+                        Module._retro_init();
+
+                        logger("Loading game with ccall...");
+                        try {
+                            const res = Module.ccall('retro_load_game', 'number', ['number'], [info]);
+                            if (res) {
+                                logger(`Game loaded successfully!`, "#0f0");
+                                document.getElementById('status').innerText = "Running!";
+                                const loop = () => {
+                                    Module._retro_run();
+                                    requestAnimationFrame(loop);
+                                };
+                                requestAnimationFrame(loop);
+                            } else {
+                                logger("Failed to load game (core returned 0)", "#f00");
+                                document.getElementById('status').innerText = "Load failed - Check ROM compatibility";
+                            }
+                        } catch (e) {
+                            logger(`Load error: ${e.message}`, "#f00");
+                            if (e.message.includes("signature mismatch")) {
+                                logger("CRITICAL: Signature mismatch - Core needs rebuild", "#ff0");
+                            }
+                        }
+                    } catch (e) {
+                        logger("Error: " + e.message, "#f00");
+                        console.error(e);
+                    }
+                }
+            };
+
+            const script = document.createElement('script');
+            script.src = 'src/core/fbneo_libretro.js';
+            document.body.appendChild(script);
+        });
+    </script>
+</body>
+
+</html>
