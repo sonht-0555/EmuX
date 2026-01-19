@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAME2003 WASM Test</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #222;
+            color: #fff;
+        }
+
+        canvas {
+            border: 2px solid #555;
+            background: #000;
+            image-rendering: pixelated;
+            max-width: 100%;
+        }
+
+        #controls {
+            margin: 20px;
+            padding: 10px;
+            background: #333;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>MAME2003 Core Test</h1>
+
+    <div id="controls">
+        <label for="romInput">Load ROM (.zip): </label>
+        <input type="file" id="romInput" accept=".zip">
+    </div>
+
+    <canvas id="canvas" width="320" height="240"></canvas>
+    <div id="status">Waiting for ROM...</div>
+
+    <script>
+        const CORE_PATH = 'src/core/mame2003_libretro.js';
+        let isRunning = false;
+
+        // --- LIBRETRO CALLBACKS ---
+
+        // Environment callback: handles core requests like "set pixel format" (10)
+        function env_cb(cmd, data) {
+            // console.log('env_cb', cmd);
+            switch (cmd) {
+                case 1:  // SET_PIXEL_FORMAT
+                case 10: // SET_PIXEL_FORMAT (1=0RGB1555, 2=XRGB8888, 3=RGB565)
+                    // MAME2003 typically uses RGB565 (3) or ARGB8888 (2)
+                    // We assume the core sets what it wants and we just acknowledge.
+                    // If we needed to track it: Module.HEAP32[data >> 2]
+                    return 1;
+                case 17: // GET_VARIABLE_UPDATE
+                    return 0;
+                default:
+                    return 0;
+            }
+        }
+
+        // Video refresh callback: draws the frame to the canvas
+        function video_cb(data, width, height, pitch) {
+            if (!Module.ctx) return;
+
+            // Adjust canvas size if needed (only once or when changed)
+            if (Module.lastW !== width || Module.lastH !== height) {
+                Module.canvas.width = width;
+                Module.canvas.height = height;
+                Module.lastW = width;
+                Module.lastH = height;
+                Module.imageData = Module.ctx.createImageData(width, height);
+            }
+
+            // data is a pointer to the frame buffer in WASM memory (HEAPU16 typically for MAME2003)
+            // MAME2003 often uses RGB565 or XRGB8888. 
+            // We need to check what pixel format was set, but for a simple test we can try to guess or hardcode.
+            // Let's assume standard behavior. typically MAME2003 is XRGB8888 or RGB565.
+
+            // For now, let's try assuming 16-bit RGB565 (common in libretro) or 32-bit.
+            // Pitch / width = bytes per pixel roughly.
+            const bpp = pitch / width;
+
+            const imgData = Module.imageData;
+            const dst = imgData.data;
+
+            if (bpp === 2) {
+                // RGB565
+                const src = Module.HEAPU16.subarray(data >> 1, (data + pitch * height) >> 1);
+                let i = 0;
+                for (let y = 0; y < height; y++) {
+                    for (let x = 0; x < width; x++) {
+                        // Correctly calculate index based on pitch (which is in bytes)
+                        const srcIdx = (y * (pitch >> 1)) + x;
+                        const pixel = src[srcIdx];
+
+                        // Extract RGB565: RRRRR GGGGGG BBBBB
+                        const r = (pixel >> 11) & 0x1F;
+                        const g = (pixel >> 5) & 0x3F;
+                        const b = pixel & 0x1F;
+
+                        // Scale to 8-bit
+                        dst[i++] = (r * 255 / 31) | 0;
+                        dst[i++] = (g * 255 / 63) | 0;
+                        dst[i++] = (b * 255 / 31) | 0;
+                        dst[i++] = 255; // Alpha
+                    }
+                }
+            } else if (bpp === 4) {
+                // XRGB8888
+                const src = Module.HEAPU32.subarray(data >> 2, (data + pitch * height) >> 2);
+                let i = 0;
+                for (let y = 0; y < height; y++) {
+                    for (let x = 0; x < width; x++) {
+                        const srcIdx = (y * (pitch >> 2)) + x;
+                        const pixel = src[srcIdx];
+
+                        // XRGB8888 format
+                        dst[i++] = (pixel >> 16) & 0xFF; // R
+                        dst[i++] = (pixel >> 8) & 0xFF;  // G
+                        dst[i++] = pixel & 0xFF;         // B
+                        dst[i++] = 255;                  // A
+                    }
+                }
+            }
+
+            Module.ctx.putImageData(imgData, 0, 0);
+        }
+
+        function audio_cb(left, right) {
+            // Stub: Audio processing would go here
+        }
+        function audio_batch_cb(data, frames) {
+            // Stub: Batch audio processing
+            return frames;
+        }
+        function input_poll_cb() {
+            // Stub: Poll input (keyboard/gamepad)
+        }
+        function input_state_cb(port, device, index, id) {
+            // Stub: Return state of input
+            return 0;
+        }
+
+        // --- LOADER LOGIC ---
+
+        document.getElementById('romInput').addEventListener('change', async function (e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            document.getElementById('status').innerText = "Loading core and ROM...";
+
+            const buffer = await file.arrayBuffer();
+            const romData = new Uint8Array(buffer);
+
+            // Setup the Module global that emscripten looks for
+            window.Module = {
+                canvas: document.getElementById('canvas'),
+                ctx: document.getElementById('canvas').getContext('2d'),
+
+                locateFile: function (path, scriptDirectory) {
+                    if (path.endsWith('.wasm')) {
+                        return 'src/core/mame2003_libretro.wasm';
+                    }
+                    return path;
+                },
+
+                onRuntimeInitialized: function () {
+                    console.log("WASM Initialized");
+                    document.getElementById('status').innerText = "Core Loaded. initializing game...";
+
+                    try {
+                        // Allocate filename in WASM memory
+                        const filename = "game.zip"; // MAME usually cares about the internal name inside ZIP, but let's try generic
+                        // Actually, libretro MAME2003 might need the specific driver name if it relies on filename.
+                        // But often it probes content or we must trust it handles the generic name if passed via memory? 
+                        // Note: MAME2003 IS picky about filenames if using 'load_game'. 
+                        // It usually looks up drivers by filename (e.g. pacman.zip).
+                        // WE MUST USE THE REAL FILENAME from the input file
+
+                        const realName = file.name; // e.g., "pacman.zip"
+                        const fileNameBytes = new TextEncoder().encode(realName + '\0');
+                        const fileNamePtr = Module._malloc(fileNameBytes.length);
+                        Module.HEAPU8.set(fileNameBytes, fileNamePtr);
+
+                        // Allocate ROM data
+                        const romDataPtr = Module._malloc(romData.length);
+                        Module.HEAPU8.set(romData, romDataPtr);
+
+                        // retro_game_info struct (path, data, size, meta)
+                        // defined roughly as: const char *path; const void *data; size_t size; const char *meta;
+                        // 4 pointers/size_t (32-bitwasm = 4 bytes each) -> 16 bytes
+                        const gameInfoPtr = Module._malloc(16);
+
+                        // Write struct members to memory (pointers are 32-bit integers in HEAP32)
+                        Module.HEAP32[(gameInfoPtr >> 2) + 0] = fileNamePtr;      // path
+                        Module.HEAP32[(gameInfoPtr >> 2) + 1] = romDataPtr;       // data
+                        Module.HEAP32[(gameInfoPtr >> 2) + 2] = romData.length;   // size
+                        Module.HEAP32[(gameInfoPtr >> 2) + 3] = 0;                // meta (NULL)
+
+                        // Register callbacks (critical!)
+                        // Function signature strings: 'v'=void, 'i'=int, etc.
+                        // These match what Emscripten's `addFunction` expects.
+                        const callbacks = [
+                            ['retro_set_environment', env_cb, "iii"],
+                            ['retro_set_video_refresh', video_cb, "viiii"],
+                            ['retro_set_audio_sample', audio_cb, "vii"],
+                            ['retro_set_audio_sample_batch', audio_batch_cb, "iii"],
+                            ['retro_set_input_poll', input_poll_cb, "v"],
+                            ['retro_set_input_state', input_state_cb, "iiiii"]
+                        ];
+
+                        callbacks.forEach(([name, cb, sig]) => {
+                            const fn = Module['_' + name]; // e.g. _retro_set_environment
+                            if (fn) {
+                                // addFunction returns a function pointer index
+                                const fp = Module.addFunction(cb, sig);
+                                fn(fp);
+                            } else {
+                                console.warn(`Function ${name} not found in Module exports`);
+                            }
+                        });
+
+
+                        // Boot the core
+                        Module._retro_init();
+                        console.log("retro_init done");
+
+                        const loadResult = Module._retro_load_game(gameInfoPtr);
+                        console.log("retro_load_game result:", loadResult);
+
+                        if (loadResult) { // Usually true/1 on success, but check core specific
+                            document.getElementById('status').innerText = "Game Running!";
+
+                            // Start the loop
+                            const loop = () => {
+                                Module._retro_run();
+                                requestAnimationFrame(loop);
+                            };
+                            requestAnimationFrame(loop);
+                        } else {
+                            document.getElementById('status').innerText = "Failed to load game (Result: " + loadResult + ")";
+                        }
+
+                    } catch (err) {
+                        console.error(err);
+                        let msg = "Error: " + err.message;
+                        if (err.message && err.message.includes("Unable to grow wasm table")) {
+                            msg = "BUILD ERROR: The core was built without allowing dynamic functions.<br>" +
+                                "Please rebuild with <code>-s ALLOW_TABLE_GROWTH=1</code> in your Emscripten flags.";
+                        }
+                        document.getElementById('status').innerHTML = msg;
+                    }
+                },
+                print: function (text) { console.log("[Core]", text); },
+                printErr: function (text) { console.warn("[Core Err]", text); }
+            };
+
+            // Dynamically load the core script
+            if (!document.querySelector(`script[src="${CORE_PATH}"]`)) {
+                const script = document.createElement('script');
+                script.src = CORE_PATH;
+                document.body.appendChild(script);
+            } else {
+                // If loaded, we might need a manual triggering if it doesn't re-init.
+                // Simpler to just refresh page for this test setup.
+            }
+        });
+    </script>
+</body>
+
+</html>

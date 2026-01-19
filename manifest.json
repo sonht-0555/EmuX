@@ -5,6 +5,9 @@
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#000000",
+  "lang": "en",
+  "scope": "/",
+  "id": "?pwa_version=1",
   "description": "EmuX - Play retro games in your browser",
   "icons": [
     {
