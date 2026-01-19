@@ -35,17 +35,17 @@ jobs:
     - name: Build MAME 2003 (DEBUG MODE)
       run: |
         cd mame2003-libretro
-        make clean # Xóa sạch các file cũ để tránh xung đột
-        emmake make -f Makefile platform=emscripten -j$(nproc) DEBUG=1 \
-          EXTRA_CFLAGS="-O1 -g2 -fno-common" \
-          EXTRA_LDFLAGS="-O1 -g2 -s ASSERTIONS=2 -s DEMANGLE_SUPPORT=1"
-
-    - name: Link WASM + JS (DEBUG MODE)
-      run: |
-        cd mame2003-libretro
+        make clean
+        emmake make -f Makefile platform=emscripten -j$(nproc) DEBUG=1
+        
+        # Tìm file sản phẩm chính của Core (thường là .a hoặc .bc)
+        CORE_LIB=$(find . -maxdepth 1 -name "*_libretro*.a" -o -name "*_libretro*.bc" | head -n 1)
+        echo "Linking core library: $CORE_LIB"
+        
+        # Link chính xác file thư viện này
         emcc \
+        $CORE_LIB \
         -O1 -g2 \
-        $(find . -name "*.o" ! -name ".*") \
         -s WASM=1 \
         -s USE_ZLIB=1 \
         -s ALLOW_MEMORY_GROWTH=1 \
@@ -63,6 +63,12 @@ jobs:
         -s EXPORTED_FUNCTIONS='["_retro_init","_retro_deinit","_retro_run","_retro_load_game","_retro_unload_game","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_retro_get_system_av_info","_malloc","_free"]' \
         -s ALLOW_TABLE_GROWTH=1 \
         -o ../src/core/mame2003_libretro.js
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: mame2003-wasm-debug
+        path: src/core/mame2003_libretro.*
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
