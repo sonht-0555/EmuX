@@ -219,21 +219,24 @@
 
                         console.log("Registering callbacks...");
                         callbacks.forEach(([name, cb, sig]) => {
-                            const fn = Module['_' + name];
-                            if (fn) {
+                            // Convert libretro name to Module name (e.g. retro_set_environment -> _retro_set_environment)
+                            const exportName = '_' + name;
+                            if (Module[exportName]) {
                                 try {
                                     const fp = Module.addFunction(cb, sig);
-                                    console.log(`Calling ${name} with fp: ${fp} (sig: ${sig})`);
-                                    fn(fp);
+                                    console.log(`Registering ${name} with fp: ${fp} (sig: ${sig})`);
+
+                                    // Using ccall is safer for function signature enforcement
+                                    Module.ccall(name, 'void', ['number'], [fp]);
+
                                 } catch (e) {
                                     console.error(`Failed to register ${name}:`, e);
-                                    // Try fallback signature if common mismatch
-                                    if (sig === "iii") {
-                                        console.log(`Retrying ${name} with 'viii' (void return)...`);
-                                        const fp = Module.addFunction(cb, "viii");
-                                        fn(fp);
-                                    } else {
-                                        throw e;
+                                    // Try fallback with direct call if ccall fails
+                                    try {
+                                        const fp = Module.addFunction(cb, sig);
+                                        Module[exportName](fp);
+                                    } catch (inner) {
+                                        console.error("Deep failure:", inner);
                                     }
                                 }
                             } else {
@@ -243,10 +246,11 @@
 
 
                         // Boot the core
-                        Module._retro_init();
-                        console.log("retro_init done");
+                        console.log("Initializing core...");
+                        Module.ccall('retro_init', 'void', [], []);
 
-                        const loadResult = Module._retro_load_game(gameInfoPtr);
+                        console.log("Loading game...");
+                        const loadResult = Module.ccall('retro_load_game', 'number', ['number'], [gameInfoPtr]);
                         console.log("retro_load_game result:", loadResult);
 
                         if (loadResult) { // Usually true/1 on success, but check core specific

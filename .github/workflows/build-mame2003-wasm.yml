@@ -35,7 +35,7 @@ jobs:
     - name: Build MAME 2003 (DEBUG MODE)
       run: |
         cd mame2003-libretro
-        # Use DEBUG=1 and -O1 for better stability in debug mode than -O0
+        make clean # Xóa sạch các file cũ để tránh xung đột
         emmake make -f Makefile platform=emscripten -j$(nproc) DEBUG=1 \
           EXTRA_CFLAGS="-O1 -g2 -fno-common" \
           EXTRA_LDFLAGS="-O1 -g2 -s ASSERTIONS=2 -s DEMANGLE_SUPPORT=1"
@@ -43,7 +43,6 @@ jobs:
     - name: Link WASM + JS (DEBUG MODE)
       run: |
         cd mame2003-libretro
-        # Link using matching flags and include necessary emscripten settings
         emcc \
         -O1 -g2 \
         $(find . -name "*.o" ! -name ".*") \
@@ -51,7 +50,7 @@ jobs:
         -s USE_ZLIB=1 \
         -s ALLOW_MEMORY_GROWTH=1 \
         -s INITIAL_MEMORY=268435456 \
-        -s STACK_SIZE=5242880 \
+        -s STACK_SIZE=8388608 \
         -s ENVIRONMENT=web \
         -s EXPORT_NAME="'Module'" \
         -s FORCE_FILESYSTEM=1 \
@@ -60,7 +59,7 @@ jobs:
         -s ASSERTIONS=2 \
         -s DEMANGLE_SUPPORT=1 \
         -s STACK_OVERFLOW_CHECK=2 \
-        -s EXPORTED_RUNTIME_METHODS='["addFunction","removeFunction","ccall","cwrap","FS","HEAPU8","HEAPU16","HEAP16","HEAP32","HEAPU32","UTF8ToString","getValue","setValue","stringToUTF8"]' \
+        -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","addFunction","removeFunction","FS","HEAPU8","HEAPU16","HEAP16","HEAP32","HEAPU32","UTF8ToString","getValue","setValue","stringToUTF8"]' \
         -s EXPORTED_FUNCTIONS='["_retro_init","_retro_deinit","_retro_run","_retro_load_game","_retro_unload_game","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_retro_get_system_av_info","_malloc","_free"]' \
         -s ALLOW_TABLE_GROWTH=1 \
         -o ../src/core/mame2003_libretro.js
