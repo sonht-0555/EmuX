@@ -49,18 +49,44 @@
         // --- LIBRETRO CALLBACKS ---
 
         // Environment callback: handles core requests like "set pixel format" (10)
+        // Environment callback: handles core requests like "set pixel format" (10)
         function env_cb(cmd, data) {
-            // console.log('env_cb', cmd);
+            console.log('env_cb called:', cmd);
             switch (cmd) {
                 case 1:  // SET_PIXEL_FORMAT
                 case 10: // SET_PIXEL_FORMAT (1=0RGB1555, 2=XRGB8888, 3=RGB565)
-                    // MAME2003 typically uses RGB565 (3) or ARGB8888 (2)
-                    // We assume the core sets what it wants and we just acknowledge.
-                    // If we needed to track it: Module.HEAP32[data >> 2]
+                    console.log("Core requested Pixel Format:", Module.HEAP32[data >> 2]);
+                    // Luôn trả về true để core vui
                     return 1;
-                case 17: // GET_VARIABLE_UPDATE
+                case 3:  // GET_CAN_DUPE
+                    Module.HEAP8[data] = 1;
+                    return 1;
+                case 9: // GET_SYSTEM_DIRECTORY
+                    const sysDir = "/home/web_user/retroarch/system";
+                    try { if (!Module.FS.analyzePath(sysDir).exists) Module.FS.mkdirTree(sysDir); } catch (e) { }
+
+                    const dirPtr = Module._malloc(sysDir.length + 1);
+                    Module.stringToUTF8(sysDir, dirPtr, sysDir.length + 1);
+                    console.log("Core requested Directory, returning:", sysDir);
+
+                    Module.HEAP32[data >> 2] = dirPtr;
+                    return 1;
+                case 31: // GET_SAVE_DIRECTORY
+                    const saveDir = "/home/web_user/retroarch/saves";
+                    try { if (!Module.FS.analyzePath(saveDir).exists) Module.FS.mkdirTree(saveDir); } catch (e) { }
+                    const savePtr = Module._malloc(saveDir.length + 1);
+                    Module.stringToUTF8(saveDir, savePtr, saveDir.length + 1);
+                    Module.HEAP32[data >> 2] = savePtr;
+                    return 1;
+                case 6: // SET_INPUT_DESCRIPTORS
+                    return 1;
+                case 31: // GET_VFS_INTERFACE
+                    // Đây là cái quan trọng! MAME có thể cần VFS.
+                    // Nhưng nếu build static, có thể nó dùng internal 
                     return 0;
                 default:
+                    // Log unknown commands
+                    // console.log("Unhandled env cmd:", cmd);
                     return 0;
             }
         }
@@ -218,39 +244,48 @@
                         ];
 
                         console.log("Registering callbacks...");
-                        callbacks.forEach(([name, cb, sig]) => {
-                            // Convert libretro name to Module name (e.g. retro_set_environment -> _retro_set_environment)
-                            const exportName = '_' + name;
-                            if (Module[exportName]) {
-                                try {
-                                    const fp = Module.addFunction(cb, sig);
-                                    console.log(`Registering ${name} with fp: ${fp} (sig: ${sig})`);
 
-                                    // Using ccall is safer for function signature enforcement
-                                    Module.ccall(name, 'void', ['number'], [fp]);
+                        // Đăng ký từng callback một cách đơn giản nhất
+                        const envFp = Module.addFunction(env_cb, "iii");
+                        console.log("env_cb fp:", envFp);
+                        Module._retro_set_environment(envFp);
 
-                                } catch (e) {
-                                    console.error(`Failed to register ${name}:`, e);
-                                    // Try fallback with direct call if ccall fails
-                                    try {
-                                        const fp = Module.addFunction(cb, sig);
-                                        Module[exportName](fp);
-                                    } catch (inner) {
-                                        console.error("Deep failure:", inner);
-                                    }
-                                }
-                            } else {
-                                console.warn(`Function ${name} not found in Module exports`);
-                            }
-                        });
+                        const videoFp = Module.addFunction(video_cb, "viiii");
+                        Module._retro_set_video_refresh(videoFp);
 
+                        const audioFp = Module.addFunction(audio_cb, "vii");
+                        Module._retro_set_audio_sample(audioFp);
+
+                        const audioBatchFp = Module.addFunction(audio_batch_cb, "iii");
+                        Module._retro_set_audio_sample_batch(audioBatchFp);
+
+                        const inputPollFp = Module.addFunction(input_poll_cb, "v");
+                        Module._retro_set_input_poll(inputPollFp);
+
+                        const inputStateFp = Module.addFunction(input_state_cb, "iiiii");
+                        Module._retro_set_input_state(inputStateFp);
+
+                        console.log("All callbacks registered!");
 
                         // Boot the core
                         console.log("Initializing core...");
-                        Module.ccall('retro_init', 'void', [], []);
+                        Module._retro_init();
 
-                        console.log("Loading game...");
-                        const loadResult = Module.ccall('retro_load_game', 'number', ['number'], [gameInfoPtr]);
+                        console.log("Writing ROM to virtual FS...");
+                        const romPath = "/game.zip";
+                        Module.FS.writeFile(romPath, romData);
+
+                        console.log("Loading game from FS...");
+                        // Cập nhật struct: Chỉ dùng Path, Data để NULL
+                        const pathPtr = Module._malloc(romPath.length + 1);
+                        Module.stringToUTF8(romPath, pathPtr, romPath.length + 1);
+
+                        Module.HEAP32[(gameInfoPtr >> 2) + 0] = pathPtr;       // path
+                        Module.HEAP32[(gameInfoPtr >> 2) + 1] = 0;             // data = NULL (force core to load from file)
+                        Module.HEAP32[(gameInfoPtr >> 2) + 2] = 0;             // size = 0
+                        Module.HEAP32[(gameInfoPtr >> 2) + 3] = 0;             // meta
+
+                        const loadResult = Module._retro_load_game(gameInfoPtr);
                         console.log("retro_load_game result:", loadResult);
 
                         if (loadResult) { // Usually true/1 on success, but check core specific
