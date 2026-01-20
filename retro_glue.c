@@ -4,21 +4,20 @@
 #include <string.h>
 #include <sys/stat.h>
 
-/* Fixed signatures to match libretro-common standard exactly */
+/* REVERTED TO 4-ARGUMENT SIGNATURES (MATCHING THE WORKING STATE) */
 
 /* Legacy RFILE API */
 void *rfopen(const char *path, const char *mode) {
   return (void *)fopen(path, mode);
 }
 
-/* IMPORTANT: rfread in libretro-common takes 3 arguments: stream, data, len */
-int64_t rfread(void *stream, void *buffer, int64_t len) {
-  return (int64_t)fread(buffer, 1, (size_t)len, (FILE *)stream);
+/* 4 arguments: (buffer, size, count, stream) */
+int64_t rfread(void *buffer, size_t size, size_t count, void *stream) {
+  return (int64_t)fread(buffer, size, count, (FILE *)stream);
 }
 
-/* IMPORTANT: rfwrite in libretro-common takes 3 arguments: stream, data, len */
-int64_t rfwrite(void *stream, const void *buffer, int64_t len) {
-  return (int64_t)fwrite(buffer, 1, (size_t)len, (FILE *)stream);
+int64_t rfwrite(const void *buffer, size_t size, size_t count, void *stream) {
+  return (int64_t)fwrite(buffer, size, count, (FILE *)stream);
 }
 
 int64_t rfseek(void *stream, int64_t offset, int origin) {
@@ -51,9 +50,9 @@ struct retro_vfs_file_handle *
 retro_vfs_file_open_impl(const char *path, unsigned mode, unsigned hints) {
   const char *mode_str = "rb";
   if (mode & (1 << 1))
-    mode_str = "wb"; // RETRO_VFS_FILE_ACCESS_WRITE
+    mode_str = "wb";
   if (mode & (1 << 2))
-    mode_str = "r+b"; // UPDATE
+    mode_str = "r+b";
 
   FILE *fp = fopen(path, mode_str);
   if (!fp)
@@ -83,12 +82,12 @@ int64_t retro_vfs_file_get_size_impl(struct retro_vfs_file_handle *stream) {
 
 int64_t retro_vfs_file_read_impl(struct retro_vfs_file_handle *stream, void *s,
                                  int64_t len) {
-  return fread(s, 1, len, stream->fp);
+  return fread(s, 1, (size_t)len, stream->fp);
 }
 
 int64_t retro_vfs_file_write_impl(struct retro_vfs_file_handle *stream,
                                   const void *s, int64_t len) {
-  return fwrite(s, 1, len, stream->fp);
+  return fwrite(s, 1, (size_t)len, stream->fp);
 }
 
 int64_t retro_vfs_file_seek_impl(struct retro_vfs_file_handle *stream,
@@ -100,16 +99,16 @@ int64_t retro_vfs_file_tell_impl(struct retro_vfs_file_handle *stream) {
   return ftello(stream->fp);
 }
 
-/* Aliases for some core versions */
+/* Aliases */
 int64_t rfget_size(void *stream) { return rfsize(stream); }
 void *filestream_open(const char *path, const char *mode) {
   return rfopen(path, mode);
 }
-int64_t filestream_read(void *stream, void *buffer, int64_t len) {
-  return rfread(stream, buffer, len);
+int64_t filestream_read(void *stream, void *buffer, size_t size) {
+  return (int64_t)fread(buffer, 1, size, (FILE *)stream);
 }
-int64_t filestream_write(void *stream, const void *buffer, int64_t len) {
-  return rfwrite(stream, buffer, len);
+int64_t filestream_write(void *stream, const void *buffer, size_t size) {
+  return (int64_t)fwrite(buffer, 1, size, (FILE *)stream);
 }
 int64_t filestream_seek(void *stream, int64_t offset, int origin) {
   return rfseek(stream, offset, origin);
@@ -117,6 +116,7 @@ int64_t filestream_seek(void *stream, int64_t offset, int origin) {
 int64_t filestream_tell(void *stream) { return rftell(stream); }
 int filestream_close(void *stream) { return rfclose(stream); }
 int64_t filestream_get_size(void *stream) { return rfsize(stream); }
+
 char *string_to_lower(const char *str) {
   if (!str)
     return NULL;
