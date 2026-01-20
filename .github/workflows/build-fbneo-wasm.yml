@@ -35,10 +35,15 @@ jobs:
         echo "Compiling libretro-common utilities..."
         LIBRETRO_COMMON=../../../../libretro-common
         
-        # Compile string utilities
+        # Compile all necessary utilities
         emcc -c $LIBRETRO_COMMON/string/stdstring.c -o stdstring.o -I$LIBRETRO_COMMON/include
         emcc -c $LIBRETRO_COMMON/file/file_path.c -o file_path.o -I$LIBRETRO_COMMON/include
         emcc -c $LIBRETRO_COMMON/compat/compat_strl.c -o compat_strl.o -I$LIBRETRO_COMMON/include
+        emcc -c $LIBRETRO_COMMON/vfs/vfs_implementation.c -o vfs_implementation.o -I$LIBRETRO_COMMON/include
+        emcc -c $LIBRETRO_COMMON/compat/compat_posix_string.c -o compat_posix_string.o -I$LIBRETRO_COMMON/include
+        emcc -c $LIBRETRO_COMMON/file/retro_dirent.c -o retro_dirent.o -I$LIBRETRO_COMMON/include
+        
+        echo "Compiled libretro-common utilities"
         
         # Build core
         echo "Building FBNeo core..."
@@ -77,7 +82,7 @@ jobs:
           
           # Link all object files including libretro-common utilities
           emcc \
-          *.o ../stdstring.o ../file_path.o ../compat_strl.o \
+          *.o ../stdstring.o ../file_path.o ../compat_strl.o ../vfs_implementation.o ../compat_posix_string.o ../retro_dirent.o \
           -O3 \
           -s WASM=1 \
           -s USE_ZLIB=1 \
