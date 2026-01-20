@@ -1,142 +1,203 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 
 <head>
-    <meta charset="UTF-8">
-    <title>FBNeo WASM Test</title>
+    <title>EmuX - FBNeo WASM Test</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body {
-            font-family: sans-serif;
-            background: #222;
-            color: #fff;
-            padding: 20px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
         }
 
-        canvas {
-            border: 2px solid #555;
-            background: #000;
+        .header {
+            padding: 20px;
+            background: #2a2a2a;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            padding: 20px;
+            width: 100%;
+            max-width: 1000px;
+        }
+
+        #canvas {
+            background-color: #000;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.1);
+            border: 2px solid #333;
+            max-width: 100%;
+            height: auto;
             image-rendering: pixelated;
         }
 
-        #status {
-            margin: 10px 0;
-            color: #0f0;
-        }
-
         #log {
-            font-family: monospace;
-            font-size: 12px;
-            background: #000;
-            padding: 10px;
+            width: 100%;
             height: 200px;
-            overflow-y: scroll;
+            background: #000;
+            color: #0f0;
+            font-family: 'Courier New', Courier, monospace;
+            padding: 10px;
+            overflow-y: auto;
+            border-radius: 5px;
+            font-size: 12px;
             border: 1px solid #444;
         }
 
-        .info {
+        .controls {
+            display: flex;
+            gap: 10px;
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 8px;
+            width: 100%;
+            justify-content: center;
+        }
+
+        input[type="file"] {
             background: #333;
-            padding: 10px;
-            margin: 10px 0;
-            border-radius: 5px;
+            padding: 8px;
+            border-radius: 4px;
+            color: white;
+        }
+
+        .status {
+            font-weight: bold;
+            color: #0ff;
         }
     </style>
 </head>
 
 <body>
-    <h1>FBNeo Core Test</h1>
-
-    <div class="info">
-        <strong>FBNeo</strong> - Final Burn Neo arcade emulator<br>
-        Supports 6,000+ arcade games (CPS1, CPS2, CPS3, Neo Geo, etc.)<br>
-        <small>ROM format: .zip (MAME 0.187+ or FBNeo romset)</small>
+    <div class="header">
+        <h1>EmuX - FBNeo WASM Core</h1>
+        <div id="status" class="status">Waiting for ROM...</div>
     </div>
 
-    <input type="file" id="romInput" accept=".zip">
-    <div id="status">Waiting for ROM...</div>
-    <div id="log"></div>
-    <canvas id="canvas" width="320" height="240"></canvas>
+    <div class="container">
+        <div class="controls">
+            <input type="file" id="rom-upload" accept=".zip">
+        </div>
 
+        <canvas id="canvas" width="640" height="480"></canvas>
+
+        <div id="log"></div>
+    </div>
+
+    <script src="fbneo_libretro.js"></script>
     <script>
-        const logger = (msg, color = '#fff') => {
-            const l = document.getElementById('log');
-            const d = document.createElement('div');
-            d.style.color = color;
-            d.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
-            l.appendChild(d);
-            l.scrollTop = l.scrollHeight;
+        const logElement = document.getElementById('log');
+        const statusElement = document.getElementById('status');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d', { alpha: false });
+
+        function logger(msg, color = '#ccc') {
+            const div = document.createElement('div');
+            div.style.color = color;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            logElement.appendChild(div);
+            logElement.scrollTop = logElement.scrollHeight;
             console.log(msg);
+        }
+
+        const Module = {
+            canvas: canvas,
+            ctx: ctx,
+            noInitialRun: true,
+            print: (text) => logger(text),
+            printErr: (text) => logger(text, '#f44'),
+            onRuntimeInitialized: () => {
+                logger("WASM Core Initialized", "#0f0");
+                statusElement.textContent = "Core Ready - Please select a ROM";
+            },
+            preRun: [function () {
+                // Pre-setup if needed
+            }]
         };
 
+        // Environment Callback
         function env_cb(cmd, data) {
-            logger(`env_cb: cmd=${cmd} (0x${cmd.toString(16)})`);
             switch (cmd) {
+                case 10: // GET_PIXEL_FORMAT
+                    const pixelFormat = Module.HEAP32[data >> 2];
+                    // logger(`  -> pixel format request: ${pixelFormat}`, "#aaa");
+                    return 1; // We prefer XRGB8888 or RGB565
+                case 11: // SET_VIDEO_REFRESH_RATE
+                    return 1;
+                case 27: // GET_CAN_DUPE
+                    return 1;
                 case 1: // SET_ROTATION
                     return 1;
-                case 2: // GET_CAN_DUPE
-                    if (data) Module.HEAP8[data] = 1;
-                    return 1;
-                case 8: // GET_SYSTEM_DIRECTORY
-                case 9: // GET_SAVE_DIRECTORY
-                case 31: // GET_CORE_ASSETS_DIRECTORY
-                    const dir = "/home/web_user/retroarch";
-                    try { if (!Module.FS.analyzePath(dir).exists) Module.FS.mkdirTree(dir); } catch (e) { }
-                    const ptr = Module._malloc(dir.length + 1);
-                    Module.stringToUTF8(dir, ptr, dir.length + 1);
-                    Module.HEAP32[data >> 2] = ptr;
-                    logger(`  -> provided directory: ${dir}`);
-                    return 1;
-                case 10: // SET_PIXEL_FORMAT
-                    const fmt = Module.HEAP32[data >> 2];
-                    logger(`  -> pixel format: ${fmt}`);
+                case 31: // GET_SYSTEM_DIRECTORY
+                case 9:  // GET_SAVE_DIRECTORY
+                    const dirPtr = Module._malloc(256);
+                    Module.stringToUTF8("/home/web_user/retroarch", dirPtr, 256);
+                    Module.HEAP32[data >> 2] = dirPtr;
                     return 1;
                 case 15: // GET_VARIABLE
                     const variablePtr = Module.HEAP32[data >> 2];
                     if (!variablePtr) return 0;
 
-                    // Manual string reading to avoid Emscripten's "not exported" abort
                     let key = "";
                     for (let i = variablePtr; Module.HEAPU8[i] !== 0; i++) {
                         key += String.fromCharCode(Module.HEAPU8[i]);
                     }
-
-                    logger(`  -> variable query: ${key}`, "#aaa");
+                    // logger(`  -> variable query: ${key}`, "#aaa");
                     return 0;
                 default:
+                    // console.log("env_cb: cmd=" + cmd);
                     return 0;
             }
         }
 
-        function video_cb(data, w, h, p) {
-            if (!Module.ctx) return;
-            if (Module.lastW !== w || Module.lastH !== h) {
-                Module.canvas.width = w;
-                Module.canvas.height = h;
-                Module.lastW = w;
-                Module.lastH = h;
-                Module.imageData = Module.ctx.createImageData(w, h);
-                logger(`Video: ${w}x${h}`, "#0ff");
+        // Video Callback - Cleaned up to remove spam
+        function video_refresh_cb(data, w, h, p) {
+            if (!data || !Module.ctx) return;
+
+            if (canvas.width !== w || canvas.height !== h) {
+                canvas.width = w;
+                canvas.height = h;
+                Module.imageData = ctx.createImageData(w, h);
+                logger(`Resolution changed: ${w}x${h}`, "#0ff");
             }
+
             const bpp = p / w;
             const imgData = Module.imageData;
             const dst = imgData.data;
-            if (bpp === 2) {
+
+            if (bpp === 2) { // RGB565
                 const src = Module.HEAPU16.subarray(data >> 1, (data + p * h) >> 1);
                 let i = 0;
                 for (let y = 0; y < h; y++) {
+                    const rowStart = (y * (p >> 1));
                     for (let x = 0; x < w; x++) {
-                        const pixel = src[(y * (p >> 1)) + x];
+                        const pixel = src[rowStart + x];
                         dst[i++] = ((pixel >> 11) & 0x1F) * 255 / 31;
                         dst[i++] = ((pixel >> 5) & 0x3F) * 255 / 63;
                         dst[i++] = (pixel & 0x1F) * 255 / 31;
                         dst[i++] = 255;
                     }
                 }
-            } else if (bpp === 4) {
+            } else if (bpp === 4) { // XRGB8888
                 const src = Module.HEAPU32.subarray(data >> 2, (data + p * h) >> 2);
                 let i = 0;
                 for (let y = 0; y < h; y++) {
+                    const rowStart = (y * (p >> 2));
                     for (let x = 0; x < w; x++) {
-                        const pixel = src[(y * (p >> 2)) + x];
+                        const pixel = src[rowStart + x];
                         dst[i++] = (pixel >> 16) & 0xFF;
                         dst[i++] = (pixel >> 8) & 0xFF;
                         dst[i++] = pixel & 0xFF;
@@ -144,109 +205,77 @@
                     }
                 }
             }
-            Module.ctx.putImageData(imgData, 0, 0);
+            ctx.putImageData(imgData, 0, 0);
         }
 
-        function audio_cb(l, r) { }
-        function audio_batch_cb(d, f) { return f; }
+        function audio_cb(left, right) { return 0; }
+        function audio_batch_cb(data, frames) { return frames; }
         function input_poll_cb() { }
-        function input_state_cb(p, d, i, id) { return 0; }
+        function input_state_cb(port, device, index, id) { return 0; }
 
-        document.getElementById('romInput').addEventListener('change', async (e) => {
+        let gameRunning = false;
+
+        document.getElementById('rom-upload').addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) return;
 
-            logger(`Loading: ${file.name}`, "#0ff");
+            statusElement.textContent = "Loading: " + file.name;
+            logger(`Reading ${file.name}...`);
+
             const buffer = await file.arrayBuffer();
-            const romData = new Uint8Array(buffer);
+            const data = new Uint8Array(buffer);
 
-            window.Module = {
-                canvas: document.getElementById('canvas'),
-                ctx: document.getElementById('canvas').getContext('2d'),
-                locateFile: (p) => p.endsWith('.wasm') ? 'src/core/fbneo_libretro.wasm' : p,
+            // Write to FS
+            Module.FS.writeFile('/' + file.name, data);
+            logger(`ROM written to virtual FS: /${file.name}`, "#aaa");
 
-                preRun: [function () {
-                    // Inject string_to_lower function before WASM runs
-                    Module['string_to_lower'] = function (str_ptr) {
-                        if (!str_ptr) return 0;
+            // Setup Callbacks
+            const videoPtr = Module.addFunction(video_refresh_cb, 'vppiii');
+            const audioPtr = Module.addFunction(audio_cb, 'vii');
+            const audioBatchPtr = Module.addFunction(audio_batch_cb, 'ipi');
+            const inputPollPtr = Module.addFunction(input_poll_cb, 'v');
+            const inputStatePtr = Module.addFunction(input_state_cb, 'iiiii');
+            const envPtr = Module.addFunction(env_cb, 'iii');
+
+            Module._retro_set_environment(envPtr);
+            Module._retro_init();
+            Module._retro_set_video_refresh(videoPtr);
+            Module._retro_set_audio_sample(audioPtr);
+            Module._retro_set_audio_sample_batch(audioBatchPtr);
+            Module._retro_set_input_poll(inputPollPtr);
+            Module._retro_set_input_state(inputStatePtr);
+
+            // Load game
+            const gameInfo = Module._malloc(24); // struct retro_game_info
+            const pathPtr = Module._malloc(file.name.length + 2);
+            Module.stringToUTF8('/' + file.name, pathPtr, file.name.length + 1);
+
+            Module.HEAP32[gameInfo >> 2] = pathPtr;
+            Module.HEAP32[(gameInfo + 4) >> 2] = data.length;
+            Module.HEAP32[(gameInfo + 8) >> 2] = 0; // meta
+
+            const success = Module._retro_load_game(gameInfo);
+            if (success) {
+                logger("Game loaded successfully!", "#0f0");
+                statusElement.textContent = "Running: " + file.name;
+                gameRunning = true;
+
+                function loop() {
+                    if (gameRunning) {
                         try {
-                            const str = Module.UTF8ToString(str_ptr);
-                            const lower = str.toLowerCase();
-                            const len = Module.lengthBytesUTF8(lower) + 1;
-                            const ptr = Module._malloc(len);
-                            Module.stringToUTF8(lower, ptr, len);
-                            logger(`string_to_lower: "${str}" -> "${lower}"`, "#888");
-                            return ptr;
-                        } catch (e) {
-                            console.error('string_to_lower error:', e);
-                            return str_ptr;
+                            Module._retro_run();
+                            requestAnimationFrame(loop);
+                        } catch (err) {
+                            logger("Execution Error: " + err, "#f00");
+                            gameRunning = false;
                         }
-                    };
-                    // Also define with underscore prefix for C name mangling
-                    Module['_string_to_lower'] = Module['string_to_lower'];
-                }],
-
-                onRuntimeInitialized: async function () {
-                    logger("WASM Initialized", "#0f0");
-                    try {
-                        // 1. Write ROM to Virtual Filesystem (Crucial for Arcade cores)
-                        const romPath = `/${file.name}`;
-                        Module.FS.writeFile(romPath, romData);
-                        logger(`ROM written to virtual FS: ${romPath}`, "#888");
-
-                        // 2. Prepare retro_game_info
-                        const namePtr = Module._malloc(romPath.length + 1);
-                        Module.stringToUTF8(romPath, namePtr, romPath.length + 1);
-
-                        // Arcade cores usually want the path, not the data buffer
-                        const info = Module._malloc(16);
-                        Module.HEAP32[(info >> 2) + 0] = namePtr; // path
-                        Module.HEAP32[(info >> 2) + 1] = 0;       // data (null)
-                        Module.HEAP32[(info >> 2) + 2] = 0;       // size (0)
-                        Module.HEAP32[(info >> 2) + 3] = 0;       // meta (null)
-
-                        logger("Registering callbacks...");
-                        Module._retro_set_environment(Module.addFunction(env_cb, "iii"));
-                        Module._retro_set_video_refresh(Module.addFunction(video_cb, "viiii"));
-                        Module._retro_set_audio_sample(Module.addFunction(audio_cb, "vii"));
-                        Module._retro_set_audio_sample_batch(Module.addFunction(audio_batch_cb, "iii"));
-                        Module._retro_set_input_poll(Module.addFunction(input_poll_cb, "v"));
-                        Module._retro_set_input_state(Module.addFunction(input_state_cb, "iiiii"));
-
-                        logger("Initializing core...");
-                        Module._retro_init();
-
-                        logger("Loading game with ccall...");
-                        try {
-                            const res = Module.ccall('retro_load_game', 'number', ['number'], [info]);
-                            if (res) {
-                                logger(`Game loaded successfully!`, "#0f0");
-                                document.getElementById('status').innerText = "Running!";
-                                const loop = () => {
-                                    Module._retro_run();
-                                    requestAnimationFrame(loop);
-                                };
-                                requestAnimationFrame(loop);
-                            } else {
-                                logger("Failed to load game (core returned 0)", "#f00");
-                                document.getElementById('status').innerText = "Load failed - Check ROM compatibility";
-                            }
-                        } catch (e) {
-                            logger(`Load error: ${e.message}`, "#f00");
-                            if (e.message.includes("signature mismatch")) {
-                                logger("CRITICAL: Signature mismatch - Core needs rebuild", "#ff0");
-                            }
-                        }
-                    } catch (e) {
-                        logger("Error: " + e.message, "#f00");
-                        console.error(e);
                     }
                 }
-            };
-
-            const script = document.createElement('script');
-            script.src = 'src/core/fbneo_libretro.js';
-            document.body.appendChild(script);
+                loop();
+            } else {
+                logger("Failed to load game!", "#f00");
+                statusElement.textContent = "Error Loading ROM";
+            }
         });
     </script>
 </body>
