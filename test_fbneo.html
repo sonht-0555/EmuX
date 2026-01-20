@@ -89,6 +89,18 @@
                     const fmt = Module.HEAP32[data >> 2];
                     logger(`  -> pixel format: ${fmt}`);
                     return 1;
+                case 15: // GET_VARIABLE
+                    const variablePtr = Module.HEAP32[data >> 2];
+                    if (!variablePtr) return 0;
+
+                    // Manual string reading to avoid Emscripten's "not exported" abort
+                    let key = "";
+                    for (let i = variablePtr; Module.HEAPU8[i] !== 0; i++) {
+                        key += String.fromCharCode(Module.HEAPU8[i]);
+                    }
+
+                    logger(`  -> variable query: ${key}`, "#aaa");
+                    return 0;
                 default:
                     return 0;
             }
@@ -177,15 +189,21 @@
                 onRuntimeInitialized: async function () {
                     logger("WASM Initialized", "#0f0");
                     try {
-                        const namePtr = Module._malloc(file.name.length + 1);
-                        Module.stringToUTF8(file.name, namePtr, file.name.length + 1);
-                        const romPtr = Module._malloc(romData.length);
-                        Module.HEAPU8.set(romData, romPtr);
+                        // 1. Write ROM to Virtual Filesystem (Crucial for Arcade cores)
+                        const romPath = `/${file.name}`;
+                        Module.FS.writeFile(romPath, romData);
+                        logger(`ROM written to virtual FS: ${romPath}`, "#888");
+
+                        // 2. Prepare retro_game_info
+                        const namePtr = Module._malloc(romPath.length + 1);
+                        Module.stringToUTF8(romPath, namePtr, romPath.length + 1);
+
+                        // Arcade cores usually want the path, not the data buffer
                         const info = Module._malloc(16);
-                        Module.HEAP32[(info >> 2) + 0] = namePtr;
-                        Module.HEAP32[(info >> 2) + 1] = romPtr;
-                        Module.HEAP32[(info >> 2) + 2] = romData.length;
-                        Module.HEAP32[(info >> 2) + 3] = 0;
+                        Module.HEAP32[(info >> 2) + 0] = namePtr; // path
+                        Module.HEAP32[(info >> 2) + 1] = 0;       // data (null)
+                        Module.HEAP32[(info >> 2) + 2] = 0;       // size (0)
+                        Module.HEAP32[(info >> 2) + 3] = 0;       // meta (null)
 
                         logger("Registering callbacks...");
                         Module._retro_set_environment(Module.addFunction(env_cb, "iii"));
