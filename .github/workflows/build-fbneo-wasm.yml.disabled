@@ -1,0 +1,83 @@
+name: Build FBNeo WASM
+
+on:
+  push:
+    paths:
+      - '.github/workflows/build-fbneo-wasm.yml'
+      - 'retro_glue.c'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Emscripten 3.1.74
+      uses: mymindstorm/setup-emsdk@v14
+      with:
+        version: 3.1.74
+        actions-cache-folder: 'emsdk-cache-fbneo'
+
+    - name: Clone FBNeo
+      run: git clone --depth 1 https://github.com/libretro/FBNeo.git
+
+    - name: Build FBNeo
+      run: |
+        # 1. Compile glue code
+        echo "Compiling glue code..."
+        emcc -c retro_glue.c -o retro_glue.o -s USE_ZLIB=1
+        GLUE_OBJ_PATH=$(pwd)/retro_glue.o
+
+        # 2. Build FBNeo Core
+        cd FBNeo/src/burner/libretro
+        echo "Building FBNeo core..."
+        emmake make -f Makefile platform=emscripten -j$(nproc)
+
+        # 3. Identify output
+        if [ -f "fbneo_libretro_emscripten.bc" ]; then
+          CORE_FILE="fbneo_libretro_emscripten.bc"
+        elif [ -f "fbneo_libretro_emscripten.a" ]; then
+          CORE_FILE="fbneo_libretro_emscripten.a"
+        else
+          echo "ERROR: No output file found"
+          ls -la
+          exit 1
+        fi
+        echo "Found core: $CORE_FILE"
+
+        # 4. Define Flags function to avoid repetition
+        # Note: We use a local shell variable and ensure it's not split incorrectly
+        COMMON_ARGS="-O2 -s WASM=1 -s USE_ZLIB=1 -s ALLOW_MEMORY_GROWTH=1 -s INITIAL_MEMORY=268435456 -s ENVIRONMENT=web -s MODULARIZE=0 -s EXPORT_NAME='Module' -s FORCE_FILESYSTEM=1 -s EXPORTED_RUNTIME_METHODS='[\"addFunction\",\"FS\",\"stringToUTF8\",\"UTF8ToString\",\"ccall\",\"cwrap\"]' -s EXPORTED_FUNCTIONS='[\"_retro_init\",\"_retro_deinit\",\"_retro_run\",\"_retro_load_game\",\"_retro_unload_game\",\"_retro_set_environment\",\"_retro_set_video_refresh\",\"_retro_set_audio_sample\",\"_retro_set_audio_sample_batch\",\"_retro_set_input_poll\",\"_retro_set_input_state\",\"_retro_get_system_av_info\",\"_string_replace_substring\",\"_find_last_slash\",\"_path_basename\",\"_path_parent_dir\",\"_path_is_absolute\",\"_retro_opendir_include_hidden\",\"_retro_readdir\",\"_retro_dirent_get_name\",\"_retro_dirent_is_dir\",\"_retro_closedir\",\"_malloc\",\"_free\"]' -s ALLOW_TABLE_GROWTH=1 -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=2 -s RESERVED_FUNCTION_POINTERS=20"
+
+        # 5. Link to WASM
+        FILE_TYPE=$(file "$CORE_FILE")
+        if echo "$FILE_TYPE" | grep -q "archive"; then
+          echo "Linking archive..."
+          mkdir -p tmp_obj && cd tmp_obj
+          emar x "../$CORE_FILE"
+          eval emcc *.o "$GLUE_OBJ_PATH" $COMMON_ARGS -o ../../../../../src/core/fbneo_libretro.js
+          cd ..
+        else
+          echo "Linking bitcode..."
+          eval emcc "$CORE_FILE" "$GLUE_OBJ_PATH" $COMMON_ARGS -o ../../../../src/core/fbneo_libretro.js
+        fi
+
+        # 6. Verify
+        echo "=== Build Verification ==="
+        if grep -q "dynCall_iii" ../../../../src/core/fbneo_libretro.js; then
+          echo "✓ SUCCESS: Found dynCall_iii"
+        else
+          echo "✗ FAILURE: dynCall_iii not found"
+          exit 1
+        fi
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: fbneo-wasm
+        path: src/core/fbneo_libretro.*

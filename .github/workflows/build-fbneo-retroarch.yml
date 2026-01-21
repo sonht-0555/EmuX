@@ -1,0 +1,98 @@
+name: Build FBNeo Standalone
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout EmuX
+      uses: actions/checkout@v3
+      with:
+        path: emux
+
+    - name: Setup Emscripten
+      uses: mymindstorm/setup-emsdk@v14
+      with:
+        version: 3.1.46
+        actions-cache-folder: 'emsdk-cache'
+
+    - name: Clone libretro-super and fetch FBNeo
+      run: |
+        git clone --depth 1 https://github.com/libretro/libretro-super.git
+        cd libretro-super
+        ./libretro-fetch.sh fbneo
+        
+        echo "FBNeo source fetched:"
+        ls -la libretro-fbneo/
+
+    - name: Compile glue code
+      run: |
+        cd emux
+        echo "Compiling glue code..."
+        emcc -c retro_glue.c -o retro_glue.o -s USE_ZLIB=1
+        echo "Glue code compiled:"
+        ls -lh retro_glue.o
+
+    - name: Build FBNeo core
+      run: |
+        cd libretro-super/libretro-fbneo/src/burner/libretro
+        
+        echo "Building FBNeo core for Emscripten..."
+        emmake make -f Makefile platform=emscripten -j$(nproc)
+        
+        echo "Build output:"
+        ls -lh fbneo_libretro_emscripten.*
+
+    - name: Link to WASM
+      run: |
+        cd libretro-super/libretro-fbneo/src/burner/libretro
+        
+        CORE_FILE="fbneo_libretro_emscripten.bc"
+        if [ ! -f "$CORE_FILE" ]; then
+          CORE_FILE="fbneo_libretro_emscripten.a"
+        fi
+        
+        echo "Linking $CORE_FILE with glue code..."
+        emcc "$CORE_FILE" ../../../../../emux/retro_glue.o \
+          -g \
+          -O2 \
+          -s WASM=1 \
+          -s USE_ZLIB=1 \
+          -s ALLOW_MEMORY_GROWTH=1 \
+          -s INITIAL_MEMORY=536870912 \
+          -s STACK_SIZE=8388608 \
+          -s ENVIRONMENT=web \
+          -s MODULARIZE=0 \
+          -s EXPORT_NAME='Module' \
+          -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap"]' \
+          -s EXPORTED_FUNCTIONS='["_retro_init","_retro_deinit","_retro_run","_retro_load_game","_retro_unload_game","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_retro_get_system_av_info","_string_replace_substring","_find_last_slash","_path_basename","_path_parent_dir","_path_is_absolute","_retro_opendir_include_hidden","_retro_readdir","_retro_dirent_get_name","_retro_dirent_is_dir","_retro_closedir","_malloc","_free"]' \
+          -s ALLOW_TABLE_GROWTH=1 \
+          -s ERROR_ON_UNDEFINED_SYMBOLS=0 \
+          -s ASSERTIONS=2 \
+          -s RESERVED_FUNCTION_POINTERS=20 \
+          -s SAFE_HEAP=0 \
+          -s DEMANGLE_SUPPORT=1 \
+          -o fbneo_libretro.js
+        
+        echo "Link complete! Output:"
+        ls -lh fbneo_libretro.*
+
+    - name: Copy built files to EmuX
+      run: |
+        mkdir -p emux/src/core
+        cp libretro-super/libretro-fbneo/src/burner/libretro/fbneo_libretro.js emux/src/core/
+        cp libretro-super/libretro-fbneo/src/burner/libretro/fbneo_libretro.wasm emux/src/core/
+        
+        echo "Files copied:"
+        ls -lh emux/src/core/fbneo_libretro.*
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: fbneo-wasm
+        path: emux/src/core/fbneo_libretro.*

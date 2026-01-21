@@ -56,6 +56,9 @@
     <div id="log"></div>
     <canvas id="canvas" width="320" height="240"></canvas>
 
+    <!-- JSZip library for extracting ROM from ZIP -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
     <script>
         const logger = (msg, color = '#fff') => {
             const l = document.getElementById('log');
@@ -176,129 +179,165 @@
             if (!file) return;
 
             logger(`Loading: ${file.name}`, "#0ff");
-            const buffer = await file.arrayBuffer();
-            const romData = new Uint8Array(buffer);
+            document.getElementById('status').innerText = `Extracting ${file.name}...`;
 
-            window.Module = {
-                canvas: document.getElementById('canvas'),
-                ctx: document.getElementById('canvas').getContext('2d'),
-                locateFile: (p) => p.endsWith('.wasm') ? 'src/core/fbneo_libretro.wasm' : p,
+            try {
+                // Read ZIP file
+                const zipData = await file.arrayBuffer();
+                const zip = await JSZip.loadAsync(zipData);
 
-                preRun: [function () {
-                    // Inject string_to_lower function before WASM runs
-                    Module['string_to_lower'] = function (str_ptr) {
-                        if (!str_ptr) return 0;
-                        try {
-                            const str = Module.UTF8ToString(str_ptr);
-                            const lower = str.toLowerCase();
-                            const len = Module.lengthBytesUTF8(lower) + 1;
-                            const ptr = Module._malloc(len);
-                            Module.stringToUTF8(lower, ptr, len);
-                            logger(`string_to_lower: "${str}" -> "${lower}"`, "#888");
-                            return ptr;
-                        } catch (e) {
-                            console.error('string_to_lower error:', e);
-                            return str_ptr;
-                        }
-                    };
-                    // Also define with underscore prefix for C name mangling
-                    Module['_string_to_lower'] = Module['string_to_lower'];
+                logger(`ZIP opened, found ${Object.keys(zip.files).length} files`, "#0ff");
 
-                    // Inject string_replace_substring function
-                    Module['string_replace_substring'] = function (inPtr, patternPtr, byPtr) {
-                        const input = Module.UTF8ToString(inPtr);
-                        const pattern = Module.UTF8ToString(patternPtr);
-                        const by = Module.UTF8ToString(byPtr);
-                        const result = input.split(pattern).join(by);
-                        const resPtr = Module._malloc(result.length + 1);
-                        Module.stringToUTF8(result, resPtr, result.length + 1);
-                        logger(`string_replace_substring: "${input}" (pattern: "${pattern}", by: "${by}") -> "${result}"`, "#888");
-                        return resPtr;
-                    };
-                    Module['_string_replace_substring'] = Module['string_replace_substring'];
-                }],
-
-                onRuntimeInitialized: async function () {
-                    logger("WASM Initialized", "#0f0");
-                    try {
-                        // 1. Write ROM to Virtual Filesystem (Crucial for Arcade cores)
-                        const romPath = `/${file.name}`;
-                        Module.FS.writeFile(romPath, romData);
-                        logger(`ROM written to virtual FS: ${romPath}`, "#888");
-
-                        // 2. Prepare retro_game_info
-                        const namePtr = Module._malloc(romPath.length + 1);
-                        Module.stringToUTF8(romPath, namePtr, romPath.length + 1);
-
-                        // Arcade cores usually want the path, not the data buffer
-                        const info = Module._malloc(16);
-                        Module.HEAP32[(info >> 2) + 0] = namePtr; // path
-                        Module.HEAP32[(info >> 2) + 1] = 0;       // data (null)
-                        Module.HEAP32[(info >> 2) + 2] = 0;       // size (0)
-                        Module.HEAP32[(info >> 2) + 3] = 0;       // meta (null)
-
-                        logger("Registering callbacks...");
-                        Module._retro_set_environment(Module.addFunction(env_cb, "iii"));
-                        Module._retro_set_video_refresh(Module.addFunction(video_refresh_cb, "viiii"));
-                        Module._retro_set_audio_sample(Module.addFunction(audio_cb, "vii"));
-                        Module._retro_set_audio_sample_batch(Module.addFunction(audio_batch_cb, "iii"));
-                        Module._retro_set_input_poll(Module.addFunction(input_poll_cb, "v"));
-                        Module._retro_set_input_state(Module.addFunction(input_state_cb, "iiiii"));
-
-                        logger("Initializing core...");
-                        Module._retro_init();
-
-                        logger("Loading game with ccall...");
-                        try {
-                            logger("Calling retro_load_game...");
-                            const res = Module.ccall('retro_load_game', 'number', ['number'], [info]);
-                            logger(`retro_load_game returned: ${res}`);
-
-                            if (res) {
-                                logger(`Game loaded successfully!`, "#0f0");
-
-                                // Get AV info
-                                try {
-                                    const avInfo = Module._malloc(32);
-                                    logger("Calling retro_get_system_av_info...");
-                                    Module._retro_get_system_av_info(avInfo);
-                                    logger("retro_get_system_av_info succeeded");
-
-                                    const width = Module.HEAP32[(avInfo >> 2) + 2];
-                                    const height = Module.HEAP32[(avInfo >> 2) + 3];
-                                    logger(`Video: ${width}x${height}`, "#0ff");
-                                    Module._free(avInfo);
-                                } catch (e) {
-                                    logger(`AV Info error: ${e.message}`, "#f00");
-                                }
-
-                                document.getElementById('status').innerText = "Running!";
-                                const loop = () => {
-                                    Module._retro_run();
-                                    requestAnimationFrame(loop);
-                                };
-                                requestAnimationFrame(loop);
-                            } else {
-                                logger("Failed to load game (core returned 0)", "#f00");
-                                document.getElementById('status').innerText = "Load failed - Check ROM compatibility";
-                            }
-                        } catch (e) {
-                            logger(`Load error: ${e.message}`, "#f00");
-                            console.error(e);
-                            if (e.message.includes("signature mismatch")) {
-                                logger("CRITICAL: Signature mismatch - Core needs rebuild", "#ff0");
-                            }
-                        }
-                    } catch (e) {
-                        logger("Error: " + e.message, "#f00");
-                        console.error(e);
+                // Extract all files from ZIP
+                const extractedFiles = [];
+                for (const [filename, zipEntry] of Object.entries(zip.files)) {
+                    if (!zipEntry.dir) {
+                        const fileData = await zipEntry.async('uint8array');
+                        extractedFiles.push({ name: filename, data: fileData });
+                        logger(`  Extracted: ${filename} (${fileData.length} bytes)`, "#888");
                     }
                 }
-            };
 
-            const script = document.createElement('script');
-            script.src = 'src/core/fbneo_libretro.js';
-            document.body.appendChild(script);
+                if (extractedFiles.length === 0) {
+                    throw new Error("No files found in ZIP");
+                }
+
+                // Store for later use
+                window.romData = extractedFiles;
+                window.romFile = file;
+
+                window.Module = {
+                    canvas: document.getElementById('canvas'),
+                    ctx: document.getElementById('canvas').getContext('2d'),
+                    locateFile: (p) => p.endsWith('.wasm') ? 'src/core/fbneo_libretro.wasm' : p,
+
+                    preRun: [function () {
+                        // Inject string_to_lower function before WASM runs
+                        Module['string_to_lower'] = function (str_ptr) {
+                            if (!str_ptr) return 0;
+                            try {
+                                const str = Module.UTF8ToString(str_ptr);
+                                const lower = str.toLowerCase();
+                                const len = Module.lengthBytesUTF8(lower) + 1;
+                                const ptr = Module._malloc(len);
+                                Module.stringToUTF8(lower, ptr, len);
+                                logger(`string_to_lower: "${str}" -> "${lower}"`, "#888");
+                                return ptr;
+                            } catch (e) {
+                                console.error('string_to_lower error:', e);
+                                return str_ptr;
+                            }
+                        };
+                        // Also define with underscore prefix for C name mangling
+                        Module['_string_to_lower'] = Module['string_to_lower'];
+
+                        // Inject string_replace_substring function
+                        Module['string_replace_substring'] = function (inPtr, patternPtr, byPtr) {
+                            const input = Module.UTF8ToString(inPtr);
+                            const pattern = Module.UTF8ToString(patternPtr);
+                            const by = Module.UTF8ToString(byPtr);
+                            const result = input.split(pattern).join(by);
+                            const resPtr = Module._malloc(result.length + 1);
+                            Module.stringToUTF8(result, resPtr, result.length + 1);
+                            logger(`string_replace_substring: "${input}" (pattern: "${pattern}", by: "${by}") -> "${result}"`, "#888");
+                            return resPtr;
+                        };
+                        Module['_string_replace_substring'] = Module['string_replace_substring'];
+                    }],
+
+                    onRuntimeInitialized: async function () {
+                        logger("WASM Initialized", "#0f0");
+                        try {
+                            // Write all extracted ROM files to virtual FS
+                            for (const file of window.romData) {
+                                Module.FS.writeFile(`/${file.name}`, file.data);
+                                logger(`  Written: /${file.name} (${file.data.length} bytes)`, "#888");
+                            }
+
+                            // Also write the original ZIP (FBNeo might need it)
+                            const zipPath = `/${window.romFile.name}`;
+                            const zipBuffer = await window.romFile.arrayBuffer();
+                            Module.FS.writeFile(zipPath, new Uint8Array(zipBuffer));
+                            logger(`ROM files written to virtual FS`, "#0f0");
+
+                            // Prepare retro_game_info with ZIP path
+                            const namePtr = Module._malloc(zipPath.length + 1);
+                            Module.stringToUTF8(zipPath, namePtr, zipPath.length + 1);
+
+                            // Arcade cores usually want the path, not the data buffer
+                            const info = Module._malloc(16);
+                            Module.HEAP32[(info >> 2) + 0] = namePtr; // path
+                            Module.HEAP32[(info >> 2) + 1] = 0;       // data (null)
+                            Module.HEAP32[(info >> 2) + 2] = 0;       // size (0)
+                            Module.HEAP32[(info >> 2) + 3] = 0;       // meta (null)
+
+                            logger("Registering callbacks...");
+                            Module._retro_set_environment(Module.addFunction(env_cb, "iii"));
+                            Module._retro_set_video_refresh(Module.addFunction(video_refresh_cb, "viiii"));
+                            Module._retro_set_audio_sample(Module.addFunction(audio_cb, "vii"));
+                            Module._retro_set_audio_sample_batch(Module.addFunction(audio_batch_cb, "iii"));
+                            Module._retro_set_input_poll(Module.addFunction(input_poll_cb, "v"));
+                            Module._retro_set_input_state(Module.addFunction(input_state_cb, "iiiii"));
+
+                            logger("Initializing core...");
+                            Module._retro_init();
+
+                            logger("Loading game with ccall...");
+                            try {
+                                logger("Calling retro_load_game...");
+                                const res = Module.ccall('retro_load_game', 'number', ['number'], [info]);
+                                logger(`retro_load_game returned: ${res}`);
+
+                                if (res) {
+                                    logger(`Game loaded successfully!`, "#0f0");
+
+                                    // Get AV info
+                                    try {
+                                        const avInfo = Module._malloc(32);
+                                        logger("Calling retro_get_system_av_info...");
+                                        Module._retro_get_system_av_info(avInfo);
+                                        logger("retro_get_system_av_info succeeded");
+
+                                        const width = Module.HEAP32[(avInfo >> 2) + 2];
+                                        const height = Module.HEAP32[(avInfo >> 2) + 3];
+                                        logger(`Video: ${width}x${height}`, "#0ff");
+                                        Module._free(avInfo);
+                                    } catch (e) {
+                                        logger(`AV Info error: ${e.message}`, "#f00");
+                                    }
+
+                                    document.getElementById('status').innerText = "Running!";
+                                    const loop = () => {
+                                        Module._retro_run();
+                                        requestAnimationFrame(loop);
+                                    };
+                                    requestAnimationFrame(loop);
+                                } else {
+                                    logger("Failed to load game (core returned 0)", "#f00");
+                                    document.getElementById('status').innerText = "Load failed - Check ROM compatibility";
+                                }
+                            } catch (e) {
+                                logger(`Load error: ${e.message}`, "#f00");
+                                console.error(e);
+                                if (e.message.includes("signature mismatch")) {
+                                    logger("CRITICAL: Signature mismatch - Core needs rebuild", "#ff0");
+                                }
+                            }
+                        } catch (e) {
+                            logger("Error: " + e.message, "#f00");
+                            console.error(e);
+                        }
+                    }
+                };
+
+                const script = document.createElement('script');
+                script.src = 'src/core/fbneo_libretro.js?v=' + Date.now();
+                document.body.appendChild(script);
+            } catch (e) {
+                logger(`ZIP extraction error: ${e.message}`, "#f00");
+                console.error(e);
+                document.getElementById('status').innerText = `Error: ${e.message}`;
+            }
         });
     </script>
 </body>
