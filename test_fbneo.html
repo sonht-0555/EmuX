@@ -70,44 +70,63 @@
         function env_cb(cmd, data) {
             logger(`env_cb: cmd=${cmd} (0x${cmd.toString(16)})`);
             switch (cmd) {
-                case 1: // SET_ROTATION
+                case 1:  // RETRO_ENVIRONMENT_SET_ROTATION
+                case 11: // RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS
+                case 12: // RETRO_ENVIRONMENT_SET_KEYBOARD_CALLBACK
                     return 1;
-                case 2: // GET_CAN_DUPE
-                    if (data) Module.HEAP8[data] = 1;
+
+                case 10: // RETRO_ENVIRONMENT_SET_PIXEL_FORMAT
+                    const pixelFormat = Module.HEAP32[data >> 2];
+                    logger(`  -> Pixel format set to: ${pixelFormat} (0=RGB1555, 1=XRGB8888, 2=RGB565)`, "#aaa");
                     return 1;
-                case 8: // GET_SYSTEM_DIRECTORY
-                case 9: // GET_SAVE_DIRECTORY
-                case 31: // GET_CORE_ASSETS_DIRECTORY
-                    const dir = "/home/web_user/retroarch";
-                    try { if (!Module.FS.analyzePath(dir).exists) Module.FS.mkdirTree(dir); } catch (e) { }
-                    const ptr = Module._malloc(dir.length + 1);
-                    Module.stringToUTF8(dir, ptr, dir.length + 1);
-                    Module.HEAP32[data >> 2] = ptr;
-                    logger(`  -> provided directory: ${dir}`);
+
+                case 31: // RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY
+                case 9:  // RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY
+                case 54: // RETRO_ENVIRONMENT_GET_CORE_ASSETS_DIRECTORY
+                    const dirPtr = Module._malloc(256);
+                    Module.stringToUTF8("/home/web_user/retroarch", dirPtr, 256);
+                    Module.HEAP32[data >> 2] = dirPtr;
                     return 1;
-                case 10: // SET_PIXEL_FORMAT
-                    const fmt = Module.HEAP32[data >> 2];
-                    logger(`  -> pixel format: ${fmt}`);
-                    return 1;
-                case 15: // GET_VARIABLE
+
+                case 15: // RETRO_ENVIRONMENT_GET_VARIABLE
                     const variablePtr = Module.HEAP32[data >> 2];
                     if (!variablePtr) return 0;
-
-                    // Manual string reading to avoid Emscripten's "not exported" abort
-                    let key = "";
-                    for (let i = variablePtr; Module.HEAPU8[i] !== 0; i++) {
-                        key += String.fromCharCode(Module.HEAPU8[i]);
-                    }
-
-                    logger(`  -> variable query: ${key}`, "#aaa");
+                    let key = Module.UTF8ToString(variablePtr);
+                    // logger(`  -> query variable: ${key}`, "#888");
+                    Module.HEAP32[(data >> 2) + 1] = 0; // Value = NULL
                     return 0;
+
+                case 27: // RETRO_ENVIRONMENT_GET_LOG_INTERFACE
+                    return 0; // Return 0 to avoid variadic function signature mismatch crashes
+
+                case 52: // RETRO_ENVIRONMENT_GET_CORE_OPTIONS_VERSION
+                    if (data) Module.HEAP32[data >> 2] = 1;
+                    return 1;
+
+                case 55: // RETRO_ENVIRONMENT_GET_CORE_OPTIONS_V2
+                case 53: // RETRO_ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY
+                    return 0; // Fallback to older options API
+
+                case 60: // RETRO_ENVIRONMENT_GET_VFS_INTERFACE
+                    return 0;
+
+                    return 0;
+
                 default:
+                    // console.log("env_cb: cmd=" + cmd);
                     return 0;
             }
         }
+        let firstFrameReceived = false;
+        // Video Callback - Cleaned up to remove spam
+        function video_refresh_cb(data, w, h, p) {
+            if (!data || !Module.ctx) return;
 
-        function video_cb(data, w, h, p) {
-            if (!Module.ctx) return;
+            if (!firstFrameReceived) {
+                logger(`First frame received: ${w}x${h}, pitch: ${p}`, "#0f0");
+                firstFrameReceived = true;
+            }
+
             if (Module.lastW !== w || Module.lastH !== h) {
                 Module.canvas.width = w;
                 Module.canvas.height = h;
@@ -184,6 +203,19 @@
                     };
                     // Also define with underscore prefix for C name mangling
                     Module['_string_to_lower'] = Module['string_to_lower'];
+
+                    // Inject string_replace_substring function
+                    Module['string_replace_substring'] = function (inPtr, patternPtr, byPtr) {
+                        const input = Module.UTF8ToString(inPtr);
+                        const pattern = Module.UTF8ToString(patternPtr);
+                        const by = Module.UTF8ToString(byPtr);
+                        const result = input.split(pattern).join(by);
+                        const resPtr = Module._malloc(result.length + 1);
+                        Module.stringToUTF8(result, resPtr, result.length + 1);
+                        logger(`string_replace_substring: "${input}" (pattern: "${pattern}", by: "${by}") -> "${result}"`, "#888");
+                        return resPtr;
+                    };
+                    Module['_string_replace_substring'] = Module['string_replace_substring'];
                 }],
 
                 onRuntimeInitialized: async function () {
@@ -207,7 +239,7 @@
 
                         logger("Registering callbacks...");
                         Module._retro_set_environment(Module.addFunction(env_cb, "iii"));
-                        Module._retro_set_video_refresh(Module.addFunction(video_cb, "viiii"));
+                        Module._retro_set_video_refresh(Module.addFunction(video_refresh_cb, "viiii"));
                         Module._retro_set_audio_sample(Module.addFunction(audio_cb, "vii"));
                         Module._retro_set_audio_sample_batch(Module.addFunction(audio_batch_cb, "iii"));
                         Module._retro_set_input_poll(Module.addFunction(input_poll_cb, "v"));
@@ -218,9 +250,28 @@
 
                         logger("Loading game with ccall...");
                         try {
+                            logger("Calling retro_load_game...");
                             const res = Module.ccall('retro_load_game', 'number', ['number'], [info]);
+                            logger(`retro_load_game returned: ${res}`);
+
                             if (res) {
                                 logger(`Game loaded successfully!`, "#0f0");
+
+                                // Get AV info
+                                try {
+                                    const avInfo = Module._malloc(32);
+                                    logger("Calling retro_get_system_av_info...");
+                                    Module._retro_get_system_av_info(avInfo);
+                                    logger("retro_get_system_av_info succeeded");
+
+                                    const width = Module.HEAP32[(avInfo >> 2) + 2];
+                                    const height = Module.HEAP32[(avInfo >> 2) + 3];
+                                    logger(`Video: ${width}x${height}`, "#0ff");
+                                    Module._free(avInfo);
+                                } catch (e) {
+                                    logger(`AV Info error: ${e.message}`, "#f00");
+                                }
+
                                 document.getElementById('status').innerText = "Running!";
                                 const loop = () => {
                                     Module._retro_run();
@@ -233,6 +284,7 @@
                             }
                         } catch (e) {
                             logger(`Load error: ${e.message}`, "#f00");
+                            console.error(e);
                             if (e.message.includes("signature mismatch")) {
                                 logger("CRITICAL: Signature mismatch - Core needs rebuild", "#ff0");
                             }
