@@ -1,6 +1,8 @@
 #define _FILE_OFFSET_BITS 64
 #include <dirent.h>
+#ifdef __EMSCRIPTEN__
 #include <emscripten.h>
+#endif
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -8,7 +10,10 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#define GLUE_LOG(fmt, ...) printf("[GLUE] " fmt "\n", ##__VA_ARGS__)
+/* Fix for IDE/IntelliSense red squiggly lines */
+#ifndef EMSCRIPTEN_KEEPALIVE
+#define EMSCRIPTEN_KEEPALIVE
+#endif
 
 /* Libretro VFS Constants */
 #define RETRO_VFS_FILE_ACCESS_READ (1 << 0)
@@ -20,7 +25,7 @@
 #define RETRO_VFS_FILE_ACCESS_HINT_NONE (0)
 #define RETRO_VFS_FILE_ACCESS_HINT_FREQUENT_ACCESS (1 << 0)
 
-/* String utilities */
+/* String utilities - Kept for core logic compatibility */
 EMSCRIPTEN_KEEPALIVE char *string_to_lower(const char *str) {
   if (!str)
     return NULL;
@@ -31,7 +36,6 @@ EMSCRIPTEN_KEEPALIVE char *string_to_lower(const char *str) {
   return lower;
 }
 
-/* Audited from libretro-common/string/stdstring.c */
 EMSCRIPTEN_KEEPALIVE char *
 string_replace_substring(const char *in, size_t in_len, const char *pattern,
                          size_t pattern_len, const char *replacement,
@@ -72,7 +76,7 @@ string_replace_substring(const char *in, size_t in_len, const char *pattern,
   return out;
 }
 
-/* Path utilities - Audited from libretro-common/file/file_path.c */
+/* Path utilities */
 EMSCRIPTEN_KEEPALIVE const char *find_last_slash(const char *str) {
   const char *s1 = strrchr(str, '/'), *s2 = strrchr(str, '\\');
   return (s1 > s2) ? s1 : (s2 ? s2 : s1);
@@ -162,7 +166,7 @@ EMSCRIPTEN_KEEPALIVE void retro_closedir(struct RDIR *r) {
   }
 }
 
-/* Helper to convert Libretro VFS modes to fopen modes */
+/* File I/O utilities */
 static const char *vfs_mode_to_string(unsigned mode) {
   if (mode == RETRO_VFS_FILE_ACCESS_READ)
     return "rb";
@@ -176,10 +180,8 @@ static const char *vfs_mode_to_string(unsigned mode) {
   return "rb";
 }
 
-/* Standard File implementation used by filestream and VFS */
 EMSCRIPTEN_KEEPALIVE void *filestream_open(const char *path, unsigned mode,
                                            unsigned hints) {
-  GLUE_LOG("filestream_open: %s (mode %u)", path, mode);
   return (void *)fopen(path, vfs_mode_to_string(mode));
 }
 
@@ -203,12 +205,13 @@ EMSCRIPTEN_KEEPALIVE int64_t filestream_tell(void *stream) {
 }
 
 EMSCRIPTEN_KEEPALIVE int filestream_close(void *stream) {
-  GLUE_LOG("filestream_close: %p", stream);
   return fclose((FILE *)stream);
 }
 
 EMSCRIPTEN_KEEPALIVE int64_t filestream_get_size(void *stream) {
   FILE *fp = (FILE *)stream;
+  if (!fp)
+    return 0;
   int64_t curr = ftello(fp);
   fseeko(fp, 0, SEEK_END);
   int64_t size = ftello(fp);
@@ -216,9 +219,8 @@ EMSCRIPTEN_KEEPALIVE int64_t filestream_get_size(void *stream) {
   return size;
 }
 
-/* Backwards compatibility / Aliases */
+/* Libretro Common Aliases */
 EMSCRIPTEN_KEEPALIVE void *rfopen(const char *path, const char *mode) {
-  GLUE_LOG("rfopen: %s", path);
   return (void *)fopen(path, mode);
 }
 EMSCRIPTEN_KEEPALIVE int64_t rfread(void *buffer, size_t size, size_t count,
@@ -239,13 +241,13 @@ EMSCRIPTEN_KEEPALIVE int64_t rfsize(void *stream) {
   return filestream_get_size(stream);
 }
 EMSCRIPTEN_KEEPALIVE int rfclose(void *stream) {
-  return filestream_close(stream);
+  return fclose((FILE *)stream);
 }
 EMSCRIPTEN_KEEPALIVE int64_t rfget_size(void *stream) {
   return filestream_get_size(stream);
 }
 
-/* VFS Callbacks - Standard signatures from libretro.h */
+/* VFS Callbacks Wrapper */
 struct retro_vfs_file_handle {
   FILE *fp;
 };
@@ -262,10 +264,10 @@ retro_vfs_file_open_impl(const char *path, unsigned mode, unsigned hints) {
 
 EMSCRIPTEN_KEEPALIVE int
 retro_vfs_file_close_impl(struct retro_vfs_file_handle *stream) {
-  if (!stream)
-    return 0;
-  fclose(stream->fp);
-  free(stream);
+  if (stream) {
+    fclose(stream->fp);
+    free(stream);
+  }
   return 0;
 }
 

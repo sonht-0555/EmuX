@@ -5512,13 +5512,6 @@ var _retro_dirent_get_name = Module['_retro_dirent_get_name'] = createExportWrap
 var _retro_dirent_is_dir = Module['_retro_dirent_is_dir'] = createExportWrapper('retro_dirent_is_dir');
 var _retro_closedir = Module['_retro_closedir'] = createExportWrapper('retro_closedir');
 var _free = Module['_free'] = createExportWrapper('free');
-var _rfopen = Module['_rfopen'] = createExportWrapper('rfopen');
-var _rfread = Module['_rfread'] = createExportWrapper('rfread');
-var _rfwrite = Module['_rfwrite'] = createExportWrapper('rfwrite');
-var _rfseek = Module['_rfseek'] = createExportWrapper('rfseek');
-var _rftell = Module['_rftell'] = createExportWrapper('rftell');
-var _rfsize = Module['_rfsize'] = createExportWrapper('rfsize');
-var _rfclose = Module['_rfclose'] = createExportWrapper('rfclose');
 var _filestream_open = Module['_filestream_open'] = createExportWrapper('filestream_open');
 var _filestream_read = Module['_filestream_read'] = createExportWrapper('filestream_read');
 var _filestream_write = Module['_filestream_write'] = createExportWrapper('filestream_write');
@@ -5526,6 +5519,13 @@ var _filestream_seek = Module['_filestream_seek'] = createExportWrapper('filestr
 var _filestream_tell = Module['_filestream_tell'] = createExportWrapper('filestream_tell');
 var _filestream_close = Module['_filestream_close'] = createExportWrapper('filestream_close');
 var _filestream_get_size = Module['_filestream_get_size'] = createExportWrapper('filestream_get_size');
+var _rfopen = Module['_rfopen'] = createExportWrapper('rfopen');
+var _rfread = Module['_rfread'] = createExportWrapper('rfread');
+var _rfwrite = Module['_rfwrite'] = createExportWrapper('rfwrite');
+var _rfseek = Module['_rfseek'] = createExportWrapper('rfseek');
+var _rftell = Module['_rftell'] = createExportWrapper('rftell');
+var _rfsize = Module['_rfsize'] = createExportWrapper('rfsize');
+var _rfclose = Module['_rfclose'] = createExportWrapper('rfclose');
 var _rfget_size = Module['_rfget_size'] = createExportWrapper('rfget_size');
 var _retro_vfs_file_open_impl = Module['_retro_vfs_file_open_impl'] = createExportWrapper('retro_vfs_file_open_impl');
 var _retro_vfs_file_close_impl = Module['_retro_vfs_file_close_impl'] = createExportWrapper('retro_vfs_file_close_impl');
