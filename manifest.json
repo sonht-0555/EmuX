@@ -1,14 +1,14 @@
 {
-  "name": "EmuX",
-  "short_name": "EmuX",
-  "start_url": "",
+  "name": "Test",
+  "short_name": "Test",
+  "start_url": "/1",
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#000000",
-  "description": "EmuX - Play retro games in your browser",
+  "description": "Test",
   "icons": [
     {
-      "src": "/src/img/icon.png",
+      "src": "/icon.png",
       "sizes": "512x512",
       "type": "image/png"
     }
