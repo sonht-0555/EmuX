@@ -29,7 +29,6 @@ jobs:
         emmake make platform=emscripten -j$(nproc) LTO=1
         
         # 3. Link WASM (Ultra-Optimized)
-        # QuickNES output thường là quicknes_libretro_emscripten.bc hoặc .a
         CORE_FILE=$(ls quicknes_libretro_emscripten.* | grep -E '\.(a|bc)$' | head -n 1)
         echo "Linking with core file: $CORE_FILE"
 
