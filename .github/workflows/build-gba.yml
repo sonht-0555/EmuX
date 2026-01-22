@@ -1,4 +1,4 @@
-name: Build Genesis (Genesis Plus GX)
+name: Build GBA (mGBA)
 
 on:
   push:
@@ -18,35 +18,35 @@ jobs:
       with:
         version: 3.1.46
 
-    - name: Fetch and Build Genesis Plus GX Core
+    - name: Fetch and Build mGBA Core
       run: |
         # 1. Fetch Source
         git clone --depth 1 https://github.com/libretro/libretro-super.git
-        cd libretro-super && ./libretro-fetch.sh genesis_plus_gx && cd ..
+        cd libretro-super && ./libretro-fetch.sh mgba && cd ..
         
         # 2. Build Core with LTO
-        cd libretro-super/libretro-genesis_plus_gx
+        cd libretro-super/libretro-mgba
         emmake make -f Makefile.libretro platform=emscripten -j$(nproc) LTO=1
         
         # 3. Link WASM (Ultra-Optimized)
-        CORE_FILE=$(ls genesis_plus_gx_libretro_emscripten.* | grep -E '\.(a|bc)$' | head -n 1)
+        CORE_FILE=$(ls mgba_libretro_emscripten.* | grep -E '\.(a|bc)$' | head -n 1)
         echo "Linking with core file: $CORE_FILE"
 
         emcc "$CORE_FILE" \
           -Oz -flto \
           -s WASM=1 -s USE_ZLIB=1 -s FORCE_FILESYSTEM=1 -s ALLOW_MEMORY_GROWTH=1 \
-          -s INITIAL_MEMORY=67108864 -s STACK_SIZE=5242880 -s ENVIRONMENT=web \
+          -s INITIAL_MEMORY=134217728 -s STACK_SIZE=5242880 -s ENVIRONMENT=web \
           -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap"]' \
           -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free"]' \
           -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 -s ALLOW_TABLE_GROWTH=1 \
-          -o genesis.js
+          -o mgba.js
 
     - name: Package & Upload
       run: |
         mkdir -p emux/src/core
-        zip -j emux/src/core/genesis.zip libretro-super/libretro-genesis_plus_gx/genesis.{js,wasm}
+        cp libretro-super/libretro-mgba/mgba.{js,wasm} emux/src/core/
         
     - uses: actions/upload-artifact@v4
       with:
-        name: genesis
-        path: emux/src/core/genesis.zip
+        name: gba
+        path: emux/src/core/mgba.*

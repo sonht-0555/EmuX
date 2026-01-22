@@ -115,13 +115,13 @@
     display: flex;
     column-gap: 1px;
     transform: rotate(180deg);
+    max-width: calc(100vw - 40px);
   }
   titl {
     padding: 16px 0px 6px 0px;
     color:var(--profile-4);
   }
   name, ver, opti {
-    display: flex;
     flex:1;
     padding: 17px;
     white-space: nowrap;
@@ -186,6 +186,10 @@
   notification title1, time1{
     line-height: 6px;
     height: 7px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: calc(100vw - 120px);
   }
   notification time1{
     font-family: "04bf";
