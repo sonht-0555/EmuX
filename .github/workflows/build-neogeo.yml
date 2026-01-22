@@ -24,8 +24,10 @@ jobs:
         git clone --depth 1 https://github.com/libretro/libretro-super.git
         cd libretro-super && ./libretro-fetch.sh fbneo && cd ..
         
-        # 2. Compile Glue Code with LTO
-        emcc -c emux/retro_glue.c -o emux/retro_glue.o -Oz -flto -s USE_ZLIB=1
+        # 2. Compile Glue Code
+        GLUE_SRC=$(find . -name retro_glue.c | head -n 1)
+        echo "Found glue source at: $GLUE_SRC"
+        emcc -c "$GLUE_SRC" -o retro_glue.o -Oz -flto -s USE_ZLIB=1
         
         # 3. Build Core with LTO
         cd libretro-super/libretro-fbneo/src/burner/libretro
@@ -35,13 +37,14 @@ jobs:
         CORE_FILE=$(ls fbneo_libretro_emscripten.* | grep -E '\.(a|bc)$' | head -n 1)
         echo "Linking with core file: $CORE_FILE"
 
-        emcc "$CORE_FILE" ../../../../../emux/retro_glue.o \
+        emcc "$CORE_FILE" ../../../../../retro_glue.o \
           -Oz -flto \
           -s WASM=1 -s USE_ZLIB=1 -s FORCE_FILESYSTEM=1 -s ALLOW_MEMORY_GROWTH=1 \
+          -s ALLOW_TABLE_GROWTH=1 \
           -s INITIAL_MEMORY=134217728 -s STACK_SIZE=5242880 -s ENVIRONMENT=web \
           -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap"]' \
           -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free"]' \
-          -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 -s RESERVED_FUNCTION_POINTERS=20 \
+          -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 \
           -o fbneo_libretro.js
 
     - name: Package & Upload
@@ -51,5 +54,5 @@ jobs:
         
     - uses: actions/upload-artifact@v4
       with:
-        name: fbneo-wasm-ultra
+        name: fbneo
         path: emux/src/core/fbneo.zip

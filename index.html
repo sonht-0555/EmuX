@@ -1,48 +1,96 @@
 <!DOCTYPE html>
-<html>
+<html lang="vi">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1, width=device-width, height=device-height" />
-<title>mGBA WASM</title>
-<link rel="manifest" href="/manifest.json"/>
-<script type="" src="/main.js"></script>
-<style>
-html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; }
-body { background:#000; color:#fff; text-align:center }
-canvas { image-rendering: pixelated; }
-</style>
+  <title>EmuX</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1, width=device-width, height=device-height" />
+  <link rel="icon" href="/src/img/icon.png" type="image/png" />
+  <link rel="stylesheet" type="text/css" href="./src/css/main.css" />
+  <link rel="manifest" href="/manifest.json" />
 </head>
-<body>
-<h3>EmuX 1.34</h3>
-<canvas id="screen" width="256" height="224"></canvas><br><br>
-<!-- Virtual Gamepad Controls -->
-<div id="gamepad" style="display: flex; justify-content: center; gap: 40px; margin-bottom: 20px;">
-	<div id="dpad" style="display: flex; flex-direction: column; align-items: center; gap:5px">
-		<button class="btn-control" data-btn="up" style="width:40px;height:40px;">▲</button>
-		<div style="display: flex; gap:5px">
-			<button class="btn-control" data-btn="left" style="width:40px;height:40px;">◀</button>
-			<button class="btn-control" data-btn="down" style="width:40px;height:40px;">▼</button>
-			<button class="btn-control" data-btn="right" style="width:40px;height:40px;">▶</button>
-		</div>
-	</div>
-    <div style="display: flex; gap:5px; flex-direction: column;">
-        <div style="display: flex; align-items: center; gap: 5px;">
-            <button class="btn-control" data-btn="l" style="flex:1;height:40px;">L</button>
-            <button class="btn-control" data-btn="r" style="flex:1;height:40px;">R</button>
-        </div>
-        <div style="display: flex; align-items: center; gap: 5px;">
-            <button class="btn-control" data-btn="a" style="width:40px;height:40px;">A</button>
-            <button class="btn-control" data-btn="b" style="width:40px;height:40px;">B</button>
-            <button class="btn-control" data-btn="y" style="width:40px;height:40px;">Y</button>
-            <button class="btn-control" data-btn="x" style="width:40px;height:40px;">X</button>
-        </div>
-        <div style="display: flex; align-items: center; gap: 5px;">
-            <button class="btn-control" data-btn="select" style="width:40px;height:40px;">-</button>
-            <button class="btn-control" data-btn="start" style="width:40px;height:40px;">▶</button>
-            <button class="btn-control" id="resume" style="width:40px;height:40px;">?</button>
-            <input type="file" id="rom" style="width:40px;height:40px; opacity: 0;" accept=".gba,.smc,.sfc">
-        </div>
-    </div>
-</div>
+<script>let gameVer = 'Ver_2.65';</script>
+<body hide>
+  <page00 hidden>
+    <divide></divide>
+    <title0>&nbsp<green0></green0><white0></white0></title0>
+    <message0></message0>
+    <divide></divide>
+  </page00>
+  <page01 >
+    <list02 hidden>
+      <cont><opti>Cloud</opti><opti>Restore</opti><opti>Backup</opti></cont>
+      <titl>Dropbox Cloud.</titl>
+      <cont><opti>Lated</opti><opti>New</opti><opti>Old</opti></cont>
+      <titl>Core setting.</titl>
+    </list02>
+    <list01 hidden></list01>
+    <list><rom><ver op4></ver></rom></list>
+    <cta>
+      <logo></logo>
+      <setting></setting>
+      <vertical>
+        <svg width="50" height="50" viewBox="0 0 50 50" fill="none">
+          <path id="k6"   d="M22 19H28" stroke="var(--profile-4)" stroke-width="2"/>
+          <path id="k80"  d="M22 25H28" stroke="var(--profile-4)" stroke-width="2"/>
+          <path id="k160" d="M22 31H28" stroke="var(--profile-4)" stroke-width="2"/>
+        </svg>
+      </vertical>
+      <input type="file" id="romInput" hidden />
+      <label for="romInput" id="fileInputLable"></label>
+    </cta>
+  </page01>
+  <page02 hidden>
+    <display>
+      <screen><canvas fil id="canvas"></canvas></screen>
+      <notification>
+        <title1>...</title1>
+        <time1>0h00.00</time1>
+      </notification>
+    </display>
+    <divide></divide>
+    <gamepad>
+      <state-button id="state"></state-button>
+      <l-button data="func-l"></l-button>
+      <r-button data="func-r"></r-button>
+      <menu-button id="menu"></menu-button>
+      <dpad-section id="dpad">
+        <svg width="100%" height="100%" viewBox="0 0 100 100" fill-opacity="0">
+          <polygon points="50 50, 100 100, 100 0"   fill="transparent" data="btn-right"/>
+          <polygon points="0 0, 0 100, 50 50"       fill="transparent" data="btn-left"/>
+          <polygon points="0 0, 100 0, 50 50"       fill="transparent" data="btn-up"/>
+          <polygon points="0 100, 100 100, 50 50"   fill="transparent" data="btn-down"/>
+          <polygon points="0 0, 25 0, 0 25"         fill="transparent" data="btn-up-left"/>
+          <polygon points="75 0, 100 0, 100 25"     fill="transparent" data="btn-up-right"/>
+          <polygon points="0 75, 25 100, 0 100"     fill="transparent" data="btn-down-left"/>
+          <polygon points="100 75, 100 100, 75 100" fill="transparent" data="btn-down-right"/>
+        </svg>
+      </dpad-section>
+      <a-button data="func-a"></a-button>
+      <x-button data="func-x"></x-button>
+      <b-button data="func-b"></b-button>
+      <y-button data="func-y"></y-button>
+      <select-button data="func-select"></select-button>
+      <start-button data="func-start"></start-button>
+    </gamepad>
+    <joypad>
+      <svg id="joy" style="height:auto; width:auto" viewBox="0 0 100 100" fill-opacity="0">
+        <polygon points="50 50, 100 100, 100 0"   fill="transparent" data="btn-right"/>
+        <polygon points="0 0, 0 100, 50 50"       fill="transparent" data="btn-left"/>
+        <polygon points="0 0, 100 0, 50 50"       fill="transparent" data="btn-up"/>
+        <polygon points="0 100, 100 100, 50 50"   fill="transparent" data="btn-down"/>
+      </svg>
+    </joypad>
+    <invis></invis>
+  </page02>
 </body>
+<script type="" src="src/back/audio.js"></script>
+<script type="" src="src/back/video.js"></script>
+<script type="" src="src/back/gamepad.js"></script>
+<script type="" src="src/back/loader.js"></script>
+<script type="" src="src/back/zip.js"></script>
+<script type="" src="src/back/storage.js"></script>
+<script type="" src="src/back/main.js"></script>
+<script type="" src="src/front/global.js"></script>
+<script type="" src="src/front/page01.js"></script>
+<script type="" src="src/front/page02.js"></script>
 </html>

@@ -38,7 +38,7 @@ jobs:
           -s INITIAL_MEMORY=134217728 -s STACK_SIZE=5242880 -s ENVIRONMENT=web \
           -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap"]' \
           -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free"]' \
-          -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 \
+          -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 -s ALLOW_TABLE_GROWTH=1 \
           -o mgba.js
 
     - name: Package & Upload
@@ -48,5 +48,5 @@ jobs:
         
     - uses: actions/upload-artifact@v4
       with:
-        name: mgba-wasm-ultra
+        name: gba
         path: emux/src/core/gba.zip
