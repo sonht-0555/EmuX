@@ -1,4 +1,4 @@
-name: Build FBNeo Standalone (Ultra-Compressed)
+name: Build NEOGEO (fbNeo)
 
 on:
   push:
@@ -47,9 +47,9 @@ jobs:
     - name: Package & Upload
       run: |
         mkdir -p emux/src/core
-        cp libretro-super/libretro-fbneo/src/burner/libretro/fbneo_libretro.{js,wasm} emux/src/core/
+        zip -j emux/src/core/fbneo.zip libretro-super/libretro-fbneo/src/burner/libretro/fbneo_libretro.{js,wasm}
         
     - uses: actions/upload-artifact@v4
       with:
         name: fbneo-wasm-ultra
-        path: emux/src/core/fbneo_libretro.*
+        path: emux/src/core/fbneo.zip

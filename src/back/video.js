@@ -27,8 +27,8 @@ function initWebGL(width, height) {
 }
 function video_cb(pointer, width, height, pitch) {
   if (!gl) initWebGL(width, height);
-  const src = new Uint16Array(Module.HEAPU8.buffer, pointer, (pitch >> 1) * height);
-  const stride = pitch >> 1;
+  const src = new Uint16Array(Module.HEAPU8.buffer, pointer, (pitch / 2) * height);
+  const stride = pitch / 2;
   let di = 0;
   for (let y = 0; y < height; y++) {
     let si = y * stride;
