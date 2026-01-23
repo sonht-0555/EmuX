@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
     - name: Checkout EmuX & Setup Emscripten
       uses: actions/checkout@v3
@@ -43,10 +45,21 @@ jobs:
 
     - name: Package & Upload
       run: |
-        mkdir -p emux/src/core
-        cp libretro-super/libretro-snes9x/libretro/snes9x.{js,wasm} emux/src/core/
+        cd libretro-super/libretro-snes9x/libretro
+        zip -r snes9x.zip snes9x.js snes9x.wasm
+        mkdir -p ../../../emux/src/core
+        cp snes9x.zip ../../../emux/src/core/
+        
+    - name: Commit and Push Core
+      run: |
+        cd emux
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git add src/core/snes9x.zip
+        git commit -m "Update SNES Core: snes9x.zip [skip ci]" || echo "No changes to commit"
+        git push
         
     - uses: actions/upload-artifact@v4
       with:
-        name: snes
-        path: emux/src/core/snes9x.*
+        name: snes9x-core
+        path: emux/src/core/snes9x.zip

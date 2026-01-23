@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
     - name: Checkout EmuX & Setup Emscripten
       uses: actions/checkout@v3
@@ -39,14 +41,25 @@ jobs:
           -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap"]' \
           -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free"]' \
           -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 -s ALLOW_TABLE_GROWTH=1 \
-          -o nes.js
+          -o quicknes.js
 
     - name: Package & Upload
       run: |
-        mkdir -p emux/src/core
-        cp libretro-super/libretro-quicknes/nes.{js,wasm} emux/src/core/
+        cd libretro-super/libretro-quicknes
+        zip -r quicknes.zip quicknes.js quicknes.wasm
+        mkdir -p ../../emux/src/core
+        cp quicknes.zip ../../emux/src/core/
+        
+    - name: Commit and Push Core
+      run: |
+        cd emux
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git add src/core/quicknes.zip
+        git commit -m "Update NES Core: quicknes.zip [skip ci]" || echo "No changes to commit"
+        git push
         
     - uses: actions/upload-artifact@v4
       with:
-        name: nes
-        path: emux/src/core/nes.*
+        name: quicknes-core
+        path: emux/src/core/quicknes.zip
