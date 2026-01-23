@@ -27,9 +27,7 @@ function initWebGL(width, height) {
 }
 function video_cb(pointer, width, height, pitch) {
   if (!gl) initWebGL(width, height);
-  
-  // Resize buffer if resolution changed
-  if (!rgbaBuffer || rgbaBuffer.length !== width * height * 4) {
+    if (!rgbaBuffer || rgbaBuffer.length !== width * height * 4) {
     rgbaBuffer = new Uint8Array(width * height * 4);
     if (gl && (Module.canvas.width !== width || Module.canvas.height !== height)) {
       Module.canvas.width = width;
@@ -39,14 +37,8 @@ function video_cb(pointer, width, height, pitch) {
   }
   
   const bpp = pitch / width;
-  console.log(`[VIDEO] w=${width} h=${height} pitch=${pitch} bpp=${bpp} isFBNeo=${Module.isFBNeo}`);
   let di = 0;
-  
-  // Detect pixel format based on actual BPP
-  // BPP ~2 (1.5-3.0) = RGB565
-  // BPP ~4 (3.5-5.0) = XRGB8888
   if (bpp < 3.5) {
-    // RGB565 format (all cores, even FBNeo on some games)
     const src = new Uint16Array(Module.HEAPU8.buffer, pointer, (pitch / 2) * height);
     const stride = pitch / 2;
     for (let y = 0; y < height; y++) {
@@ -60,7 +52,6 @@ function video_cb(pointer, width, height, pitch) {
       }
     }
   } else {
-    // XRGB8888 format (FBNeo/Arcade)
     const src = new Uint32Array(Module.HEAPU8.buffer, pointer, (pitch / 4) * height);
     const stride = pitch / 4;
     for (let y = 0; y < height; y++) {
