@@ -21,8 +21,12 @@ async function unzip(source, nameFilter) {
     if (!fileName.endsWith('.zip')) return { [fileName.toLowerCase()]: binaryData };
     const unzippedFiles = fflate.unzipSync(binaryData), result = {};
     for (let entryName in unzippedFiles) {
-        if (unzippedFiles[entryName].length > 0 && (!nameFilter || nameFilter.test(entryName))) {
-            result[entryName.split('/').pop().toLowerCase()] = unzippedFiles[entryName];
+        const pathParts = entryName.split('/');
+        const fileName = pathParts.pop();
+        // Skip hidden files, macOS metadata (__MACOSX), and directories
+        if (fileName.startsWith('.') || pathParts.some(part => part.startsWith('.') || part.startsWith('__')) || unzippedFiles[entryName].length === 0) continue;
+        if (!nameFilter || nameFilter.test(entryName)) {
+            result[fileName.toLowerCase()] = unzippedFiles[entryName];
         }
     }
     return result;
