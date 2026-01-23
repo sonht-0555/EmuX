@@ -1,0 +1,152 @@
+name: Build All Cores
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-gba:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout EmuX & Setup Emscripten
+      uses: actions/checkout@v3
+      with:
+        path: emux
+    - uses: mymindstorm/setup-emsdk@v14
+      with:
+        version: 3.1.46
+    - name: Fetch and Build mGBA Core
+      run: |
+        git clone --depth 1 https://github.com/libretro/libretro-super.git
+        cd libretro-super && ./libretro-fetch.sh mgba && cd ..
+        cd libretro-super/libretro-mgba
+        emmake make -f Makefile.libretro platform=emscripten -j$(nproc) LTO=1
+        CORE_FILE=$(ls mgba_libretro_emscripten.* | grep -E '\.(a|bc)$' | head -n 1)
+        emcc "$CORE_FILE" -Oz -flto -s WASM=1 -s USE_ZLIB=1 -s FORCE_FILESYSTEM=1 -s ALLOW_MEMORY_GROWTH=1 \
+          -s INITIAL_MEMORY=134217728 -s STACK_SIZE=5242880 -s ENVIRONMENT=web \
+          -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap"]' \
+          -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free"]' \
+          -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 -s ALLOW_TABLE_GROWTH=1 \
+          -o mgba.js
+        zip -r mgba.zip mgba.js mgba.wasm
+    - uses: actions/upload-artifact@v4
+      with:
+        name: mgba-core
+        path: libretro-super/libretro-mgba/mgba.zip
+
+  build-nes:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout EmuX & Setup Emscripten
+      uses: actions/checkout@v3
+      with:
+        path: emux
+    - uses: mymindstorm/setup-emsdk@v14
+      with:
+        version: 3.1.46
+    - name: Fetch and Build QuickNES Core
+      run: |
+        git clone --depth 1 https://github.com/libretro/libretro-super.git
+        cd libretro-super && ./libretro-fetch.sh quicknes && cd ..
+        cd libretro-super/libretro-quicknes
+        emmake make platform=emscripten -j$(nproc) LTO=1
+        CORE_FILE=$(ls quicknes_libretro_emscripten.* | grep -E '\.(a|bc)$' | head -n 1)
+        emcc "$CORE_FILE" -Oz -flto -s WASM=1 -s USE_ZLIB=1 -s FORCE_FILESYSTEM=1 -s ALLOW_MEMORY_GROWTH=1 \
+          -s INITIAL_MEMORY=67108864 -s STACK_SIZE=5242880 -s ENVIRONMENT=web \
+          -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap"]' \
+          -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free"]' \
+          -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 -s ALLOW_TABLE_GROWTH=1 \
+          -o quicknes.js
+        zip -r quicknes.zip quicknes.js quicknes.wasm
+    - uses: actions/upload-artifact@v4
+      with:
+        name: quicknes-core
+        path: libretro-super/libretro-quicknes/quicknes.zip
+
+  build-snes:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout EmuX & Setup Emscripten
+      uses: actions/checkout@v3
+      with:
+        path: emux
+    - uses: mymindstorm/setup-emsdk@v14
+      with:
+        version: 3.1.46
+    - name: Fetch and Build SNES9x Core
+      run: |
+        git clone --depth 1 https://github.com/libretro/libretro-super.git
+        cd libretro-super && ./libretro-fetch.sh snes9x && cd ..
+        cd libretro-super/libretro-snes9x/libretro
+        emmake make platform=emscripten -j$(nproc) LTO=1
+        CORE_FILE=$(ls snes9x_libretro_emscripten.* | grep -E '\.(a|bc)$' | head -n 1)
+        emcc "$CORE_FILE" -Oz -flto -s WASM=1 -s USE_ZLIB=1 -s FORCE_FILESYSTEM=1 -s ALLOW_MEMORY_GROWTH=1 \
+          -s INITIAL_MEMORY=134217728 -s STACK_SIZE=5242880 -s ENVIRONMENT=web \
+          -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap"]' \
+          -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free"]' \
+          -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 -s ALLOW_TABLE_GROWTH=1 \
+          -o snes9x.js
+        zip -r snes9x.zip snes9x.js snes9x.wasm
+    - uses: actions/upload-artifact@v4
+      with:
+        name: snes9x-core
+        path: libretro-super/libretro-snes9x/libretro/snes9x.zip
+
+  build-neogeo:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout EmuX & Setup Emscripten
+      uses: actions/checkout@v3
+      with:
+        path: emux
+    - uses: mymindstorm/setup-emsdk@v14
+      with:
+        version: 3.1.46
+    - name: Fetch and Build FBNeo Core
+      run: |
+        git clone --depth 1 https://github.com/libretro/libretro-super.git
+        cd libretro-super && ./libretro-fetch.sh fbneo && cd ..
+        GLUE_SRC=$(find . -name retro_glue.c | head -n 1)
+        emcc -c "$GLUE_SRC" -o retro_glue.o -Oz -flto -s USE_ZLIB=1
+        cd libretro-super/libretro-fbneo/src/burner/libretro
+        emmake make -f Makefile platform=emscripten -j$(nproc) LTO=1
+        CORE_FILE=$(ls fbneo_libretro_emscripten.* | grep -E '\.(a|bc)$' | head -n 1)
+        emcc "$CORE_FILE" ../../../../../retro_glue.o -Oz -flto \
+          -s WASM=1 -s USE_ZLIB=1 -s FORCE_FILESYSTEM=1 -s ALLOW_MEMORY_GROWTH=1 \
+          -s ALLOW_TABLE_GROWTH=1 -s INITIAL_MEMORY=134217728 -s STACK_SIZE=5242880 -s ENVIRONMENT=web \
+          -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap"]' \
+          -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free"]' \
+          -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 -o fbneo_libretro.js
+        zip -j fbneo.zip fbneo_libretro.{js,wasm}
+    - uses: actions/upload-artifact@v4
+      with:
+        name: fbneo-core
+        path: libretro-super/libretro-fbneo/src/burner/libretro/fbneo.zip
+
+  deploy-cores:
+    runs-on: ubuntu-latest
+    needs: [build-gba, build-nes, build-snes, build-neogeo]
+    permissions:
+      contents: write
+    steps:
+    - name: Checkout EmuX
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: downloaded-cores
+
+    - name: Commit and Push (Amend)
+      run: |
+        mkdir -p src/core
+        find downloaded-cores -name "*.zip" -exec cp {} src/core/ \;
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git add src/core/*.zip
+        # Amend to keep repo clean, with skip-ci to avoid loop
+        git commit --amend --no-edit || git commit -m "Update all cores [skip ci]"
+        git push -f origin main

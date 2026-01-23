@@ -10,6 +10,7 @@ const CORE_CONFIG = {
     gbc:  { ratio: 131072 / 48000, width: 160, height: 144, ext: '.gb,.gbc', script: './src/core/mgba.zip' },
     snes: { ratio: 32040  / 48000, width: 256, height: 224, ext: '.smc,.sfc', script: './src/core/snes9x.zip' },
     nes:  { ratio: 44100  / 48000, width: 256, height: 240, ext: '.nes', script: './src/core/quicknes.zip' },
+    neogeo: { ratio: 1, width: 320, height: 224, ext: '.zip', script: './src/core/fbneo.zip' },
 };
 var isRunning = false;
 // ===== Unzip ====
