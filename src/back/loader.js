@@ -56,7 +56,6 @@ async function unzip(binaryData, nameFilter) {
         });
     });
 }
-
 // ===== initCore ====
 async function initCore(romFile) {
     const lowName = romFile.name.toLowerCase();
@@ -102,7 +101,7 @@ async function initCore(romFile) {
         window.Module = {
             isFBNeo, canvas,
             locateFile: (path) => path.endsWith('.wasm') ? (window.wasmUrl || path) : path,
-            onRuntimeInitialized() {
+            async onRuntimeInitialized() {
                 const romPointer = Module._malloc(finalRomData.length), infoPointer = Module._malloc(16);
                 [[Module._retro_set_environment, env_cb, "iii"], 
                  [Module._retro_set_video_refresh, video_cb, "viiii"], 
@@ -113,6 +112,11 @@ async function initCore(romFile) {
                 ].forEach(([retroFunction, callback, signature]) => retroFunction(Module.addFunction(callback, signature)));
                 Module._retro_init();
                 if (isFBNeo) {
+                    const biosRes = await fetch('./src/core/neogeo.zip');
+                    if (biosRes.ok) {
+                        const biosData = new Uint8Array(await biosRes.arrayBuffer());
+                        Module.FS.writeFile('/neogeo.zip', biosData);
+                    }
                     const romPath = '/' + finalRomName;
                     Module.FS.writeFile(romPath, finalRomData);
                     const pathPtr = Module._malloc(256);

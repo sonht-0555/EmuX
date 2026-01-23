@@ -1,4 +1,4 @@
-let revision = 'EmuX 2.01';
+let revision = 'EmuX 2.02';
 var urlsToCache = [
     './index.html',
     './manifest.json',
@@ -12,6 +12,7 @@ var urlsToCache = [
     './src/core/snes9x.zip',
     './src/core/quicknes.zip',
     './src/core/fbneo.zip',
+    './src/core/neogeo.zip',
     './src/back/zip.js',
     './src/back/loader.js',
     './src/back/audio.js',
