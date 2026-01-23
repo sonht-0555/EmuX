@@ -27,45 +27,19 @@ function initWebGL(width, height) {
 }
 function video_cb(pointer, width, height, pitch) {
   if (!gl) initWebGL(width, height);
-    if (!rgbaBuffer || rgbaBuffer.length !== width * height * 4) {
-    rgbaBuffer = new Uint8Array(width * height * 4);
-    if (gl && (Module.canvas.width !== width || Module.canvas.height !== height)) {
-      Module.canvas.width = width;
-      Module.canvas.height = height;
-      gl.viewport(0, 0, width, height);
-    }
-  }
-  
-  const bpp = pitch / width;
+  const src = new Uint16Array(Module.HEAPU8.buffer, pointer, (pitch / 2) * height);
+  const stride = pitch / 2;
   let di = 0;
-  if (bpp < 3.5) {
-    const src = new Uint16Array(Module.HEAPU8.buffer, pointer, (pitch / 2) * height);
-    const stride = pitch / 2;
-    for (let y = 0; y < height; y++) {
-      let si = y * stride;
-      for (let x = 0; x < width; x++, si++) {
-        const c = src[si];
-        rgbaBuffer[di++] = r5to8[c >> 11];
-        rgbaBuffer[di++] = g6to8[(c >> 5) & 0x3F];
-        rgbaBuffer[di++] = b5to8[c & 0x1F];
-        rgbaBuffer[di++] = 255;
-      }
-    }
-  } else {
-    const src = new Uint32Array(Module.HEAPU8.buffer, pointer, (pitch / 4) * height);
-    const stride = pitch / 4;
-    for (let y = 0; y < height; y++) {
-      let si = y * stride;
-      for (let x = 0; x < width; x++, si++) {
-        const pix = src[si];
-        rgbaBuffer[di++] = (pix >> 16) & 0xFF;
-        rgbaBuffer[di++] = (pix >> 8) & 0xFF;
-        rgbaBuffer[di++] = pix & 0xFF;
-        rgbaBuffer[di++] = 255;
-      }
+  for (let y = 0; y < height; y++) {
+    let si = y * stride;
+    for (let x = 0; x < width; x++, si++) {
+      const c = src[si];
+      rgbaBuffer[di++] = r5to8[c >> 11];
+      rgbaBuffer[di++] = g6to8[(c >> 5) & 0x3F];
+      rgbaBuffer[di++] = b5to8[c & 0x1F];
+      rgbaBuffer[di++] = 255;
     }
   }
-  
   gl.bindTexture(gl.TEXTURE_2D, glTexture);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, rgbaBuffer);
   gl.uniform1i(glLocations.texture, 0);

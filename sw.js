@@ -1,4 +1,4 @@
-let revision = 'EmuX 2.07';
+let revision = 'EmuX 2.03';
 var urlsToCache = [
     './index.html',
     './manifest.json',
