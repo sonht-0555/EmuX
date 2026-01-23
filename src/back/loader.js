@@ -1,7 +1,7 @@
 // ===== LibEnvironment =====
-window.env_cb = function(cmd, data) {
-    if (cmd === 1 || cmd === 10) return 1; // SET_PIXEL_FORMAT
-    if (cmd === 3) { if (data) Module.HEAP8[data] = 1; return 1; } // GET_CAN_DUPE
+function env_cb (cmd, data) {
+    if (cmd === 1 || cmd === 10) return 1;
+    if (cmd === 3) { if (data) Module.HEAP8[data] = 1; return 1; }
     return 0;
 }
 
@@ -9,9 +9,8 @@ window.env_cb = function(cmd, data) {
 const CORE_CONFIG = {
     gba: { ratio: 65536 / 48000, width: 240, height: 160, ext: '.gba', script: './src/core/mgba.js' },
     gbc: { ratio: 131072 / 48000, width: 160, height: 144, ext: '.gb,.gbc', script: './src/core/mgba.js' },
-    snes: { ratio: 32040 / 48000, width: 256, height: 224, ext: '.smc,.sfc', script: './src/core/snes9x.js' },
-    nes: { ratio: 29780 / 48000, width: 256, height: 240, ext: '.nes', script: './src/core/nes.js' },
-    gen: { ratio: 147456 / 48000, width: 320, height: 224, ext: '.gen,.smd,.bin,.md', script: './src/core/picodrive.js' },
+    snes:{ ratio: 32040 / 48000, width: 256, height: 224, ext: '.smc,.sfc', script: './src/core/snes9x.js' },
+    nes: { ratio: 44100 / 48000, width: 256, height: 240, ext: '.nes', script: './src/core/nes.js' },
 };
 var isRunning = false;
 async function initCore(file) {
