@@ -1,9 +1,9 @@
-let revision = 'EmuX 1.67';
+let revision = 'EmuX 1.70';
 var urlsToCache = [
-    './src/core/mgba.js',
-    './src/core/mgba.wasm',
-    './src/core/snes9x.js',
-    './src/core/snes9x.wasm',
+    './src/core/mgba.zip',
+    './src/core/snes9x.zip',
+    './src/core/quicknes.zip',
+    './src/back/zip.js',
 ];
 
 self.addEventListener('install', function (event) {
