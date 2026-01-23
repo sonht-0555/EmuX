@@ -113,8 +113,7 @@ jobs:
       run: |
         git clone --depth 1 https://github.com/libretro/libretro-super.git
         cd libretro-super && ./libretro-fetch.sh fbneo && cd ..
-        GLUE_SRC=$(find . -name retro_glue.c | head -n 1)
-        emcc -c "$GLUE_SRC" -o retro_glue.o -Oz -flto -DNDEBUG -s USE_ZLIB=1
+        emcc -c .github/workflows/retro_glue.c -o retro_glue.o -Oz -flto -DNDEBUG -s USE_ZLIB=1
         cd libretro-super/libretro-fbneo/src/burner/libretro
         emmake make -f Makefile platform=emscripten -j$(nproc) LTO=1
         CORE_FILE=$(ls fbneo_libretro_emscripten.* | grep -E '\.(a|bc)$' | head -n 1)

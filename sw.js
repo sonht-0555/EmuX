@@ -1,9 +1,28 @@
-let revision = 'EmuX 1.70';
+let revision = 'EmuX 2.01';
 var urlsToCache = [
+    './index.html',
+    './manifest.json',
+    './src/css/main.css',
+    './src/img/icon.png',
+    './src/font/04bf.woff',
+    './src/font/04b.ttf',
+    './src/font/mother.ttf',
+    './src/font/3x3.ttf',
     './src/core/mgba.zip',
     './src/core/snes9x.zip',
     './src/core/quicknes.zip',
+    './src/core/fbneo.zip',
     './src/back/zip.js',
+    './src/back/loader.js',
+    './src/back/audio.js',
+    './src/back/video.js',
+    './src/back/gamepad.js',
+    './src/back/storage.js',
+    './src/back/main.js',
+    './src/front/global.js',
+    './src/front/main.js',
+    './src/front/page01.js',
+    './src/front/page02.js'
 ];
 
 self.addEventListener('install', function (event) {
