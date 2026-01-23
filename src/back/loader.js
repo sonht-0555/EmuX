@@ -1,7 +1,34 @@
 // ===== LibEnvironment =====
-function env_cb (cmd, data) {
-    if (cmd === 1 || cmd === 10) return 1;
-    if (cmd === 3) { if (data) Module.HEAP8[data] = 1; return 1; }
+function env_cb(cmd, data) {
+    if (cmd === 10) return 1;
+    if (cmd === 3 && data) { Module.HEAP8[data] = 1; return 1; }
+    if (cmd === 31 || cmd === 37) {
+        const w = Module.HEAP32[data >> 2], h = Module.HEAP32[(data >> 2) + 1];
+        const canvas = document.getElementById("canvas");
+        if (w > 0 && h > 0 && (canvas.width !== w || canvas.height !== h)) {
+            canvas.width = w; canvas.height = h;
+        }
+        return 1;
+    }
+    if (cmd === 15) {
+        const key = Module.UTF8ToString(Module.HEAP32[data >> 2]);
+        if (key === "fbneo-sample-rate") {
+            if (!Module._sampleRatePtr) {
+                Module._sampleRatePtr = Module._malloc(8);
+                Module.stringToUTF8("44100", Module._sampleRatePtr, 8);
+            }
+            Module.HEAP32[(data >> 2) + 1] = Module._sampleRatePtr;
+            return 1;
+        }
+    }
+    if (cmd === 9 || cmd === 33) {
+        if (!Module._sysPath) {
+            Module._sysPath = Module._malloc(2);
+            Module.stringToUTF8("/", Module._sysPath, 2);
+        }
+        Module.HEAP32[data >> 2] = Module._sysPath;
+        return 1;
+    }
     return 0;
 }
 // ===== Core =====
@@ -24,7 +51,6 @@ async function unzip(source, nameFilter) {
     for (let entryName in unzippedFiles) {
         const pathParts = entryName.split('/');
         const fileName = pathParts.pop();
-        // Skip hidden files, macOS metadata (__MACOSX), and directories
         if (fileName.startsWith('.') || pathParts.some(part => part.startsWith('.') || part.startsWith('__')) || unzippedFiles[entryName].length === 0) continue;
         if (!nameFilter || nameFilter.test(entryName)) {
             result[fileName.toLowerCase()] = unzippedFiles[entryName];
@@ -36,11 +62,28 @@ async function unzip(source, nameFilter) {
 async function initCore(romFile) {
     const extractedRoms = await unzip(romFile, /\.(gba|gbc|gb|smc|sfc|nes)$/i);
     const romFileName = Object.keys(extractedRoms)[0];
+    let finalRomName, finalRomData;
+    if (romFileName) {
+        finalRomName = romFileName;
+        finalRomData = extractedRoms[romFileName];
+    } else if (romFile.name.toLowerCase().endsWith('.zip')) {
+        finalRomName = romFile.name.toLowerCase();
+        finalRomData = new Uint8Array(await romFile.arrayBuffer());
+    } else {
+        finalRomName = romFile.name.toLowerCase();
+        finalRomData = new Uint8Array(await romFile.arrayBuffer());
+    } 
     const coreConfig = Object.values(CORE_CONFIG).find(config => 
-        config.ext.split(',').some(extension => romFileName.endsWith(extension.toLowerCase()) || romFileName === extension.replace('.', '').toLowerCase())
+        config.ext.split(',').map(ext => ext.trim()).filter(ext => ext).some(extension => 
+            finalRomName.endsWith(extension.toLowerCase()) || finalRomName === extension.replace('.', '').toLowerCase()
+        )
     );
-    if (!coreConfig) return;
-    let romBinary = extractedRoms[romFileName], scriptSource = coreConfig.script;
+    if (!coreConfig) {
+        console.error("No core found for:", finalRomName);
+        return;
+    }
+    let scriptSource = coreConfig.script;
+    const isFBNeo = scriptSource.includes('fbneo');
     if (scriptSource.endsWith('.zip')) {
         const coreFiles = await unzip(scriptSource, /\.(js|wasm)$/i);
         const jsFileName = Object.keys(coreFiles).find(name => name.endsWith('.js'));
@@ -55,9 +98,10 @@ async function initCore(romFile) {
         Object.assign(canvas, { width: coreConfig.width, height: coreConfig.height });
         gameView(romFile.name, coreConfig); initAudio(coreConfig);
         window.Module = {
+            isFBNeo: isFBNeo, 
             canvas, locateFile: (path) => path.endsWith('.wasm') ? (window.wasmUrl || path) : path,
             onRuntimeInitialized() {
-                const romPointer = Module._malloc(romBinary.length), infoPointer = Module._malloc(16);
+                const romPointer = Module._malloc(finalRomData.length), infoPointer = Module._malloc(16);
                 [[Module._retro_set_environment, env_cb, "iii"], 
                  [Module._retro_set_video_refresh, video_cb, "viiii"], 
                  [Module._retro_set_audio_sample, audio_cb, "vii"], 
@@ -65,10 +109,20 @@ async function initCore(romFile) {
                  [Module._retro_set_input_poll, input_poll_cb, "v"], 
                  [Module._retro_set_input_state, input_state_cb, "iiiii"]
                 ].forEach(([retroFunction, callback, signature]) => retroFunction(Module.addFunction(callback, signature)));
-                Module._retro_init(); 
-                Module.HEAPU8.set(romBinary, romPointer); 
-                Module.HEAPU32.set([0, romPointer, romBinary.length, 0], infoPointer >> 2); 
-                Module._retro_load_game(infoPointer);
+                Module._retro_init();
+                if (isFBNeo) {
+                    const romPath = '/' + finalRomName;
+                    Module.FS.writeFile(romPath, finalRomData);
+                    const pathPtr = Module._malloc(256);
+                    Module.stringToUTF8(romPath, pathPtr, 256);
+                    Module.HEAP32[infoPointer >> 2] = pathPtr;
+                    Module.HEAP32[(infoPointer >> 2) + 1] = Module.HEAP32[(infoPointer >> 2) + 2] = Module.HEAP32[(infoPointer >> 2) + 3] = 0;
+                    Module._retro_load_game(infoPointer);
+                } else {
+                    Module.HEAPU8.set(finalRomData, romPointer); 
+                    Module.HEAPU32.set([0, romPointer, finalRomData.length, 0], infoPointer >> 2); 
+                    Module._retro_load_game(infoPointer);
+                }
                 (function mainLoop() { Module._retro_run(), requestAnimationFrame(mainLoop) })();
                 isRunning = true; 
                 resolve();
