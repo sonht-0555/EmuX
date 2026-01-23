@@ -17,11 +17,23 @@ var isRunning = false;
 async function initCore(file) {
     let ext = file.name.split('.').pop().toLowerCase(), rom, cfg;
     if (ext === 'zip') {
-        const zip = await JSZip.loadAsync(await file.arrayBuffer());
-        const n = Object.keys(zip.files).find(n => /\.(gba|gbc|gb|smc|sfc|gen|smd|bin|md)$/i.test(n));
-        if (!n) return;
-        ext = n.split('.').pop().toLowerCase();
-        rom = await zip.files[n].async('uint8array');
+        if (typeof JSZip === 'undefined') {
+            alert('ZIP library is loading... Please wait a moment and try again.');
+            return;
+        }
+        try {
+            const zip = await JSZip.loadAsync(await file.arrayBuffer());
+            const n = Object.keys(zip.files).find(n => /\.(gba|gbc|gb|smc|sfc|nes|gen|smd|bin|md)$/i.test(n));
+            if (!n) {
+                alert('No valid ROM file found in ZIP');
+                return;
+            }
+            ext = n.split('.').pop().toLowerCase();
+            rom = await zip.files[n].async('uint8array');
+        } catch (error) {
+            alert('Error loading ZIP: ' + error.message);
+            return;
+        }
     } else {
         rom = new Uint8Array(await file.arrayBuffer());
     }
