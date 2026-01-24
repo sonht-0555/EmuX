@@ -48,12 +48,16 @@ async function notifi(green, white, message) {
     white0.textContent = white;
     message0.textContent = message;
 }
-async function gameView(romName, cfg) {
+async function gameView(romName) {
     // global
     page02.ontouchstart = (e) => { e.preventDefault(); }
     // display
+    gameWidth = canvas.width || 160;
+    gameHeight = canvas.height || 144;
     [gameName, gameType] = [romName.slice(0, -4), romName.slice(-3)];
-    [gameWidth, gameHeight] = cfg ? [cfg.width, cfg.height] : [160, 144];    integer = Math.min(6, Math.floor((window.innerWidth * window.devicePixelRatio) / gameWidth));
+    title1.textContent = romName;
+    console.log("Kích thước Canvas hiện tại:", gameWidth, gameHeight);
+    integer = Math.min(6, Math.floor((window.innerWidth * window.devicePixelRatio) / gameWidth));
     display.style.height = `${Math.ceil(gameHeight * (integer/window.devicePixelRatio)) + 10}px`;
     display.style.width  = `${Math.ceil(gameWidth  * (integer/window.devicePixelRatio))}px`;
     screen.style.width   = `${gameWidth * (integer/window.devicePixelRatio)}px`;
