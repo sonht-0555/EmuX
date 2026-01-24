@@ -56,7 +56,6 @@ async function gameView(romName) {
     gameHeight = canvas.height || 144;
     [gameName, gameType] = [romName.slice(0, -4), romName.slice(-3)];
     title1.textContent = romName;
-    console.log("Kích thước Canvas hiện tại:", gameWidth, gameHeight);
     integer = Math.min(6, Math.floor((window.innerWidth * window.devicePixelRatio) / gameWidth));
     display.style.height = `${Math.ceil(gameHeight * (integer/window.devicePixelRatio)) + 10}px`;
     display.style.width  = `${Math.ceil(gameWidth  * (integer/window.devicePixelRatio))}px`;
@@ -71,9 +70,10 @@ async function gameView(romName) {
     page02.style.gridTemplateRows  =  `auto ${window.innerWidth - (adjust * 8 + 8) - 12}px ${(adjust * 4) + 4 + 8 + 26}px 1fr 20px`;
     joy.style.width = `${(adjust * 4 + 3)}px`;
     // action
+    page00.hidden = true;
     page01.hidden = true;
     page02.hidden = false;
-    screen.style.setProperty("--shader", svgGen(window.devicePixelRatio, integer, local(`shader0${local("shader")}`) || "0.0.0.1.0.0.1.0.0.1.0.0.1.0.0.0"));
+    screen.style.setProperty("--shader", svgGen(integer, window.devicePixelRatio, "0.0.1.0.1.0.1.0.0"));
 }
 document.addEventListener("DOMContentLoaded", function(){
     body.removeAttribute('hide')

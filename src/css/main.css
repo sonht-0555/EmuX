@@ -168,6 +168,7 @@
   screen { z-index: 2; position: relative; }
   screen::after { 
     background-image: var(--shader);
+    background-size: var(--size);
   }
   canvas {
     width:100%;
