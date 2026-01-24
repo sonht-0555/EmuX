@@ -1,5 +1,6 @@
 let revision = 'EmuX 2.04';
 var urlsToCache = [
+    '/', 
     './index.html',
     './manifest.json',
     './src/css/main.css',

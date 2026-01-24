@@ -8,7 +8,19 @@
   <link rel="stylesheet" type="text/css" href="./src/css/main.css" />
   <link rel="manifest" href="/manifest.json" />
 </head>
-<script>let gameVer = 'Ver_2.04';</script>
+<script>
+let gameVer = 'Ver_2.04';
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js') });
+    navigator.serviceWorker.addEventListener('message', function (event) {
+    if (event.data.msg === "Updating...") {
+        ver.textContent = "The system is updating...";
+        isReload = true;
+        setTimeout(() => {location.reload()},2000);
+        }
+    });
+}
+</script>
 <body hide>
   <page00 hidden>
     <divide></divide>

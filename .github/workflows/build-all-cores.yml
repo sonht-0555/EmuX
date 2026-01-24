@@ -23,7 +23,7 @@ jobs:
         cd libretro-super/libretro-mgba
         emmake make -f Makefile.libretro platform=emscripten -j$(nproc) LTO=1
         CORE_FILE=$(ls mgba_libretro_emscripten.* | grep -E '\.(a|bc)$' | head -n 1)
-        emcc "$CORE_FILE" -O2 -flto -DNDEBUG \
+        emcc "$CORE_FILE" -O3 -flto -DNDEBUG \
           -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web \
           -s ALLOW_MEMORY_GROWTH=1 \
           -s INITIAL_MEMORY=256mb -s STACK_SIZE=8mb \
@@ -54,7 +54,7 @@ jobs:
         cd libretro-super/libretro-quicknes
         emmake make platform=emscripten -j$(nproc) LTO=1
         CORE_FILE=$(ls quicknes_libretro_emscripten.* | grep -E '\.(a|bc)$' | head -n 1)
-        emcc "$CORE_FILE" -O2 -flto -DNDEBUG \
+        emcc "$CORE_FILE" -O3 -flto -DNDEBUG \
           -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web \
           -s ALLOW_MEMORY_GROWTH=1 \
           -s INITIAL_MEMORY=128mb -s STACK_SIZE=4mb \
@@ -85,7 +85,7 @@ jobs:
         cd libretro-super/libretro-snes9x/libretro
         emmake make platform=emscripten -j$(nproc) LTO=1
         CORE_FILE=$(ls snes9x_libretro_emscripten.* | grep -E '\.(a|bc)$' | head -n 1)
-        emcc "$CORE_FILE" -O2 -flto -DNDEBUG \
+        emcc "$CORE_FILE" -O3 -flto -DNDEBUG \
           -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web \
           -s ALLOW_MEMORY_GROWTH=1 \
           -s INITIAL_MEMORY=256mb -s STACK_SIZE=8mb \

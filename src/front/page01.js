@@ -59,16 +59,6 @@ function optionClick(text) {
 }
 //DOMContentLoaded
 document.addEventListener("DOMContentLoaded", function() {
-   if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js') });
-        navigator.serviceWorker.addEventListener('message', function (event) {
-        if (event.data.msg === "Updating...") {
-            ver.textContent = "The system is updating...";
-            isReload = true;
-            setTimeout(() => {location.reload()},2000);
-            }
-        });
-    }
     ver.textContent = gameVer;
     setTimeout(() => {if(!isReload){verSetting(),listGame()}},1000);
     romInput.addEventListener("change", function(e) { inputGame(e) })
