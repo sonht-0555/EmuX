@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <title>PS1 Core Tester</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { background: #1a1a1a; color: #fff; font-family: sans-serif; text-align: center; margin: 0; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; border: 1px solid #333; padding: 20px; border-radius: 10px; background: #222; }
+        canvas { background: #000; width: 100%; border-radius: 5px; image-rendering: pixelated; margin-top: 20px; }
+        .controls { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+        .status { padding: 10px; color: #aaa; font-style: italic; }
+        input[type="file"] { background: #333; color: #fff; padding: 10px; border-radius: 5px; border: 1px solid #444; }
+        h1 { margin-top: 0; color: #20A5A6; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>PS1 Core Tester</h1>
+        <div class="controls">
+            <label>1. Chọn Core <b>ps1.zip</b>:</label>
+            <input type="file" id="coreInput" accept=".zip">
+            
+            <label>2. Chọn BIOS (không bắt buộc nhưng nên có):</label>
+            <input type="file" id="biosInput" accept=".bin">
+
+            <label>3. Chọn Game (ROM):</label>
+            <input type="file" id="romInput">
+            
+            <button id="startBtn" style="padding: 15px; background: #20A5A6; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">
+                KHỞI CHẠY GIẢ LẬP
+            </button>
+        </div>
+        <div id="status" class="status">Sẵn sàng. Tip: Game PS1 nên có ít nhất file SCPH5501.BIN...</div>
+        <canvas id="canvas"></canvas>
+    </div>
+
+    <!-- Nạp các thư viện có sẵn của project -->
+    <script src="src/back/zip.js"></script>
+    <script src="src/back/audio.js"></script>
+    <script src="src/back/video.js"></script>
+    <script src="src/back/gamepad.js"></script>
+
+    <script>
+        // Các biến cần thiết để giả lập môi trường của EmuX
+        let isRunning = false;
+        let gameName = "Test Game";
+        let isFBNeo = false;
+        window.tag = (s) => document.querySelector(s);
+        window.message = (m) => document.getElementById('status').innerText = m;
+        window.gameView = () => console.log("UI Updated");
+
+        const statusEl = document.getElementById('status');
+        const startBtn = document.getElementById('startBtn');
+
+        // Hàm env_cb tương tự trong bản chính
+        function env_cb(cmd, data) {
+            if (cmd === 10) return 1;
+            if (cmd === 31 || cmd === 37) {
+                const w = Module.HEAP32[data >> 2], h = Module.HEAP32[(data >> 2) + 1];
+                if (w > 0 && h > 0) {
+                    const canvas = document.getElementById("canvas");
+                    canvas.width = w; canvas.height = h;
+                }
+                return 1;
+            }
+            return 0;
+        }
+
+        startBtn.onclick = async () => {
+            const coreFile = document.getElementById('coreInput').files[0];
+            const romFile = document.getElementById('romInput').files[0];
+            const biosFile = document.getElementById('biosInput').files[0];
+
+            if (!coreFile || !romFile) {
+                alert("Vui lòng chọn ít nhất file core và file rom!");
+                return;
+            }
+
+            try {
+                // ... (phần code unzip core cũ giữ nguyên)
+                statusEl.innerText = "Đang xử lý core...";
+                const coreBuffer = await coreFile.arrayBuffer();
+                const coreFiles = await unzip(new Uint8Array(coreBuffer), /\.(js|wasm)$/i);
+                const jsName = Object.keys(coreFiles).find(n => n.endsWith('.js'));
+                const wasmName = Object.keys(coreFiles).find(n => n.endsWith('.wasm'));
+                const scriptSource = URL.createObjectURL(new Blob([coreFiles[jsName]], { type: 'application/javascript' }));
+                window.wasmUrl = URL.createObjectURL(new Blob([coreFiles[wasmName]], { type: 'application/wasm' }));
+
+                statusEl.innerText = "Đang nạp ROM...";
+                const romData = new Uint8Array(await romFile.arrayBuffer());
+
+                let biosData = null;
+                if (biosFile) {
+                    statusEl.innerText = "Đang nạp BIOS...";
+                    biosData = new Uint8Array(await biosFile.arrayBuffer());
+                }
+
+                window.Module = {
+                    canvas: document.getElementById('canvas'),
+                    locateFile: (path) => path.endsWith('.wasm') ? window.wasmUrl : path,
+                    async onRuntimeInitialized() {
+                        statusEl.innerText = "Khởi động Core...";
+                        
+                        if (biosData) {
+                            // Ghi BIOS vào thư mục ảo của Emscripten
+                            Module.FS.writeFile(biosFile.name, biosData);
+                            console.log("BIOS loaded:", biosFile.name);
+                        }
+
+                        const romPointer = Module._malloc(romData.length);
+                        const infoPointer = Module._malloc(16);
+
+                        [[Module._retro_set_environment, env_cb, "iii"], 
+                         [Module._retro_set_video_refresh, video_cb, "viiii"], 
+                         [Module._retro_set_audio_sample, audio_cb, "vii"], 
+                         [Module._retro_set_audio_sample_batch, audio_batch_cb, "iii"], 
+                         [Module._retro_set_input_poll, input_poll_cb, "v"], 
+                         [Module._retro_set_input_state, input_state_cb, "iiiii"]
+                        ].forEach(([f, cb, sig]) => f(Module.addFunction(cb, sig)));
+
+                        Module._retro_init();
+                        Module.HEAPU8.set(romData, romPointer);
+                        Module.HEAPU32.set([0, romPointer, romData.length, 0], infoPointer >> 2);
+                        
+                        Module._retro_load_game(infoPointer);
+                        isRunning = true;
+                        (function mainLoop() { if(isRunning) { Module._retro_run(); requestAnimationFrame(mainLoop); } })();
+                        statusEl.innerText = "ĐANG CHẠY: " + romFile.name;
+                    }
+                };
+
+                const script = document.createElement('script');
+                script.src = scriptSource;
+                document.body.appendChild(script);
+
+            } catch (e) {
+                statusEl.innerText = "LỖI: " + e.message;
+                console.error(e);
+            }
+        };
+
+        // Hàm unzip copy lại từ loader.js
+        async function unzip(binaryData, nameFilter) {
+            return new Promise((resolve) => {
+                fflate.unzip(binaryData, (err, unzippedFiles) => {
+                    const result = {};
+                    for (let entryName in unzippedFiles) {
+                        if (!nameFilter || nameFilter.test(entryName)) {
+                            result[entryName] = unzippedFiles[entryName];
+                        }
+                    }
+                    resolve(result);
+                });
+            });
+        }
+    </script>
+</body>
+</html>

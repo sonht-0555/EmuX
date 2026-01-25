@@ -1,0 +1,52 @@
+name: Build PS1 Core
+
+on:
+  push:
+    paths:
+      - '.github/workflows/build-ps1.yml'
+  workflow_dispatch:
+
+jobs:
+  build-ps1:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout EmuX & Setup Emscripten
+      uses: actions/checkout@v3
+      with:
+        path: emux
+    - uses: mymindstorm/setup-emsdk@v14
+      with:
+        version: 3.1.46
+    - name: Fetch and Build PCSX ReARMed Core
+      run: |
+        git clone --depth 1 https://github.com/libretro/libretro-super.git
+        cd libretro-super && ./libretro-fetch.sh pcsx_rearmed && cd ..
+        cd libretro-super/libretro-pcsx_rearmed
+        
+        # Cấu hình chuẩn nhất để fix lỗi Renderer thiếu (GPU)
+        # 1. GPU_PEOPS: Plugin đồ họa chuẩn và nhẹ nhất cho WASM
+        # 2. WANT_ZLIB=1 & USE_ZLIB=1: Để đảm bảo không bị mismatch hàm nạp zip
+        emmake make -f Makefile.libretro platform=emscripten -j$(nproc) \
+          DYNAREC="" \
+          GPU_PEOPS=1 \
+          WANT_ZLIB=1 \
+          GLES=1
+          
+        # Tìm file output
+        CORE_FILE=$(ls pcsx_rearmed_libretro_emscripten.* | grep -E '\.(a|bc|so)$' | head -n 1)
+        
+        # Link sang JS/WASM
+        # Thêm flag -s USE_ZLIB=1 ở bước link để fix triệt để signature mismatch
+        emcc "$CORE_FILE" -O3 -flto -DNDEBUG \
+          -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web \
+          -s ALLOW_MEMORY_GROWTH=1 \
+          -s ALLOW_TABLE_GROWTH=1 \
+          -s INITIAL_MEMORY=512mb -s STACK_SIZE=16mb \
+          -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap"]' \
+          -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free"]' \
+          -o ps1.js
+        zip -r ps1.zip ps1.js ps1.wasm
+    - uses: actions/upload-artifact@v4
+      with:
+        name: ps1-core
+        path: libretro-super/libretro-pcsx_rearmed/ps1.zip
