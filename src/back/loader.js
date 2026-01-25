@@ -29,7 +29,7 @@ async function unzip(binaryData, nameFilter) {
 }
 // ===== initCore ====
 async function initCore(romFile) {
-    notifi("","", "")
+    notifi("",".",".......","")
     const lowName = romFile.name.toLowerCase();
     const isZip = lowName.endsWith('.zip');
     const romBuffer = await romFile.arrayBuffer();
@@ -37,7 +37,7 @@ async function initCore(romFile) {
     let finalRomName = romFile.name, finalRomData = binaryData;
     const consoleExts = /\.(gba|gbc|gb|smc|sfc|nes)$/i;
     if (isZip) {
-        notifi("",".", "")
+        notifi("","..","......","")
         const extracted = await unzip(binaryData, consoleExts);
         const consoleRomName = Object.keys(extracted)[0];
         if (consoleRomName) {
@@ -55,11 +55,11 @@ async function initCore(romFile) {
     let scriptSource = coreConfig.script;
     const isFBNeo = scriptSource.includes('fbneo');
     if (scriptSource.endsWith('.zip')) {
-        notifi("","..", "")
+        notifi("","...",".....","")
         const response = await fetch(scriptSource);
         if (!response.ok) return;
         const bundleBuffer = await response.arrayBuffer();
-        notifi("","...", "")
+        notifi("","....","....","")
         const coreFiles = await unzip(new Uint8Array(bundleBuffer), /\.(js|wasm)$/i);
         const jsName = Object.keys(coreFiles).find(n => n.endsWith('.js'));
         const wasmName = Object.keys(coreFiles).find(n => n.endsWith('.wasm'));
@@ -69,7 +69,7 @@ async function initCore(romFile) {
         scriptSource = URL.createObjectURL(new Blob([jsBin.slice(0, jsLen)], { type: 'application/javascript' }));
         window.wasmUrl = URL.createObjectURL(new Blob([coreFiles[wasmName]], { type: 'application/wasm' }));
     }
-    notifi("","....", "")
+    notifi("",".....","...","")
     return new Promise((resolve) => {
         const canvas = document.getElementById("canvas");
         initAudio(coreConfig);
@@ -77,7 +77,7 @@ async function initCore(romFile) {
             isFBNeo, canvas,
             locateFile: (path) => path.endsWith('.wasm') ? (window.wasmUrl || path) : path,
             async onRuntimeInitialized() {
-                notifi("",".....", "")
+                notifi("","......","..","")
                 const romPointer = Module._malloc(finalRomData.length), infoPointer = Module._malloc(16);
                 [[Module._retro_set_environment, env_cb, "iii"], 
                  [Module._retro_set_video_refresh, video_cb, "viiii"], 
@@ -88,7 +88,7 @@ async function initCore(romFile) {
                 ].forEach(([retroFunction, callback, signature]) => retroFunction(Module.addFunction(callback, signature)));
                 Module._retro_init();
                 if (isFBNeo) {
-                    notifi("","......", "")
+                    notifi("",".......",".","")
                     const biosRes = await fetch('./src/core/neogeo.zip');
                     if (biosRes.ok) {
                         const biosData = new Uint8Array(await biosRes.arrayBuffer());
@@ -108,7 +108,7 @@ async function initCore(romFile) {
                 }
                 (function mainLoop() { Module._retro_run(), requestAnimationFrame(mainLoop) })();
                 isRunning = true; 
-                notifi("",".......", "")
+                notifi("","........","","")
                 resolve();
             }
         };

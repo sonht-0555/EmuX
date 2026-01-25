@@ -94,9 +94,9 @@
     height: calc(100vh - 30px);
     background: var(--profile-black);
   }
-  title0 { font-size: 12px; padding: 1px 0px 10px 0px; }
-  green0 { color: var(--profile-green); text-shadow: -3px 0px 0px var(--profile-green-dark)}
-  message0 { color: var(--profile-4) }
+  title0, gray0 { font-size: 12px; padding: 1px 0px 10px 0px; }
+  green0 { color: var(--profile-green); text-shadow: -3px 0px 0px var(--profile-green-dark) }
+  message0, gray0 { color: var(--profile-4) }
 }
 @layer page-1 {
   page01 {
