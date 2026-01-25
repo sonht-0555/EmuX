@@ -53,8 +53,7 @@ async function gameView(romName) {
     // global
     page02.ontouchstart = (e) => { e.preventDefault(); }
     // display
-    gameWidth = canvas.width || 160;
-    gameHeight = canvas.height || 144;
+    [gameWidth, gameHeight] = [canvas.width, canvas.height];
     [gameName, gameType] = [romName.slice(0, -4), romName.slice(-3)];
     title1.textContent = romName;
     integer = Math.min(6, Math.floor((window.innerWidth * window.devicePixelRatio) / gameWidth));
