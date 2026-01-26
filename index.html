@@ -9,17 +9,7 @@
   <link rel="manifest" href="/manifest.json" />
 </head>
 <script>
-let gameVer = 'Ver_2.06';
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js') });
-    navigator.serviceWorker.addEventListener('message', function (event) {
-      if (event.data.msg === "Updating...") {
-        let count = 5;
-        isReload = true;
-        setInterval(() => { ver.textContent = "|0"+ count +"|The system is updating..."; if (count-- <= 0) location.reload(); }, 1000);
-      }
-    });
-}
+let gameVer = 'EmuX_2.15';
 </script>
 <body hide>
   <page00 hidden>

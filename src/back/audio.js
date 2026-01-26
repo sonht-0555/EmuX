@@ -23,7 +23,7 @@ async function initAudio(cfg) {
   processor.connect(audioCtx.destination);
   await audioCtx.resume();
 }
-async function writeAudio(ptr, frames) {
+function writeAudio(ptr, frames) {
   if (!audioCtx || fifoCnt + frames >= 8192) return frames;
   var data = new Int16Array(Module.HEAPU8.buffer, ptr, frames * 2);
   var tail = (fifoHead + fifoCnt) % 8192;

@@ -59,8 +59,20 @@ function optionClick(text) {
 }
 //DOMContentLoaded
 document.addEventListener("DOMContentLoaded", function() {
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js')
+        });
+        navigator.serviceWorker.addEventListener('message', function (event) {
+        if (event.data.msg === "Updating...") {
+            ver.textContent = "The system is updating...";
+            isReload = true;
+            setTimeout(() => {location.reload()},4000);
+            }
+        });
+    }
     ver.textContent = gameVer;
-    setTimeout(() => {if(!isReload){verSetting(),listGame()}},1000);
+    setTimeout(() => {if(!isReload){verSetting(),listGame()}},2000);
     romInput.addEventListener("change", function(e) { inputGame(e) })
     vertical.addEventListener("click",  function(e) { verSetting() })
     logo.addEventListener("click", function() {

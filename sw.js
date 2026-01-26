@@ -1,4 +1,4 @@
-let revision = 'EmuX 2.06';
+let revision = 'EmuX_2.15';
 var urlsToCache = [
     '/', 
     './index.html',
@@ -14,6 +14,8 @@ var urlsToCache = [
     './src/core/quicknes.zip',
     './src/core/fbneo.zip',
     './src/core/neogeo.zip',
+    './src/core/ngp.zip',
+    './src/core/genesis.zip',
     './src/back/zip.js',
     './src/back/loader.js',
     './src/back/audio.js',
