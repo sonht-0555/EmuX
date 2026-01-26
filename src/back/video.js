@@ -27,6 +27,16 @@ function initWebGL(width, height) {
 }
 function video_cb(pointer, width, height, pitch) {
   if (!gl) initWebGL(width, height);
+  // New fix
+  const targetSize = width * height * 4;
+  if (!rgbaBuffer || rgbaBuffer.length < targetSize) {
+    rgbaBuffer = new Uint8Array(targetSize);
+    canvas.width = width; canvas.height = height;
+    gl.viewport(0, 0, width, height);
+    gl.bindTexture(gl.TEXTURE_2D, glTexture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  }
+  // New fix
   const src = new Uint16Array(Module.HEAPU8.buffer, pointer, (pitch / 2) * height);
   const stride = pitch / 2;
   let di = 0;

@@ -4,11 +4,13 @@ function env_cb(cmd, data) {
 }
 // ===== Core =====
 const CORE_CONFIG = {
-    gba:    { ratio: 65536  / 48000, ext: '.gba', script: './src/core/mgba.zip' },
-    gbc:    { ratio: 131072 / 48000, ext: '.gb,.gbc', script: './src/core/mgba.zip' },
-    snes:   { ratio: 32040  / 48000, ext: '.smc,.sfc', script: './src/core/snes9x.zip' },
-    nes:    { ratio: 44100  / 48000, ext: '.nes', script: './src/core/quicknes.zip' },
-    neogeo: { ratio: 48000  / 48000, ext: '.zip', script: './src/core/fbneo.zip' },
+    gba:     { ratio: 65536  / 48000, ext: '.gba', script: './src/core/mgba.zip' },
+    gbc:     { ratio: 131072 / 48000, ext: '.gb,.gbc', script: './src/core/mgba.zip' },
+    snes:    { ratio: 32000  / 48000, ext: '.smc,.sfc', script: './src/core/snes.zip' },
+    nes:     { ratio: 44100  / 48000, ext: '.nes', script: './src/core/quicknes.zip' },
+    neogeo:  { ratio: 48000  / 48000, ext: '.zip', script: './src/core/fbneo.zip' },
+    genesis: { ratio: 48000  / 48000, ext: '.md,.bin,.gen', script: './src/core/genesis.zip' },
+    ngp:     { ratio: 44100  / 48000, ext: '.ngp,.ngc', script: './src/core/ngp.zip' },
 };
 var isRunning = false;
 // ===== Unzip ====
@@ -35,7 +37,7 @@ async function initCore(romFile) {
     const romBuffer = await romFile.arrayBuffer();
     const binaryData = new Uint8Array(romBuffer);
     let finalRomName = romFile.name, finalRomData = binaryData;
-    const consoleExts = /\.(gba|gbc|gb|smc|sfc|nes)$/i;
+    const consoleExts = /\.(gba|gbc|gb|smc|sfc|nes|md|gen|ngp|ngc)$/i;
     if (isZip) {
         notifi("","..","......","")
         const extracted = await unzip(binaryData, consoleExts);
@@ -54,6 +56,7 @@ async function initCore(romFile) {
     if (!coreConfig) return;
     let scriptSource = coreConfig.script;
     const isFBNeo = scriptSource.includes('fbneo');
+    const isGenesis = scriptSource.includes('genesis') || scriptSource.includes('ngp');
     if (scriptSource.endsWith('.zip')) {
         notifi("","...",".....","")
         const response = await fetch(scriptSource);
@@ -100,6 +103,17 @@ async function initCore(romFile) {
                     Module.stringToUTF8(romPath, pathPtr, 256);
                     Module.HEAP32[infoPointer >> 2] = pathPtr;
                     Module.HEAP32[(infoPointer >> 2) + 1] = Module.HEAP32[(infoPointer >> 2) + 2] = Module.HEAP32[(infoPointer >> 2) + 3] = 0;
+                    Module._retro_load_game(infoPointer);
+                } else if (isGenesis) {
+                    const romPath = '/game.' + finalRomName.split('.').pop();
+                    Module.FS.writeFile(romPath, finalRomData);
+                    Module.HEAPU8.set(finalRomData, romPointer);
+                    const pathPtr = Module._malloc(256);
+                    Module.stringToUTF8(romPath, pathPtr, 256);
+                    Module.HEAP32[infoPointer >> 2] = pathPtr;
+                    Module.HEAP32[(infoPointer >> 2) + 1] = romPointer;
+                    Module.HEAP32[(infoPointer >> 2) + 2] = finalRomData.length;
+                    Module.HEAP32[(infoPointer >> 2) + 3] = 0;
                     Module._retro_load_game(infoPointer);
                 } else {
                     Module.HEAPU8.set(finalRomData, romPointer); 
