@@ -21,10 +21,10 @@ jobs:
       run: |
         git clone --depth 1 https://github.com/libretro/gambatte-libretro.git
         cd gambatte-libretro
-        # Build core bitcode
-        emmake make platform=emscripten -j$(nproc) STATIC_LINKING=0 WANT_VFS=1
+        # Ép core tự build các util bằng STATIC_LINKING=0
+        emmake make -f Makefile.libretro platform=emscripten -j$(nproc) STATIC_LINKING=0
         
-        # Thu thập objects
+        # Thu thập toàn bộ objects (bao gồm libretro-common)
         ALL_OBJS=$(find . -name "*.o")
         
         # Link sang JS/WASM
@@ -49,14 +49,13 @@ jobs:
     - uses: mymindstorm/setup-emsdk@v14
       with:
         version: 3.1.46
-    - name: Fetch and Build SNES9x 2005 Core
+    - name: Fetch and Build SNES9x 2010 Core
       run: |
-        git clone --depth 1 https://github.com/libretro/snes9x2005.git
-        cd snes9x2005
-        # Build core bitcode
-        emmake make platform=emscripten -j$(nproc) STATIC_LINKING=0 WANT_VFS=1
+        git clone --depth 1 https://github.com/libretro/snes9x2010.git
+        cd snes9x2010
+        # Tương tự cho SNES9x 2010
+        emmake make -f Makefile.libretro platform=emscripten -j$(nproc) STATIC_LINKING=0
         
-        # Thu thập objects
         ALL_OBJS=$(find . -name "*.o")
         
         # Link sang JS/WASM
@@ -69,4 +68,4 @@ jobs:
     - uses: actions/upload-artifact@v4
       with:
         name: snes-light-core
-        path: snes9x2005/snes_light.zip
+        path: snes9x2010/snes_light.zip

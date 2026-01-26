@@ -17,7 +17,7 @@
     <div class="box">
         <div class="input-group">
             <label>1. Tên file Core (trong thư mục src/core/):</label>
-            <input type="text" id="coreName" value="genesis" placeholder="ví dụ: genesis, ngp, ps1">
+            <input type="text" id="coreName" value="snes_light" placeholder="ví dụ: genesis, ngp, ps1">
         </div>
         <div class="input-group">
             <label>2. Chọn ROM game tương ứng:</label>
@@ -87,30 +87,43 @@
                 locateFile: (path) => path.endsWith('.wasm') ? `./src/core/${coreName}.wasm` : path,
                 async onRuntimeInitialized() {
                     status("VFS Setup...");
-                    const romPath = "/game.bin";
+                    const ext = romFile.name.split('.').pop();
+                    const romPath = `/game.${ext}`;
                     Module.FS.writeFile(romPath, romData);
 
-                    const infoPtr = Module._malloc(16);
+                    // Nạp ROM vào vùng nhớ WASM (Bắt buộc cho SNES/GBC)
+                    const romPtr = Module._malloc(romData.length);
+                    Module.HEAPU8.set(romData, romPtr);
+
+                    const infoPtr = Module._malloc(32);
                     const pathPtr = Module._malloc(256);
                     Module.stringToUTF8(romPath, pathPtr, 256);
 
-                    [[_retro_set_environment, env_cb, "iii"], 
-                     [_retro_set_video_refresh, video_cb, "viiii"], 
-                     [_retro_set_audio_sample, audio_cb, "vii"], 
-                     [_retro_set_audio_sample_batch, audio_batch_cb, "iii"], 
-                     [_retro_set_input_poll, input_poll_cb, "v"], 
-                     [_retro_set_input_state, input_state_cb, "iiiii"]
-                    ].forEach(([f, cb, sig]) => f(Module.addFunction(cb, sig)));
+                    // Thiết lập Callbacks
+                    [[Module._retro_set_environment, env_cb, "iii"], 
+                     [Module._retro_set_video_refresh, video_cb, "viiii"], 
+                     [Module._retro_set_audio_sample, () => {}, "vii"], 
+                     [Module._retro_set_audio_sample_batch, (d, f) => f, "iii"], 
+                     [Module._retro_set_input_poll, () => {}, "v"], 
+                     [Module._retro_set_input_state, () => 0, "iiiii"]
+                    ].forEach(([f, cb, sig]) => { if(f) f(Module.addFunction(cb, sig)); });
 
                     Module._retro_init();
-                    Module.HEAP32[infoPtr >> 2] = pathPtr;
-                    Module.HEAP32[(infoPtr >> 2) + 1] = Module.HEAP32[(infoPtr >> 2) + 2] = Module.HEAP32[(infoPtr >> 2) + 3] = 0;
+                    
+                    // Điền thông tin vào struct truyền cho Core
+                    Module.HEAP32[infoPtr >> 2] = pathPtr;        // info.path
+                    Module.HEAP32[(infoPtr >> 2) + 1] = romPtr;   // info.data (Quan trọng!)
+                    Module.HEAP32[(infoPtr >> 2) + 2] = romData.length; // info.size (Quan trọng!)
+                    Module.HEAP32[(infoPtr >> 2) + 3] = 0;        // info.meta
+                    
                     
                     if (Module._retro_load_game(infoPtr)) {
                         status(`Core ${coreName} đang CHẠY!`);
                         isRunning = true;
                         (function loop() { if(isRunning) { Module._retro_run(); requestAnimationFrame(loop); } })();
-                    } else { status("Lỗi: Core không nạp được game."); }
+                    } else { 
+                        status("Lỗi: Core từ chối nạp Game."); 
+                    }
                 }
             };
 
