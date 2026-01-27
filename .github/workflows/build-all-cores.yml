@@ -25,7 +25,7 @@ jobs:
         CORE_FILE=$(ls mgba_libretro_emscripten.* | grep -E '\.(a|bc)$' | head -n 1)
         emcc "$CORE_FILE" -O3 -flto -DNDEBUG \
           -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web \
-          -s ALLOW_MEMORY_GROWTH=1 \
+          -s ALLOW_MEMORY_GROWTH=1 -s WASM_BIGINT=1 --no-heap-copy \
           -s INITIAL_MEMORY=256mb -s STACK_SIZE=8mb \
           -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap"]' \
           -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free"]' \
@@ -56,7 +56,7 @@ jobs:
         CORE_FILE=$(ls quicknes_libretro_emscripten.* | grep -E '\.(a|bc)$' | head -n 1)
         emcc "$CORE_FILE" -O3 -flto -DNDEBUG \
           -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web \
-          -s ALLOW_MEMORY_GROWTH=1 \
+          -s ALLOW_MEMORY_GROWTH=1 -s WASM_BIGINT=1 --no-heap-copy \
           -s INITIAL_MEMORY=128mb -s STACK_SIZE=4mb \
           -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap"]' \
           -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free"]' \
@@ -87,7 +87,7 @@ jobs:
         CORE_FILE=$(ls snes9x_libretro_emscripten.* | grep -E '\.(a|bc)$' | head -n 1)
         emcc "$CORE_FILE" -O3 -flto -DNDEBUG \
           -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web \
-          -s ALLOW_MEMORY_GROWTH=1 \
+          -s ALLOW_MEMORY_GROWTH=1 -s WASM_BIGINT=1 --no-heap-copy \
           -s INITIAL_MEMORY=256mb -s STACK_SIZE=8mb \
           -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap"]' \
           -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free"]' \
@@ -119,7 +119,7 @@ jobs:
         CORE_FILE=$(ls fbneo_libretro_emscripten.* | grep -E '\.(a|bc)$' | head -n 1)
         emcc "$CORE_FILE" ../../../../../retro_glue.o -O3 -flto -DNDEBUG \
           -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web \
-          -s ALLOW_MEMORY_GROWTH=1 \
+          -s ALLOW_MEMORY_GROWTH=1 -s WASM_BIGINT=1 --no-heap-copy \
           -s ALLOW_TABLE_GROWTH=1 -s FORCE_FILESYSTEM=1 \
           -s INITIAL_MEMORY=256mb -s STACK_SIZE=8mb \
           -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap"]' \
@@ -151,7 +151,7 @@ jobs:
         ALL_OBJS=$(find . -name "*.o")
         emcc $ALL_OBJS -O3 -flto -DNDEBUG \
           -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web \
-          -s ALLOW_MEMORY_GROWTH=1 \
+          -s ALLOW_MEMORY_GROWTH=1 -s WASM_BIGINT=1 --no-heap-copy \
           -s INITIAL_MEMORY=256mb -s STACK_SIZE=8mb \
           -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap"]' \
           -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free"]' \
@@ -182,7 +182,7 @@ jobs:
         ALL_OBJS=$(find . -name "*.o")
         emcc $ALL_OBJS -O3 -flto -DNDEBUG \
           -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web \
-          -s ALLOW_MEMORY_GROWTH=1 \
+          -s ALLOW_MEMORY_GROWTH=1 -s WASM_BIGINT=1 --no-heap-copy \
           -s INITIAL_MEMORY=128mb -s STACK_SIZE=4mb \
           -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap"]' \
           -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free"]' \
@@ -194,9 +194,72 @@ jobs:
         name: ngp-core
         path: libretro-super/libretro-mednafen_ngp/ngp.zip
 
+  build-ps1:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout EmuX & Setup Emscripten
+      uses: actions/checkout@v3
+      with:
+        path: emux
+    - uses: mymindstorm/setup-emsdk@v14
+      with:
+        version: 3.1.46
+    - name: Fetch and Build PCSX ReARMed Core
+      run: |
+        git clone --depth 1 https://github.com/libretro/libretro-super.git
+        cd libretro-super && ./libretro-fetch.sh pcsx_rearmed && cd ..
+        cd libretro-super/libretro-pcsx_rearmed
+        emmake make -f Makefile.libretro platform=emscripten -j$(nproc) \
+          DYNAREC="" GPU_PEOPS=1 WANT_ZLIB=1 GLES=1
+        ALL_OBJS=$(find . -name "*.o")
+        emcc $ALL_OBJS -O3 -flto -DNDEBUG \
+          -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web \
+          -s ALLOW_MEMORY_GROWTH=1 -s WASM_BIGINT=1 --no-heap-copy \
+          -s INITIAL_MEMORY=512mb -s STACK_SIZE=16mb \
+          -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap"]' \
+          -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free"]' \
+          -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 -s ALLOW_TABLE_GROWTH=1 \
+          -o ps1.js
+        zip -r ps1.zip ps1.js ps1.wasm
+    - uses: actions/upload-artifact@v4
+      with:
+        name: ps1-core
+        path: libretro-super/libretro-pcsx_rearmed/ps1.zip
+
+  build-snes2010:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout EmuX & Setup Emscripten
+      uses: actions/checkout@v3
+      with:
+        path: emux
+    - uses: mymindstorm/setup-emsdk@v14
+      with:
+        version: 3.1.46
+    - name: Fetch and Build SNES9x 2010 Core
+      run: |
+        git clone --depth 1 https://github.com/libretro/libretro-super.git
+        cd libretro-super && ./libretro-fetch.sh snes9x2010 && cd ..
+        cd libretro-super/libretro-snes9x2010
+        emmake make -f Makefile.libretro platform=emscripten -j$(nproc) STATIC_LINKING=0
+        ALL_OBJS=$(find . -name "*.o")
+        emcc $ALL_OBJS -O3 -flto -DNDEBUG \
+          -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web \
+          -s ALLOW_MEMORY_GROWTH=1 -s WASM_BIGINT=1 --no-heap-copy \
+          -s INITIAL_MEMORY=128mb -s STACK_SIZE=4mb \
+          -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap"]' \
+          -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free"]' \
+          -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 -s ALLOW_TABLE_GROWTH=1 \
+          -o snes2010.js
+        zip -r snes2010.zip snes2010.js snes2010.wasm
+    - uses: actions/upload-artifact@v4
+      with:
+        name: snes2010-core
+        path: libretro-super/libretro-snes9x2010/snes2010.zip
+
   deploy-cores:
     runs-on: ubuntu-latest
-    needs: [build-gba, build-nes, build-snes, build-neogeo, build-genesis, build-ngp]
+    needs: [build-gba, build-nes, build-snes, build-neogeo, build-genesis, build-ngp, build-ps1, build-snes2010]
     steps:
     - name: Download all artifacts
       uses: actions/download-artifact@v4
