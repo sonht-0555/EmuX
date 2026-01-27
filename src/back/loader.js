@@ -3,15 +3,15 @@ function env_cb(cmd, data) {
     if (cmd === 10) return 1;
 }
 // ===== Core =====
-const CORE_CONFIG = {
-    gba:     { ratio: 65536  / 48000, ext: '.gba', script: './src/core/gba.zip' },
-    gbc:     { ratio: 131072 / 48000, ext: '.gb,.gbc', script: './src/core/gba.zip' },
-    snes:    { ratio: 32000  / 48000, ext: '.smc,.sfc', script: './src/core/snes2010.zip' },
-    nes:     { ratio: 44100  / 48000, ext: '.nes', script: './src/core/nes.zip' },
-    arcade:  { ratio: 48000  / 48000, ext: '.zip', script: './src/core/arcade.zip' },
-    genesis: { ratio: 48000  / 48000, ext: '.md,.bin,.gen', script: './src/core/genesis.zip' },
-    ngp:     { ratio: 44100  / 48000, ext: '.ngp,.ngc', script: './src/core/ngp.zip' },
-};
+const CORE_CONFIG = [
+    { ext: '.gba', script: './src/core/gba.zip' },
+    { ext: '.gb,.gbc', script: './src/core/gba.zip' },
+    { ext: '.smc,.sfc', script: './src/core/snes2010.zip' },
+    { ext: '.nes', script: './src/core/nes.zip' },
+    { ext: '.zip', script: './src/core/arcade.zip' },
+    { ext: '.md,.bin,.gen', script: './src/core/genesis.zip' },
+    { ext: '.ngp,.ngc', script: './src/core/ngp.zip' },
+];
 var isRunning = false;
 // ===== Unzip ====
 async function unzip(binaryData, nameFilter) {
@@ -48,15 +48,15 @@ async function initCore(romFile) {
         }
     }
     const finalLowName = finalRomName.toLowerCase();
-    const coreConfig = Object.values(CORE_CONFIG).find(cfg => 
+    const coreConfig = CORE_CONFIG.find(cfg => 
         cfg.ext.split(',').map(e => e.trim().toLowerCase()).filter(e => e).some(ext => 
             finalLowName.endsWith(ext) || finalLowName === ext.replace('.', '')
         )
     ); 
     if (!coreConfig) return;
     let scriptSource = coreConfig.script;
-    const isFBNeo = scriptSource.includes('arcade');
-    const isGenesis = scriptSource.includes('genesis') || scriptSource.includes('ngp');
+    const isArcade = scriptSource.includes('arcade');
+    const isSega = scriptSource.includes('genesis') || scriptSource.includes('ngp');
     if (scriptSource.endsWith('.zip')) {
         notifi("","...",".....","")
         const response = await fetch(scriptSource);
@@ -75,9 +75,8 @@ async function initCore(romFile) {
     notifi("",".....","...","")
     return new Promise((resolve) => {
         const canvas = document.getElementById("canvas");
-        initAudio(coreConfig);
         window.Module = {
-            isFBNeo, canvas,
+            isArcade, canvas,
             locateFile: (path) => path.endsWith('.wasm') ? (window.wasmUrl || path) : path,
             async onRuntimeInitialized() {
                 notifi("","......","..","")
@@ -90,7 +89,7 @@ async function initCore(romFile) {
                  [Module._retro_set_input_state, input_state_cb, "iiiii"]
                 ].forEach(([retroFunction, callback, signature]) => retroFunction(Module.addFunction(callback, signature)));
                 Module._retro_init();
-                if (isFBNeo) {
+                if (isArcade) {
                     notifi("",".......",".","")
                     const biosRes = await fetch('./src/core/neogeo.zip');
                     if (biosRes.ok) {
@@ -104,7 +103,7 @@ async function initCore(romFile) {
                     Module.HEAP32[infoPointer >> 2] = pathPtr;
                     Module.HEAP32[(infoPointer >> 2) + 1] = Module.HEAP32[(infoPointer >> 2) + 2] = Module.HEAP32[(infoPointer >> 2) + 3] = 0;
                     Module._retro_load_game(infoPointer);
-                } else if (isGenesis) {
+                } else if (isSega) {
                     const romPath = '/game.' + finalRomName.split('.').pop();
                     Module.FS.writeFile(romPath, finalRomData);
                     Module.HEAPU8.set(finalRomData, romPointer);
@@ -120,6 +119,10 @@ async function initCore(romFile) {
                     Module.HEAPU32.set([0, romPointer, finalRomData.length, 0], infoPointer >> 2); 
                     Module._retro_load_game(infoPointer);
                 }
+                const avInfo = Module._malloc(128);
+                Module._retro_get_system_av_info(avInfo);
+                initAudio(Module.HEAPF64[(avInfo + 32) >> 3] / 48000);
+                Module._free(avInfo);
                 (function mainLoop() { Module._retro_run(), requestAnimationFrame(mainLoop) })();
                 isRunning = true; 
                 notifi("","........","","")
