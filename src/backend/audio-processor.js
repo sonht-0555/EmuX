@@ -12,15 +12,17 @@ class AudioProcessor extends AudioWorkletProcessor {
     };
   }
   interp(b, p) {
-    // Cubic Hermite Interpolation (Disabled)
-    /*
     let i = Math.floor(p), f = p - i, s = this.s;
-    let p0 = b[(i - 1 + s) % s], p1 = b[i % s], p2 = b[(i + 1) % s], p3 = b[(i + 2) % s];
-    return p1 + 0.5 * f * (p2 - p0 + f * (2 * p0 - 5 * p1 + 4 * p2 - p3 + f * (3 * (p1 - p2) + p3 - p0)));
-    */
 
-    // Nearest Neighbor (Active)
-    return b[Math.floor(p) % this.s];
+    // 1. CHẤT LƯỢNG CAO: Cubic Hermite (Tốn CPU nhất)
+    // let p0 = b[(i - 1 + s) % s], p1 = b[i % s], p2 = b[(i + 1) % s], p3 = b[(i + 2) % s];
+    // return p1 + 0.5 * f * (p2 - p0 + f * (2 * p0 - 5 * p1 + 4 * p2 - p3 + f * (3 * (p1 - p2) + p3 - p0)));
+
+    // 2. HYBRID: Linear Interpolation (Cân bằng - ĐANG DÙNG)
+    return b[i % s] + f * (b[(i + 1) % s] - b[i % s]);
+
+    // 3. SIÊU NHẸ: Nearest Neighbor
+    // return b[i % s];
   }
   process(_, [out]) {
     const [oL, oR] = out, len = oL.length;
