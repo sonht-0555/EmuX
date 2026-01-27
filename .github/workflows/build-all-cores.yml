@@ -132,29 +132,80 @@ jobs:
         name: fbneo-core
         path: libretro-super/libretro-fbneo/src/burner/libretro/fbneo.zip
 
-  deploy-cores:
+  build-genesis:
     runs-on: ubuntu-latest
-    needs: [build-gba, build-nes, build-snes, build-neogeo]
-    permissions:
-      contents: write
     steps:
-    - name: Checkout EmuX
+    - name: Checkout EmuX & Setup Emscripten
       uses: actions/checkout@v3
       with:
-        fetch-depth: 0
+        path: emux
+    - uses: mymindstorm/setup-emsdk@v14
+      with:
+        version: 3.1.46
+    - name: Fetch and Build Genesis Plus GX Core
+      run: |
+        git clone --depth 1 https://github.com/libretro/libretro-super.git
+        cd libretro-super && ./libretro-fetch.sh genesis_plus_gx && cd ..
+        cd libretro-super/libretro-genesis_plus_gx
+        emmake make -f Makefile.libretro platform=emscripten -j$(nproc) STATIC_LINKING=0 WANT_ZLIB=1 WANT_VFS=1
+        ALL_OBJS=$(find . -name "*.o")
+        emcc $ALL_OBJS -O3 -flto -DNDEBUG \
+          -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web \
+          -s ALLOW_MEMORY_GROWTH=1 \
+          -s INITIAL_MEMORY=256mb -s STACK_SIZE=8mb \
+          -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap"]' \
+          -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free"]' \
+          -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 -s ALLOW_TABLE_GROWTH=1 \
+          -o genesis.js
+        zip -r genesis.zip genesis.js genesis.wasm
+    - uses: actions/upload-artifact@v4
+      with:
+        name: genesis-core
+        path: libretro-super/libretro-genesis_plus_gx/genesis.zip
 
+  build-ngp:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout EmuX & Setup Emscripten
+      uses: actions/checkout@v3
+      with:
+        path: emux
+    - uses: mymindstorm/setup-emsdk@v14
+      with:
+        version: 3.1.46
+    - name: Fetch and Build Beetle NGP Core
+      run: |
+        git clone --depth 1 https://github.com/libretro/libretro-super.git
+        cd libretro-super && ./libretro-fetch.sh mednafen_ngp && cd ..
+        cd libretro-super/libretro-mednafen_ngp
+        emmake make platform=emscripten -j$(nproc) STATIC_LINKING=0 WANT_VFS=1
+        ALL_OBJS=$(find . -name "*.o")
+        emcc $ALL_OBJS -O3 -flto -DNDEBUG \
+          -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web \
+          -s ALLOW_MEMORY_GROWTH=1 \
+          -s INITIAL_MEMORY=128mb -s STACK_SIZE=4mb \
+          -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap"]' \
+          -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free"]' \
+          -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 -s ALLOW_TABLE_GROWTH=1 \
+          -o ngp.js
+        zip -r ngp.zip ngp.js ngp.wasm
+    - uses: actions/upload-artifact@v4
+      with:
+        name: ngp-core
+        path: libretro-super/libretro-mednafen_ngp/ngp.zip
+
+  deploy-cores:
+    runs-on: ubuntu-latest
+    needs: [build-gba, build-nes, build-snes, build-neogeo, build-genesis, build-ngp]
+    steps:
     - name: Download all artifacts
       uses: actions/download-artifact@v4
       with:
-        path: downloaded-cores
+        path: all-cores
+        merge-multiple: true
 
-    - name: Commit and Push (Amend)
-      run: |
-        mkdir -p src/core
-        find downloaded-cores -name "*.zip" -exec cp {} src/core/ \;
-        git config --global user.name "github-actions[bot]"
-        git config --global user.email "github-actions[bot]@users.noreply.github.com"
-        git add src/core/*.zip
-        # Amend to keep repo clean, with skip-ci to avoid loop
-        git commit --amend --no-edit || git commit -m "Update all cores [skip ci]"
-        git push -f origin main
+    - name: Upload combined cores artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: all-cores-bundle
+        path: all-cores/
