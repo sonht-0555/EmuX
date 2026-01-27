@@ -4,11 +4,11 @@ function env_cb(cmd, data) {
 }
 // ===== Core =====
 const CORE_CONFIG = {
-    gba:     { ratio: 65536  / 48000, ext: '.gba', script: './src/core/mgba.zip' },
-    gbc:     { ratio: 131072 / 48000, ext: '.gb,.gbc', script: './src/core/mgba.zip' },
-    snes:    { ratio: 32000  / 48000, ext: '.smc,.sfc', script: './src/core/snes.zip' },
-    nes:     { ratio: 44100  / 48000, ext: '.nes', script: './src/core/quicknes.zip' },
-    neogeo:  { ratio: 48000  / 48000, ext: '.zip', script: './src/core/fbneo.zip' },
+    gba:     { ratio: 65536  / 48000, ext: '.gba', script: './src/core/gba.zip' },
+    gbc:     { ratio: 131072 / 48000, ext: '.gb,.gbc', script: './src/core/gba.zip' },
+    snes:    { ratio: 32000  / 48000, ext: '.smc,.sfc', script: './src/core/snes2010.zip' },
+    nes:     { ratio: 44100  / 48000, ext: '.nes', script: './src/core/nes.zip' },
+    arcade:  { ratio: 48000  / 48000, ext: '.zip', script: './src/core/arcade.zip' },
     genesis: { ratio: 48000  / 48000, ext: '.md,.bin,.gen', script: './src/core/genesis.zip' },
     ngp:     { ratio: 44100  / 48000, ext: '.ngp,.ngc', script: './src/core/ngp.zip' },
 };
@@ -55,7 +55,7 @@ async function initCore(romFile) {
     ); 
     if (!coreConfig) return;
     let scriptSource = coreConfig.script;
-    const isFBNeo = scriptSource.includes('fbneo');
+    const isFBNeo = scriptSource.includes('arcade');
     const isGenesis = scriptSource.includes('genesis') || scriptSource.includes('ngp');
     if (scriptSource.endsWith('.zip')) {
         notifi("","...",".....","")

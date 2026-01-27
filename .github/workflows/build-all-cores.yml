@@ -30,12 +30,12 @@ jobs:
           -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap"]' \
           -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free"]' \
           -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 -s ALLOW_TABLE_GROWTH=1 \
-          -o mgba.js
-        zip -r mgba.zip mgba.js mgba.wasm
+          -o gba.js
+        zip -r gba.zip gba.js gba.wasm
     - uses: actions/upload-artifact@v4
       with:
-        name: mgba-core
-        path: libretro-super/libretro-mgba/mgba.zip
+        name: gba-core
+        path: libretro-super/libretro-mgba/gba.zip
 
   build-nes:
     runs-on: ubuntu-latest
@@ -61,12 +61,12 @@ jobs:
           -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap"]' \
           -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free"]' \
           -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 -s ALLOW_TABLE_GROWTH=1 \
-          -o quicknes.js
-        zip -r quicknes.zip quicknes.js quicknes.wasm
+          -o nes.js
+        zip -r nes.zip nes.js nes.wasm
     - uses: actions/upload-artifact@v4
       with:
-        name: quicknes-core
-        path: libretro-super/libretro-quicknes/quicknes.zip
+        name: nes-core
+        path: libretro-super/libretro-quicknes/nes.zip
 
   build-snes:
     runs-on: ubuntu-latest
@@ -92,12 +92,12 @@ jobs:
           -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap"]' \
           -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free"]' \
           -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 -s ALLOW_TABLE_GROWTH=1 \
-          -o snes9x.js
-        zip -r snes9x.zip snes9x.js snes9x.wasm
+          -o snes.js
+        zip -r snes.zip snes.js snes.wasm
     - uses: actions/upload-artifact@v4
       with:
-        name: snes9x-core
-        path: libretro-super/libretro-snes9x/libretro/snes9x.zip
+        name: snes-core
+        path: libretro-super/libretro-snes9x/libretro/snes.zip
 
   build-neogeo:
     runs-on: ubuntu-latest
@@ -125,12 +125,12 @@ jobs:
           -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap"]' \
           -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free"]' \
           -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 \
-          -o fbneo_libretro.js
-        zip -j fbneo.zip fbneo_libretro.{js,wasm}
+          -o arcade.js
+        zip -j arcade.zip arcade.js arcade.wasm
     - uses: actions/upload-artifact@v4
       with:
-        name: fbneo-core
-        path: libretro-super/libretro-fbneo/src/burner/libretro/fbneo.zip
+        name: arcade-core
+        path: libretro-super/libretro-fbneo/src/burner/libretro/arcade.zip
 
   build-genesis:
     runs-on: ubuntu-latest
