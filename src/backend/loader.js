@@ -39,7 +39,7 @@ async function initCore(romFile) {
     let finalRomName = romFile.name, finalRomData = binaryData;
     const consoleExts = /\.(gba|gbc|gb|smc|sfc|nes|md|gen|ngp|ngc)$/i;
     if (isZip) {
-        notifi("","","----","")
+        notifi("","","---","")
         const extracted = await unzip(binaryData, consoleExts);
         const consoleRomName = Object.keys(extracted)[0];
         if (consoleRomName) {
@@ -58,7 +58,7 @@ async function initCore(romFile) {
     const isArcade = scriptSource.includes('arcade');
     const isSega = scriptSource.includes('genesis') || scriptSource.includes('ngp');
     if (scriptSource.endsWith('.zip')) {
-        notifi("","#","---","")
+        notifi("","#","--","")
         const response = await fetch(scriptSource);
         if (!response.ok) return;
         const bundleBuffer = await response.arrayBuffer();
@@ -72,7 +72,7 @@ async function initCore(romFile) {
         window.wasmUrl = URL.createObjectURL(new Blob([coreFiles[wasmName]], { type: 'application/wasm' }));
     }
     return new Promise((resolve) => {
-        notifi("","##","--","")
+        notifi("","##","-","")
         const canvas = document.getElementById("canvas");
         window.Module = {
             isArcade, canvas,
@@ -88,7 +88,7 @@ async function initCore(romFile) {
                 ].forEach(([retroFunction, callback, signature]) => retroFunction(Module.addFunction(callback, signature)));
                 Module._retro_init();
                 if (isArcade) {
-                    notifi("","###","-","")
+                    notifi("","###","","")
                     const biosRes = await fetch('./src/core/neogeo.zip');
                     if (biosRes.ok) {
                         const biosData = new Uint8Array(await biosRes.arrayBuffer());
@@ -124,7 +124,6 @@ async function initCore(romFile) {
                 Module._free(avInfo);
                 (function mainLoop() { if (isRunning) Module._retro_run(); requestAnimationFrame(mainLoop) })();
                 resolve();
-                notifi("","####","","");
             }
         };
         const scriptElement = document.createElement('script'); scriptElement.src = scriptSource; document.body.appendChild(scriptElement);

@@ -65,9 +65,11 @@ document.addEventListener("DOMContentLoaded", function() {
         });
         navigator.serviceWorker.addEventListener('message', function (event) {
         if (event.data.msg === "Updating...") {
-            ver.textContent = "The system is updating...";
             isReload = true;
-            setTimeout(() => {location.reload()},10000);
+            let i = 0, t = setInterval(() => {
+                ver.textContent = `|${++i}| The system is updating...`;
+                if (i == 20) clearInterval(t), location.reload();
+            }, 1000);
             }
         });
     }

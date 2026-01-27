@@ -12,6 +12,7 @@ function video_cb(pointer, width, height, pitch) {
     Module.canvas.height = height;
     imgData = ctx.createImageData(width, height);
     data32 = new Uint32Array(imgData.data.buffer);
+    if (window.gameView) gameView(gameName);
   }
   const bpp = pitch / width;
   if (bpp === 4) { 

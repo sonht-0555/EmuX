@@ -12,21 +12,39 @@ class AudioProcessor extends AudioWorkletProcessor {
     };
   }
   interp(b, p) {
-    const i = p | 0, f = p - i, m = this.s - 1;
-    const p0 = b[(i - 1) & m], p1 = b[i & m], p2 = b[(i + 1) & m], p3 = b[(i + 2) & m];
+    // 1. Bitwise
+    const i = p | 0;
+    const f = p - i;
+    const m = this.s - 1;
+    const p0 = b[(i - 1) & m];
+    const p1 = b[i & m];
+    const p2 = b[(i + 1) & m];
+    const p3 = b[(i + 2) & m];
     return p1 + 0.5 * f * (p2 - p0 + f * (2 * p0 - 5 * p1 + 4 * p2 - p3 + f * (3 * (p1 - p2) + p3 - p0)));
+
+    // 2. Linear Interpolation
+    // return b[i & m] + f * (b[(i + 1) & m] - b[i & m]);
+
+    // 3. Nearest Neighbor
+    // return b[i & m];
   }
   process(_, [out]) {
-    const [oL, oR] = out, len = oL.length;
-    let avail = (this.w - Math.floor(this.r) + this.s) % this.s;
-    let dRatio = this.ratio * (avail > this.s * 0.7 ? 1.01 : avail < 400 ? 0.99 : 1);
-    for (let i = 0; i < len; i++) {
+    const [oL, oR] = out, len = oL.length, L = this.L, R = this.R, s = this.s;
+    let r = this.r, avail = (this.w - (r | 0) + s) & (s - 1);
+    const d = this.ratio * (avail > s * 0.7 ? 1.01 : avail < 400 ? 0.99 : 1);
+
+    if (oR) for (let i = 0; i < len; i++) {
       if (avail > 8) {
-        oL[i] = this.interp(this.L, this.r); if (oR) oR[i] = this.interp(this.R, this.r);
-        this.r = (this.r + dRatio) % this.s; avail -= dRatio;
-      } else oL[i] = oR ? oR[i] = 0 : 0;
+        oL[i] = this.interp(L, r); oR[i] = this.interp(R, r);
+        if ((r += d) >= s) r -= s; avail -= d;
+      } else oL[i] = oR[i] = 0;
+    } else for (let i = 0; i < len; i++) {
+        if (avail > 8) {
+        oL[i] = this.interp(L, r);
+        if ((r += d) >= s) r -= s; avail -= d;
+      } else oL[i] = 0;
     }
-    return true;
+    this.r = r; return true;
   }
 }
 registerProcessor('audio-processor', AudioProcessor);
