@@ -4,7 +4,6 @@ const audio_cb = () => {};
 
 // ===== Audio =====
 var audioCtx, audioNode;
-var bufL = new Float32Array(2048), bufR = new Float32Array(2048); // Reusable buffers
 
 async function initAudio(ratio) {
   if (audioCtx) return audioCtx.resume();
@@ -29,4 +28,3 @@ function writeAudio(ptr, frames) {
   audioNode.port.postMessage({ l, r });
   return frames;
 }
-
