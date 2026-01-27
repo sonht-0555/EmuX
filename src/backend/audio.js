@@ -1,22 +1,19 @@
 // ===== LibAudio =====
 const audio_batch_cb = (ptr, frames) => writeAudio(ptr, frames);
 const audio_cb = () => {};
-
 // ===== Audio =====
 var audioCtx, audioNode;
-
 async function initAudio(ratio) {
   if (audioCtx) return audioCtx.resume();
   audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000, latencyHint: 'interactive' });
   try {
-    await audioCtx.audioWorklet.addModule('./src/back/audio-processor.js');
+    await audioCtx.audioWorklet.addModule('./src/backend/audio-processor.js');
     audioNode = new AudioWorkletNode(audioCtx, 'audio-processor');
     audioNode.port.postMessage({ ratio });
     audioNode.connect(audioCtx.destination);
   } catch (e) { console.error("Worklet Error:", e) }
   return audioCtx.resume();
 }
-
 function writeAudio(ptr, frames) {
   if (!audioNode || !isRunning) return frames;
   const data = new Int16Array(Module.HEAPU8.buffer, ptr, frames * 2);

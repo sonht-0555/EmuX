@@ -50,11 +50,11 @@ document.addEventListener("DOMContentLoaded", function() {
         tap++;
         setTimeout(() => {
             if (tap === 2) {
-                Main.pauseGame();
+                isRunning = false;
                 setTimeout(() => { 
                     const input = prompt("Format [shaderxx-data]");
                     input && local(...((() => { const [name, ...dataParts] = input.split('-'); return [name, dataParts.join('-')]; })()));
-                    Main.resumeGame();
+                    isRunning = true;
                 }, 150);
             } else if (tap === 1) {
                 number = number % 5 + 1;

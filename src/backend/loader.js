@@ -31,7 +31,7 @@ async function unzip(binaryData, nameFilter) {
 }
 // ===== initCore ====
 async function initCore(romFile) {
-    notifi("",".",".......","")
+    isRunning = true;
     const lowName = romFile.name.toLowerCase();
     const isZip = lowName.endsWith('.zip');
     const romBuffer = await romFile.arrayBuffer();
@@ -39,7 +39,7 @@ async function initCore(romFile) {
     let finalRomName = romFile.name, finalRomData = binaryData;
     const consoleExts = /\.(gba|gbc|gb|smc|sfc|nes|md|gen|ngp|ngc)$/i;
     if (isZip) {
-        notifi("","..","......","")
+        notifi("","","----","")
         const extracted = await unzip(binaryData, consoleExts);
         const consoleRomName = Object.keys(extracted)[0];
         if (consoleRomName) {
@@ -58,11 +58,10 @@ async function initCore(romFile) {
     const isArcade = scriptSource.includes('arcade');
     const isSega = scriptSource.includes('genesis') || scriptSource.includes('ngp');
     if (scriptSource.endsWith('.zip')) {
-        notifi("","...",".....","")
+        notifi("","#","---","")
         const response = await fetch(scriptSource);
         if (!response.ok) return;
         const bundleBuffer = await response.arrayBuffer();
-        notifi("","....","....","")
         const coreFiles = await unzip(new Uint8Array(bundleBuffer), /\.(js|wasm)$/i);
         const jsName = Object.keys(coreFiles).find(n => n.endsWith('.js'));
         const wasmName = Object.keys(coreFiles).find(n => n.endsWith('.wasm'));
@@ -72,14 +71,13 @@ async function initCore(romFile) {
         scriptSource = URL.createObjectURL(new Blob([jsBin.slice(0, jsLen)], { type: 'application/javascript' }));
         window.wasmUrl = URL.createObjectURL(new Blob([coreFiles[wasmName]], { type: 'application/wasm' }));
     }
-    notifi("",".....","...","")
     return new Promise((resolve) => {
+        notifi("","##","--","")
         const canvas = document.getElementById("canvas");
         window.Module = {
             isArcade, canvas,
             locateFile: (path) => path.endsWith('.wasm') ? (window.wasmUrl || path) : path,
             async onRuntimeInitialized() {
-                notifi("","......","..","")
                 const romPointer = Module._malloc(finalRomData.length), infoPointer = Module._malloc(16);
                 [[Module._retro_set_environment, env_cb, "iii"], 
                  [Module._retro_set_video_refresh, video_cb, "viiii"], 
@@ -90,7 +88,7 @@ async function initCore(romFile) {
                 ].forEach(([retroFunction, callback, signature]) => retroFunction(Module.addFunction(callback, signature)));
                 Module._retro_init();
                 if (isArcade) {
-                    notifi("",".......",".","")
+                    notifi("","###","-","")
                     const biosRes = await fetch('./src/core/neogeo.zip');
                     if (biosRes.ok) {
                         const biosData = new Uint8Array(await biosRes.arrayBuffer());
@@ -121,12 +119,12 @@ async function initCore(romFile) {
                 }
                 const avInfo = Module._malloc(128);
                 Module._retro_get_system_av_info(avInfo);
-                await initAudio(Module.HEAPF64[(avInfo + 32) >> 3] / 48000);
+                initAudio(Module.HEAPF64[(avInfo + 32) >> 3] / 48000);
+                audioCtx.resume();
                 Module._free(avInfo);
-                (function mainLoop() { Module._retro_run(), requestAnimationFrame(mainLoop) })();
-                isRunning = true; 
-                notifi("","........","","")
+                (function mainLoop() { if (isRunning) Module._retro_run(); requestAnimationFrame(mainLoop) })();
                 resolve();
+                notifi("","####","","");
             }
         };
         const scriptElement = document.createElement('script'); scriptElement.src = scriptSource; document.body.appendChild(scriptElement);

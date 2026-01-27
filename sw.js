@@ -1,4 +1,4 @@
-let revision = 'EmuX_2.23';
+let revision = 'EmuX_2.26';
 var urlsToCache = [
     '/', 
     './index.html',
@@ -18,18 +18,18 @@ var urlsToCache = [
     './src/core/ngp.zip',
     './src/core/genesis.zip',
     './src/core/ps1.zip',
-    './src/back/zip.js',
-    './src/back/loader.js',
-    './src/back/audio.js',
-    './src/back/audio-processor.js',
-    './src/back/video.js',
-    './src/back/gamepad.js',
-    './src/back/storage.js',
-    './src/back/main.js',
-    './src/front/global.js',
-    './src/front/main.js',
-    './src/front/page01.js',
-    './src/front/page02.js'
+    './src/backend/zip.js',
+    './src/backend/loader.js',
+    './src/backend/audio.js',
+    './src/backend/audio-processor.js',
+    './src/backend/video.js',
+    './src/backend/gamepad.js',
+    './src/backend/storage.js',
+    './src/backend/main.js',
+    './src/frontend/global.js',
+    './src/frontend/main.js',
+    './src/frontend/page01.js',
+    './src/frontend/page02.js'
 ];
 
 self.addEventListener('install', function (event) {
