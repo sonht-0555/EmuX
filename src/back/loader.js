@@ -121,7 +121,7 @@ async function initCore(romFile) {
                 }
                 const avInfo = Module._malloc(128);
                 Module._retro_get_system_av_info(avInfo);
-                initAudio(Module.HEAPF64[(avInfo + 32) >> 3] / 48000);
+                await initAudio(Module.HEAPF64[(avInfo + 32) >> 3] / 48000);
                 Module._free(avInfo);
                 (function mainLoop() { Module._retro_run(), requestAnimationFrame(mainLoop) })();
                 isRunning = true; 

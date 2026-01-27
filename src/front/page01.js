@@ -67,7 +67,7 @@ document.addEventListener("DOMContentLoaded", function() {
         if (event.data.msg === "Updating...") {
             ver.textContent = "The system is updating...";
             isReload = true;
-            setTimeout(() => {location.reload()},4000);
+            setTimeout(() => {location.reload()},10000);
             }
         });
     }
