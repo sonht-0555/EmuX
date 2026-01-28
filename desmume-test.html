@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>DeSmuME 2015 Technical Test</title>
+</head>
+<body>
+    <h1>DeSmuME 2015 Test</h1>
+    <input type="file" id="rom" accept=".nds">
+    <button id="run-btn" onclick="runCore()" disabled>Run Core (Loading...)</button>
+    <canvas id="canvas" width="256" height="384"></canvas>
+
+    <script>
+        var Module = {
+            canvas: document.getElementById('canvas'),
+            onRuntimeInitialized: () => {
+                console.log('DeSmuME WASM Ready!');
+                document.getElementById('run-btn').disabled = false;
+                document.getElementById('run-btn').innerText = 'Run DeSmuME';
+            }
+        };
+
+        function stub_video_refresh(data, width, height, pitch) {}
+        function stub_input_poll() {}
+        function stub_input_state(port, device, index, id) { return 0; }
+        function stub_audio_sample(left, right) {}
+        function stub_audio_sample_batch(data, frames) { return frames; }
+        function stub_environment(cmd, data) {
+            if (cmd === 10) return true;
+            return false; 
+        }
+
+        async function runCore() {
+            const file = document.getElementById('rom').files[0];
+            if (!file) return;
+            const buffer = await file.arrayBuffer();
+            const romData = new Uint8Array(buffer);
+            try {
+                const vPtr = Module.addFunction(stub_video_refresh, 'vpiii');
+                const aPtr = Module.addFunction(stub_audio_sample, 'vii');
+                const bPtr = Module.addFunction(stub_audio_sample_batch, 'ipi');
+                const pPtr = Module.addFunction(stub_input_poll, 'v');
+                const iPtr = Module.addFunction(stub_input_state, 'iiiii');
+                const ePtr = Module.addFunction(stub_environment, 'ipi');
+
+                Module._retro_set_video_refresh(vPtr);
+                Module._retro_set_audio_sample(aPtr);
+                Module._retro_set_audio_sample_batch(bPtr);
+                Module._retro_set_input_poll(pPtr);
+                Module._retro_set_input_state(iPtr);
+                Module._retro_set_environment(ePtr);
+
+                Module._retro_init();
+                const romPtr = Module._malloc(romData.length);
+                Module.HEAPU8.set(romData, romPtr);
+                const infoPtr = Module._malloc(16);
+                const pathPtr = Module._malloc(file.name.length + 1);
+                Module.stringToUTF8(file.name, pathPtr, file.name.length + 1);
+
+                const view = new Int32Array(Module.HEAPU8.buffer, infoPtr, 4);
+                view[0] = pathPtr;
+                view[1] = romPtr;
+                view[2] = romData.length;
+                view[3] = 0;
+
+                console.log('DeSmuME: Calling retro_load_game...');
+                const success = Module._retro_load_game(infoPtr);
+                if (success) {
+                    console.log('DeSmuME SUCCESS!');
+                    setInterval(() => Module._retro_run(), 16);
+                } else { console.error('DeSmuME FAILED'); }
+            } catch (e) { console.error('DeSmuME CRASH:', e); }
+        }
+    </script>
+    <script src="nds.js"></script>
+</body>
+</html>

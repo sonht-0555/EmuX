@@ -1,0 +1,68 @@
+name: Test NDS Core
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-nds:
+    name: build-${{ matrix.core.id }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        core:
+          - { id: desmume2015, fetch: desmume2015, flags: "DESMUME_JIT=0 DESMUME_TYPES=1" }
+          - { id: melonds, fetch: melonds, flags: "" }
+    
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        path: emux
+
+    - uses: mymindstorm/setup-emsdk@v14
+      with:
+        version: 3.1.46
+
+    - name: Fetch Core
+      run: |
+        git clone --depth 1 https://github.com/libretro/libretro-super.git
+        cd libretro-super && ./libretro-fetch.sh ${{ matrix.core.fetch }}
+
+    - name: Build
+      run: |
+        cd libretro-super/libretro-${{ matrix.core.fetch }}
+        
+        if [ "${{ matrix.core.id }}" == "desmume2015" ]; then
+          MAKE_PATH=$(find . -maxdepth 3 -name "Makefile.libretro" -o -name "Makefile" | head -n 1)
+          MAKE_DIR=$(dirname "$MAKE_PATH")
+          MAKE_FILE=$(basename "$MAKE_PATH")
+          cd "$MAKE_DIR"
+          if [[ "$MAKE_FILE" == "Makefile.libretro" ]]; then
+            emmake make -f Makefile.libretro platform=emscripten -j$(nproc) ${{ matrix.core.flags }}
+          else
+            emmake make platform=emscripten -j$(nproc) ${{ matrix.core.flags }}
+          fi
+        else
+          # melonDS: build trực tiếp
+          emmake make platform=emscripten -j$(nproc)
+        fi
+        
+        cd $GITHUB_WORKSPACE/libretro-super/libretro-${{ matrix.core.fetch }}
+        ALL_OBJS=$(find . -name "*.o")
+        
+        # LINK VỚI THÔNG TIN DEBUG VÀO FILE .JS (Dễ soi lỗi)
+        # Bỏ -flto để tránh lỗi alignment phức tạp
+        emcc $ALL_OBJS -O2 -g -DNDEBUG \
+          -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web \
+          -s ALLOW_MEMORY_GROWTH=1 -s WASM_BIGINT=1 -s ALLOW_TABLE_GROWTH=1 \
+          -s INITIAL_MEMORY=512mb -s STACK_SIZE=32mb \
+          -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap","getValue","setValue"]' \
+          -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free"]' \
+          -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=1 \
+          -o nds.js
+        zip -j ${{ matrix.core.id }}.zip nds.js nds.wasm
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.core.id }}-core
+        path: libretro-super/libretro-${{ matrix.core.fetch }}/*.zip
