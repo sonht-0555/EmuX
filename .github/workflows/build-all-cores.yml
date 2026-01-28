@@ -20,19 +20,18 @@ jobs:
       run: |
         git clone --depth 1 https://github.com/libretro/libretro-super.git
         cd libretro-super && ./libretro-fetch.sh mgba && cd ..
-        emcc -c emux/.github/workflows/retro_glue.c -o retro_glue.o -O3 -flto -DNDEBUG -s USE_ZLIB=1
         cd libretro-super/libretro-mgba
-        emmake make -f Makefile.libretro platform=emscripten -j$(nproc) LTO=1 WANT_VFS=1
-        ALL_OBJS=$(find . -name "*.o")
-        emcc $ALL_OBJS ../../retro_glue.o -O3 -flto -DNDEBUG \
+        emmake make -f Makefile.libretro platform=emscripten -j$(nproc) LTO=1
+        CORE_FILE=$(ls mgba_libretro_emscripten.* | grep -E '\.(a|bc)$' | head -n 1)
+        emcc "$CORE_FILE" -O3 -flto -DNDEBUG \
           -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web \
           -s ALLOW_MEMORY_GROWTH=1 -s WASM_BIGINT=1 --no-heap-copy \
-          -s INITIAL_MEMORY=256mb -s STACK_SIZE=8mb -s ALLOW_TABLE_GROWTH=1 \
+          -s INITIAL_MEMORY=256mb -s STACK_SIZE=8mb \
           -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap"]' \
-          -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_string_to_lower","_string_replace_substring","_path_basename","_path_parent_dir","_path_is_absolute","_path_remove_extension","_path_get_extension","_path_mkdir","_path_is_directory","_retro_opendir_include_hidden","_retro_readdir","_retro_dirent_get_name","_retro_dirent_is_dir","_retro_closedir","_filestream_open","_filestream_read","_filestream_write","_filestream_seek","_filestream_tell","_filestream_close","_filestream_get_size","_rfopen","_rfread","_rfwrite","_rfseek","_rftell","_rfsize","_rfclose","_rfget_size","_retro_vfs_file_open_impl","_retro_vfs_file_close_impl","_retro_vfs_file_get_size_impl","_retro_vfs_file_read_impl","_retro_vfs_file_write_impl","_retro_vfs_file_seek_impl","_retro_vfs_file_tell_impl","_malloc","_free"]' \
-          -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 \
+          -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free"]' \
+          -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 -s ALLOW_TABLE_GROWTH=1 \
           -o gba.js
-        zip -j gba.zip gba.js gba.wasm
+        zip -r gba.zip gba.js gba.wasm
     - uses: actions/upload-artifact@v4
       with:
         name: gba-core
@@ -52,19 +51,18 @@ jobs:
       run: |
         git clone --depth 1 https://github.com/libretro/libretro-super.git
         cd libretro-super && ./libretro-fetch.sh quicknes && cd ..
-        emcc -c emux/.github/workflows/retro_glue.c -o retro_glue.o -O3 -flto -DNDEBUG -s USE_ZLIB=1
         cd libretro-super/libretro-quicknes
-        emmake make platform=emscripten -j$(nproc) LTO=1 WANT_VFS=1
-        ALL_OBJS=$(find . -name "*.o")
-        emcc $ALL_OBJS ../../retro_glue.o -O3 -flto -DNDEBUG \
+        emmake make platform=emscripten -j$(nproc) LTO=1
+        CORE_FILE=$(ls quicknes_libretro_emscripten.* | grep -E '\.(a|bc)$' | head -n 1)
+        emcc "$CORE_FILE" -O3 -flto -DNDEBUG \
           -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web \
           -s ALLOW_MEMORY_GROWTH=1 -s WASM_BIGINT=1 --no-heap-copy \
           -s INITIAL_MEMORY=128mb -s STACK_SIZE=4mb \
           -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap"]' \
-          -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_string_to_lower","_string_replace_substring","_path_basename","_path_parent_dir","_path_is_absolute","_path_remove_extension","_path_get_extension","_path_mkdir","_path_is_directory","_retro_opendir_include_hidden","_retro_readdir","_retro_dirent_get_name","_retro_dirent_is_dir","_retro_closedir","_filestream_open","_filestream_read","_filestream_write","_filestream_seek","_filestream_tell","_filestream_close","_filestream_get_size","_rfopen","_rfread","_rfwrite","_rfseek","_rftell","_rfsize","_rfclose","_rfget_size","_retro_vfs_file_open_impl","_retro_vfs_file_close_impl","_retro_vfs_file_get_size_impl","_retro_vfs_file_read_impl","_retro_vfs_file_write_impl","_retro_vfs_file_seek_impl","_retro_vfs_file_tell_impl","_malloc","_free"]' \
+          -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free"]' \
           -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 -s ALLOW_TABLE_GROWTH=1 \
           -o nes.js
-        zip -j nes.zip nes.js nes.wasm
+        zip -r nes.zip nes.js nes.wasm
     - uses: actions/upload-artifact@v4
       with:
         name: nes-core
@@ -84,19 +82,18 @@ jobs:
       run: |
         git clone --depth 1 https://github.com/libretro/libretro-super.git
         cd libretro-super && ./libretro-fetch.sh snes9x && cd ..
-        emcc -c emux/.github/workflows/retro_glue.c -o retro_glue.o -O3 -flto -DNDEBUG -s USE_ZLIB=1
         cd libretro-super/libretro-snes9x/libretro
-        emmake make platform=emscripten -j$(nproc) LTO=1 WANT_VFS=1
-        ALL_OBJS=$(find .. -name "*.o")
-        emcc $ALL_OBJS ../../../retro_glue.o -O3 -flto -DNDEBUG \
+        emmake make platform=emscripten -j$(nproc) LTO=1
+        CORE_FILE=$(ls snes9x_libretro_emscripten.* | grep -E '\.(a|bc)$' | head -n 1)
+        emcc "$CORE_FILE" -O3 -flto -DNDEBUG \
           -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web \
           -s ALLOW_MEMORY_GROWTH=1 -s WASM_BIGINT=1 --no-heap-copy \
           -s INITIAL_MEMORY=256mb -s STACK_SIZE=8mb \
           -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap"]' \
-          -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_string_to_lower","_string_replace_substring","_path_basename","_path_parent_dir","_path_is_absolute","_path_remove_extension","_path_get_extension","_path_mkdir","_path_is_directory","_retro_opendir_include_hidden","_retro_readdir","_retro_dirent_get_name","_retro_dirent_is_dir","_retro_closedir","_filestream_open","_filestream_read","_filestream_write","_filestream_seek","_filestream_tell","_filestream_close","_filestream_get_size","_rfopen","_rfread","_rfwrite","_rfseek","_rftell","_rfsize","_rfclose","_rfget_size","_retro_vfs_file_open_impl","_retro_vfs_file_close_impl","_retro_vfs_file_get_size_impl","_retro_vfs_file_read_impl","_retro_vfs_file_write_impl","_retro_vfs_file_seek_impl","_retro_vfs_file_tell_impl","_malloc","_free"]' \
+          -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free"]' \
           -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 -s ALLOW_TABLE_GROWTH=1 \
           -o snes.js
-        zip -j snes.zip snes.js snes.wasm
+        zip -r snes.zip snes.js snes.wasm
     - uses: actions/upload-artifact@v4
       with:
         name: snes-core
@@ -118,23 +115,22 @@ jobs:
         cd libretro-super && ./libretro-fetch.sh fbneo && cd ..
         emcc -c emux/.github/workflows/retro_glue.c -o retro_glue.o -O3 -flto -DNDEBUG -s USE_ZLIB=1
         cd libretro-super/libretro-fbneo/src/burner/libretro
-        emmake make platform=emscripten -j$(nproc) WANT_VFS=1
-        cd ../../.. # Quay lại libretro-fbneo
-        ALL_OBJS=$(find . -name "*.o")
-        emcc $ALL_OBJS ../../retro_glue.o -O3 -flto -DNDEBUG \
+        emmake make -f Makefile platform=emscripten -j$(nproc) LTO=1
+        CORE_FILE=$(ls fbneo_libretro_emscripten.* | grep -E '\.(a|bc)$' | head -n 1)
+        emcc "$CORE_FILE" ../../../../../retro_glue.o -O3 -flto -DNDEBUG \
           -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web \
           -s ALLOW_MEMORY_GROWTH=1 -s WASM_BIGINT=1 --no-heap-copy \
           -s ALLOW_TABLE_GROWTH=1 -s FORCE_FILESYSTEM=1 \
           -s INITIAL_MEMORY=256mb -s STACK_SIZE=8mb \
           -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap"]' \
-          -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_string_to_lower","_string_replace_substring","_path_basename","_path_parent_dir","_path_is_absolute","_path_remove_extension","_path_get_extension","_path_mkdir","_path_is_directory","_retro_opendir_include_hidden","_retro_readdir","_retro_dirent_get_name","_retro_dirent_is_dir","_retro_closedir","_filestream_open","_filestream_read","_filestream_write","_filestream_seek","_filestream_tell","_filestream_close","_filestream_get_size","_rfopen","_rfread","_rfwrite","_rfseek","_rftell","_rfsize","_rfclose","_rfget_size","_retro_vfs_file_open_impl","_retro_vfs_file_close_impl","_retro_vfs_file_get_size_impl","_retro_vfs_file_read_impl","_retro_vfs_file_write_impl","_retro_vfs_file_seek_impl","_retro_vfs_file_tell_impl","_malloc","_free"]' \
+          -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free"]' \
           -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 \
           -o arcade.js
         zip -j arcade.zip arcade.js arcade.wasm
     - uses: actions/upload-artifact@v4
       with:
         name: arcade-core
-        path: libretro-super/libretro-fbneo/arcade.zip
+        path: libretro-super/libretro-fbneo/src/burner/libretro/arcade.zip
 
   build-genesis:
     runs-on: ubuntu-latest
@@ -150,19 +146,18 @@ jobs:
       run: |
         git clone --depth 1 https://github.com/libretro/libretro-super.git
         cd libretro-super && ./libretro-fetch.sh genesis_plus_gx && cd ..
-        emcc -c emux/.github/workflows/retro_glue.c -o retro_glue.o -O3 -flto -DNDEBUG -s USE_ZLIB=1
         cd libretro-super/libretro-genesis_plus_gx
         emmake make -f Makefile.libretro platform=emscripten -j$(nproc) STATIC_LINKING=0 WANT_ZLIB=1 WANT_VFS=1
         ALL_OBJS=$(find . -name "*.o")
-        emcc $ALL_OBJS ../../retro_glue.o -O3 -flto -DNDEBUG \
+        emcc $ALL_OBJS -O3 -flto -DNDEBUG \
           -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web \
           -s ALLOW_MEMORY_GROWTH=1 -s WASM_BIGINT=1 --no-heap-copy \
-          -s INITIAL_MEMORY=256mb -s STACK_SIZE=8mb -s ALLOW_TABLE_GROWTH=1 \
+          -s INITIAL_MEMORY=256mb -s STACK_SIZE=8mb \
           -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap"]' \
-          -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_string_to_lower","_string_replace_substring","_path_basename","_path_parent_dir","_path_is_absolute","_path_remove_extension","_path_get_extension","_path_mkdir","_path_is_directory","_retro_opendir_include_hidden","_retro_readdir","_retro_dirent_get_name","_retro_dirent_is_dir","_retro_closedir","_filestream_open","_filestream_read","_filestream_write","_filestream_seek","_filestream_tell","_filestream_close","_filestream_get_size","_rfopen","_rfread","_rfwrite","_rfseek","_rftell","_rfsize","_rfclose","_rfget_size","_retro_vfs_file_open_impl","_retro_vfs_file_close_impl","_retro_vfs_file_get_size_impl","_retro_vfs_file_read_impl","_retro_vfs_file_write_impl","_retro_vfs_file_seek_impl","_retro_vfs_file_tell_impl","_malloc","_free"]' \
-          -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 \
+          -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free"]' \
+          -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 -s ALLOW_TABLE_GROWTH=1 \
           -o genesis.js
-        zip -j genesis.zip genesis.js genesis.wasm
+        zip -r genesis.zip genesis.js genesis.wasm
     - uses: actions/upload-artifact@v4
       with:
         name: genesis-core
@@ -182,19 +177,18 @@ jobs:
       run: |
         git clone --depth 1 https://github.com/libretro/libretro-super.git
         cd libretro-super && ./libretro-fetch.sh mednafen_ngp && cd ..
-        emcc -c emux/.github/workflows/retro_glue.c -o retro_glue.o -O3 -flto -DNDEBUG -s USE_ZLIB=1
         cd libretro-super/libretro-mednafen_ngp
         emmake make platform=emscripten -j$(nproc) STATIC_LINKING=0 WANT_VFS=1
         ALL_OBJS=$(find . -name "*.o")
-        emcc $ALL_OBJS ../../retro_glue.o -O3 -flto -DNDEBUG \
+        emcc $ALL_OBJS -O3 -flto -DNDEBUG \
           -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web \
           -s ALLOW_MEMORY_GROWTH=1 -s WASM_BIGINT=1 --no-heap-copy \
-          -s INITIAL_MEMORY=128mb -s STACK_SIZE=4mb -s ALLOW_TABLE_GROWTH=1 \
+          -s INITIAL_MEMORY=128mb -s STACK_SIZE=4mb \
           -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap"]' \
-          -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_string_to_lower","_string_replace_substring","_path_basename","_path_parent_dir","_path_is_absolute","_path_remove_extension","_path_get_extension","_path_mkdir","_path_is_directory","_retro_opendir_include_hidden","_retro_readdir","_retro_dirent_get_name","_retro_dirent_is_dir","_retro_closedir","_filestream_open","_filestream_read","_filestream_write","_filestream_seek","_filestream_tell","_filestream_close","_filestream_get_size","_rfopen","_rfread","_rfwrite","_rfseek","_rftell","_rfsize","_rfclose","_rfget_size","_retro_vfs_file_open_impl","_retro_vfs_file_close_impl","_retro_vfs_file_get_size_impl","_retro_vfs_file_read_impl","_retro_vfs_file_write_impl","_retro_vfs_file_seek_impl","_retro_vfs_file_tell_impl","_malloc","_free"]' \
-          -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 \
+          -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free"]' \
+          -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 -s ALLOW_TABLE_GROWTH=1 \
           -o ngp.js
-        zip -j ngp.zip ngp.js ngp.wasm
+        zip -r ngp.zip ngp.js ngp.wasm
     - uses: actions/upload-artifact@v4
       with:
         name: ngp-core
@@ -214,20 +208,19 @@ jobs:
       run: |
         git clone --depth 1 https://github.com/libretro/libretro-super.git
         cd libretro-super && ./libretro-fetch.sh pcsx_rearmed && cd ..
-        emcc -c emux/.github/workflows/retro_glue.c -o retro_glue.o -O3 -flto -DNDEBUG -s USE_ZLIB=1
         cd libretro-super/libretro-pcsx_rearmed
         emmake make -f Makefile.libretro platform=emscripten -j$(nproc) \
-          DYNAREC="" GPU_PEOPS=1 WANT_ZLIB=1 GLES=1 WANT_VFS=1 LTO=1
+          DYNAREC="" GPU_PEOPS=1 WANT_ZLIB=1 GLES=1
         ALL_OBJS=$(find . -name "*.o")
-        emcc $ALL_OBJS ../../retro_glue.o -O3 -flto -DNDEBUG \
+        emcc $ALL_OBJS -O3 -flto -DNDEBUG \
           -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web \
           -s ALLOW_MEMORY_GROWTH=1 -s WASM_BIGINT=1 --no-heap-copy \
-          -s INITIAL_MEMORY=512mb -s STACK_SIZE=16mb -s ALLOW_TABLE_GROWTH=1 \
+          -s INITIAL_MEMORY=512mb -s STACK_SIZE=16mb \
           -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap"]' \
-          -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_string_to_lower","_string_replace_substring","_path_basename","_path_parent_dir","_path_is_absolute","_path_remove_extension","_path_get_extension","_path_mkdir","_path_is_directory","_retro_opendir_include_hidden","_retro_readdir","_retro_dirent_get_name","_retro_dirent_is_dir","_retro_closedir","_filestream_open","_filestream_read","_filestream_write","_filestream_seek","_filestream_tell","_filestream_close","_filestream_get_size","_rfopen","_rfread","_rfwrite","_rfseek","_rftell","_rfsize","_rfclose","_rfget_size","_retro_vfs_file_open_impl","_retro_vfs_file_close_impl","_retro_vfs_file_get_size_impl","_retro_vfs_file_read_impl","_retro_vfs_file_write_impl","_retro_vfs_file_seek_impl","_retro_vfs_file_tell_impl","_malloc","_free"]' \
-          -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 \
+          -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free"]' \
+          -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 -s ALLOW_TABLE_GROWTH=1 \
           -o ps1.js
-        zip -j ps1.zip ps1.js ps1.wasm
+        zip -r ps1.zip ps1.js ps1.wasm
     - uses: actions/upload-artifact@v4
       with:
         name: ps1-core
@@ -247,19 +240,18 @@ jobs:
       run: |
         git clone --depth 1 https://github.com/libretro/libretro-super.git
         cd libretro-super && ./libretro-fetch.sh snes9x2010 && cd ..
-        emcc -c emux/.github/workflows/retro_glue.c -o retro_glue.o -O3 -flto -DNDEBUG -s USE_ZLIB=1
         cd libretro-super/libretro-snes9x2010
-        emmake make -f Makefile.libretro platform=emscripten -j$(nproc) STATIC_LINKING=0 WANT_VFS=1
+        emmake make -f Makefile.libretro platform=emscripten -j$(nproc) STATIC_LINKING=0
         ALL_OBJS=$(find . -name "*.o")
-        emcc $ALL_OBJS ../../retro_glue.o -O3 -flto -DNDEBUG \
+        emcc $ALL_OBJS -O3 -flto -DNDEBUG \
           -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web \
           -s ALLOW_MEMORY_GROWTH=1 -s WASM_BIGINT=1 --no-heap-copy \
-          -s INITIAL_MEMORY=128mb -s STACK_SIZE=4mb -s ALLOW_TABLE_GROWTH=1 \
+          -s INITIAL_MEMORY=128mb -s STACK_SIZE=4mb \
           -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap"]' \
-          -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_string_to_lower","_string_replace_substring","_path_basename","_path_parent_dir","_path_is_absolute","_path_remove_extension","_path_get_extension","_path_mkdir","_path_is_directory","_retro_opendir_include_hidden","_retro_readdir","_retro_dirent_get_name","_retro_dirent_is_dir","_retro_closedir","_filestream_open","_filestream_read","_filestream_write","_filestream_seek","_filestream_tell","_filestream_close","_filestream_get_size","_rfopen","_rfread","_rfwrite","_rfseek","_rftell","_rfsize","_rfclose","_rfget_size","_retro_vfs_file_open_impl","_retro_vfs_file_close_impl","_retro_vfs_file_get_size_impl","_retro_vfs_file_read_impl","_retro_vfs_file_write_impl","_retro_vfs_file_seek_impl","_retro_vfs_file_tell_impl","_malloc","_free"]' \
-          -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 \
+          -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free"]' \
+          -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 -s ALLOW_TABLE_GROWTH=1 \
           -o snes2010.js
-        zip -j snes2010.zip snes2010.js snes2010.wasm
+        zip -r snes2010.zip snes2010.js snes2010.wasm
     - uses: actions/upload-artifact@v4
       with:
         name: snes2010-core
