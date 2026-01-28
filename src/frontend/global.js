@@ -73,6 +73,9 @@ async function gameView(romName) {
     page00.hidden = true;
     page01.hidden = true;
     page02.hidden = false;
+    list.hidden   = false; 
+    list01.hidden = true; 
+    list02.hidden = true;
     screen.style.setProperty("--shader", svgGen(integer, window.devicePixelRatio, "0.0.1.0.1.0.1.0.0"));
 }
 document.addEventListener("DOMContentLoaded", function(){
