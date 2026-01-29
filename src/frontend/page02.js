@@ -37,6 +37,22 @@ document.addEventListener("DOMContentLoaded", function() {
         }
         lastTap = Date.now(), startY = e.clientY, swiping = e.clientX > (r.right - 40);
     };
+    const canvasB = document.getElementById("canvas-bottom");
+    canvasB.onpointerdown = canvasB.onpointermove = e => {
+        if (!Module.isNDS) return;
+        const r = canvasB.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+        if (e.type === 'pointerdown') {
+            if (Date.now() - lastTap < 300) {
+                x < r.width / 2 ? (y < r.height / 2 ? Main.loadState(3) : Main.loadState(2)) : (y < r.height / 2 ? Main.saveState(3) : Main.saveState(2));
+            }
+            lastTap = Date.now(), startY = e.clientY, swiping = e.clientX > (r.right - 40);
+        }
+        window._pD = 1;
+        window._pX = Math.floor(x / r.width * 65535 - 32768);
+        window._pY = Math.floor(y / r.height * 32767);
+        e.preventDefault();
+    };
+    canvasB.onpointerup = canvasB.onpointercancel = () => { window._pD = 0; swiping = false; };
     canvas.onpointermove = e => {
         if (!swiping) return;
         if (Math.abs(startY - e.clientY) >= 20) {

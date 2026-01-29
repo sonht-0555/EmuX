@@ -54,7 +54,6 @@ async function gameView(romName) {
     page02.ontouchstart = (e) => { e.preventDefault(); }
     // display
     [gameWidth, gameHeight] = [canvas.width, canvas.height];
-    [gameName, gameType] = [romName.slice(0, -4), romName.slice(-3)];
     title1.textContent = romName;
     integer = Math.min(6, Math.floor((window.innerWidth * window.devicePixelRatio) / gameWidth));
     display.style.height = `${Math.ceil(gameHeight * (integer/window.devicePixelRatio)) + 10}px`;

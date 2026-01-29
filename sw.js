@@ -1,4 +1,4 @@
-let revision = 'EmuX_2.36';
+let revision = 'EmuX_2.37';
 var urlsToCache = [
     '/', 
     './index.html',
@@ -13,8 +13,12 @@ var urlsToCache = [
     './src/core/snes.zip',
     './src/core/snes2010.zip',
     './src/core/nes.zip',
+    './src/core/nds.zip',
     './src/core/arcade.zip',
-    './src/core/neogeo.zip',
+    './src/core/bios/neogeo.zip',
+    './src/core/bios/bios7.bin',
+    './src/core/bios/bios9.bin',
+    './src/core/bios/firmware.bin',
     './src/core/ngp.zip',
     './src/core/genesis.zip',
     './src/core/ps1.zip',
