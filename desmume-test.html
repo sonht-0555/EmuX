@@ -1,76 +1,204 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>DeSmuME 2015 Technical Test</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>EmuX - DeSmuME 2015</title>
+    <style>
+        body { background: #000; color: #fff; font-family: sans-serif; margin: 0; display: flex; flex-direction: column; align-items: center; touch-action: none; overflow: hidden; }
+        .header { padding: 5px; text-align: center; }
+        #canvas { max-width: 100vw; height: auto; image-rendering: pixelated; background: #111; cursor: crosshair; touch-action: none; border: 1px solid #333; }
+        .controller { width: 100%; box-sizing: border-box; padding: 10px; display: grid; grid-template-columns: auto 1fr auto; gap: 0px; align-items: center; justify-items: center; }
+        .btn { width: 44px; height: 44px; padding: 0; cursor: pointer; user-select: none; display: flex; align-items: center; justify-content: center; background: #222; color: #fff; border: 1px solid #444; border-radius: 6px; font-size: 16px; font-weight: bold; }
+        .btn:active { background: #555; transform: scale(0.95); }
+        .btn-mid { display: flex; flex-direction: column; gap: 10px; }
+        #status { font-size: 10px; color: #aaa; margin: 2px 0; }
+    </style>
 </head>
 <body>
-    <h1>DeSmuME 2015 Test</h1>
-    <input type="file" id="rom" accept=".nds">
-    <button id="run-btn" onclick="runCore()" disabled>Run Core (Loading...)</button>
-    <canvas id="canvas" width="256" height="384"></canvas>
+    <div class="header">
+        <label style="cursor:pointer; background:#222; padding:5px 15px; border:1px solid #444; font-size:12px; border-radius:4px;">
+            OPEN ROM <input type="file" id="rom" onchange="runCore()" style="display:none">
+        </label>
+        <div id="status">Ready</div>
+    </div>
 
+    <canvas id="canvas"></canvas>
+
+    <div class="controller">
+        <div style="display:grid; grid-template-areas:'. u .' 'l . r' '. d .'; gap:4px;">
+            <button class="btn" style="grid-area:u" onpointerdown="setK(4,1)" onpointerup="setK(4,0)">U</button>
+            <button class="btn" style="grid-area:l" onpointerdown="setK(6,1)" onpointerup="setK(6,0)">L</button>
+            <button class="btn" style="grid-area:r" onpointerdown="setK(7,1)" onpointerup="setK(7,0)">R</button>
+            <button class="btn" style="grid-area:d" onpointerdown="setK(5,1)" onpointerup="setK(5,0)">D</button>
+        </div>
+        <div class="btn-mid">
+            <button class="btn" style="height:25px; width:65px; font-size:10px;" onpointerdown="setK(2,1)" onpointerup="setK(2,0)">SELECT</button>
+            <button class="btn" style="height:25px; width:65px; font-size:10px;" onpointerdown="setK(3,1)" onpointerup="setK(3,0)">START</button>
+        </div>
+        <div style="display:grid; grid-template-areas:'. y .' 'x . b' '. a .'; gap:4px;">
+            <button class="btn" style="grid-area:y" onpointerdown="setK(1,1)" onpointerup="setK(1,0)">Y</button>
+            <button class="btn" style="grid-area:x" onpointerdown="setK(9,1)" onpointerup="setK(9,0)">X</button>
+            <button class="btn" style="grid-area:b" onpointerdown="setK(0,1)" onpointerup="setK(0,0)">B</button>
+            <button class="btn" style="grid-area:a" onpointerdown="setK(8,1)" onpointerup="setK(8,0)">A</button>
+        </div>
+    </div>
+
+    <script src="./src/backend/audio.js"></script>
     <script>
-        var Module = {
-            canvas: document.getElementById('canvas'),
-            onRuntimeInitialized: () => {
-                console.log('DeSmuME WASM Ready!');
-                document.getElementById('run-btn').disabled = false;
-                document.getElementById('run-btn').innerText = 'Run DeSmuME';
+        (function() {
+            const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d', {alpha: false});
+            canvas.width = 256; canvas.height = 384; 
+            const imgData = ctx.createImageData(256, 384);
+            const statusEl = document.getElementById('status');
+            
+            window.isRunning = false;
+            let _pX = 0, _pY = 0, _pD = 0;
+            const _btn = new Int16Array(16);
+            window.setK = (i, v) => { _btn[i] = v ? 32767 : 0; };
+
+            let _oS;
+            window.Module = {
+                onRuntimeInitialized: async () => {
+                    _oS = Module._malloc(2); Module.stringToUTF8('.', _oS, 2);
+                    statusEl.innerText = "DeSmuME Kernel Loaded";
+                }
+            };
+
+            function _v_refresh(ptr) {
+                if (!ptr) return;
+                // DeSmuME 2015 dùng RGB565 (16-bit) theo mặc định
+                const src = new Uint16Array(Module.HEAPU8.buffer, ptr, 256 * 384);
+                const dst = new Uint32Array(imgData.data.buffer);
+                
+                for (let i = 0; i < 256 * 384; i++) {
+                    const p = src[i];
+                    // Tách R, G, B từ 16-bit (5-6-5)
+                    const r = ((p >> 11) & 0x1F) << 3;
+                    const g = ((p >> 5) & 0x3F) << 2;
+                    const b = (p & 0x1F) << 3;
+                    // Ghi vào buffer 32-bit (RGBA)
+                    dst[i] = (255 << 24) | (b << 16) | (g << 8) | r;
+                }
+                ctx.putImageData(imgData, 0, 0);
             }
-        };
 
-        function stub_video_refresh(data, width, height, pitch) {}
-        function stub_input_poll() {}
-        function stub_input_state(port, device, index, id) { return 0; }
-        function stub_audio_sample(left, right) {}
-        function stub_audio_sample_batch(data, frames) { return frames; }
-        function stub_environment(cmd, data) {
-            if (cmd === 10) return true;
-            return false; 
-        }
+            function _env(cmd, data) {
+                if (cmd === 15) { // RETRO_ENVIRONMENT_GET_VARIABLE
+                    const key = Module.UTF8ToString(Module.HEAP32[data >> 2]);
+                    
+                    // Cấu hình đặc trị để UNLOCK điều khiển cho DeSmuME 2015
+                    if (key === 'desmume_pointer_mouse') { // QUAN TRỌNG NHẤT
+                        const ptr = Module._malloc(8); Module.stringToUTF8('enabled', ptr, 8);
+                        Module.HEAP32[(data >> 2) + 1] = ptr; return true;
+                    }
+                    if (key === 'desmume_pointer_type') {
+                        const ptr = Module._malloc(6); Module.stringToUTF8('touch', ptr, 6);
+                        Module.HEAP32[(data >> 2) + 1] = ptr; return true;
+                    }
+                    if (key === 'desmume_screens_layout') {
+                        const ptr = Module._malloc(11); Module.stringToUTF8('top/bottom', ptr, 11);
+                        Module.HEAP32[(data >> 2) + 1] = ptr; return true;
+                    }
+                    if (key === 'desmume_pointer_mode') {
+                        const ptr = Module._malloc(7); Module.stringToUTF8('stylus', ptr, 7);
+                        Module.HEAP32[(data >> 2) + 1] = ptr; return true;
+                    }
+                    return false;
+                }
 
-        async function runCore() {
-            const file = document.getElementById('rom').files[0];
-            if (!file) return;
-            const buffer = await file.arrayBuffer();
-            const romData = new Uint8Array(buffer);
-            try {
-                const vPtr = Module.addFunction(stub_video_refresh, 'vpiii');
-                const aPtr = Module.addFunction(stub_audio_sample, 'vii');
-                const bPtr = Module.addFunction(stub_audio_sample_batch, 'ipi');
-                const pPtr = Module.addFunction(stub_input_poll, 'v');
-                const iPtr = Module.addFunction(stub_input_state, 'iiiii');
-                const ePtr = Module.addFunction(stub_environment, 'ipi');
+                if (cmd === 9) { // GET_SYSTEM_DIRECTORY
+                    if (data) Module.HEAP32[data >> 2] = _oS; return true; 
+                }
+                if (cmd === 10) return true; // SET_PIXEL_FORMAT
+                return cmd === 10 || cmd === 9;
+            }
 
-                Module._retro_set_video_refresh(vPtr);
-                Module._retro_set_audio_sample(aPtr);
-                Module._retro_set_audio_sample_batch(bPtr);
-                Module._retro_set_input_poll(pPtr);
-                Module._retro_set_input_state(iPtr);
-                Module._retro_set_environment(ePtr);
+            canvas.onpointerdown = canvas.onpointermove = e => {
+                const r = canvas.getBoundingClientRect();
+                const xn = (e.clientX - r.left) / r.width;
+                const yn = (e.clientY - r.top) / r.height;
+                
+                if (yn > 0.5) {
+                    _pD = 1;
+                    _pX = Math.floor(xn * 65535 - 32768);
+                    _pY = Math.floor((yn - 0.5) * 2 * 65535 - 32768);
+                } else {
+                    _pD = 0;
+                }
+                e.preventDefault();
+            };
+            canvas.onpointerup = () => { _pD = 0; };
 
-                Module._retro_init();
-                const romPtr = Module._malloc(romData.length);
-                Module.HEAPU8.set(romData, romPtr);
-                const infoPtr = Module._malloc(16);
-                const pathPtr = Module._malloc(file.name.length + 1);
-                Module.stringToUTF8(file.name, pathPtr, file.name.length + 1);
+            window.runCore = async function() {
+                const romFile = document.getElementById('rom').files[0];
+                if (!romFile) return;
+                const romData = new Uint8Array(await romFile.arrayBuffer());
 
-                const view = new Int32Array(Module.HEAPU8.buffer, infoPtr, 4);
-                view[0] = pathPtr;
-                view[1] = romPtr;
-                view[2] = romData.length;
-                view[3] = 0;
+                try {
+                    Module.FS.writeFile('game.nds', romData);
+                    try { Module.FS.mkdir('/system'); } catch(e) {}
+                } catch(e) {}
+                
+                try {
+                    // Init Audio from audio.js
+                    await initAudio(1.0);
+                    window.isRunning = true;
 
-                console.log('DeSmuME: Calling retro_load_game...');
-                const success = Module._retro_load_game(infoPtr);
-                if (success) {
-                    console.log('DeSmuME SUCCESS!');
-                    setInterval(() => Module._retro_run(), 16);
-                } else { console.error('DeSmuME FAILED'); }
-            } catch (e) { console.error('DeSmuME CRASH:', e); }
-        }
+                    Module._retro_set_video_refresh(Module.addFunction(_v_refresh, 'viiii'));
+                    Module._retro_set_input_poll(Module.addFunction(()=>{}, 'v'));
+                    Module._retro_set_input_state(Module.addFunction((p,dev,idx,id) => {
+                        // Nút bấm (Joypad + Analog)
+                        if (dev === 1 || dev === 3) return (id < 16) ? _btn[id] : 0;
+                        
+                        // Cảm ứng (Cần cả Pointer và Mouse cho DeSmuME)
+                        if (dev === 6 || dev === 2) {
+                            if (id === 0) return _pX;
+                            if (id === 1) return _pY;
+                            if (id === 2) return _pD;
+                        }
+                        return 0;
+                    }, 'iiiii'));
+                    
+                    Module._retro_set_environment(Module.addFunction(_env, 'iii'));
+                    Module._retro_set_audio_sample(Module.addFunction(()=>{}, 'vii'));
+                    Module._retro_set_audio_sample_batch(Module.addFunction(audio_batch_cb, 'iii'));
+                    
+                    Module._retro_init();
+
+                    if (Module._retro_set_controller_port_device) {
+                        // Đăng ký cả hai để Core biết chúng ta có đủ thiết bị
+                        Module._retro_set_controller_port_device(0, 6); 
+                        Module._retro_set_controller_port_device(0, 1);
+                    }
+
+                    const rP = Module._malloc(romData.length);
+                    Module.HEAPU8.set(romData, rP);
+                    const iP = Module._malloc(16);
+                    Module.HEAP32[iP>>2]=Module._malloc(10);
+                    Module.stringToUTF8("game.nds", Module.HEAP32[iP>>2], 10);
+                    Module.HEAP32[(iP>>2)+1]=rP; Module.HEAP32[(iP>>2)+2]=romData.length;
+
+                    if (Module._retro_load_game(iP)) {
+                        // Lấy thông tin AV từ Core để tính Ratio âm thanh chính xác
+                        const avInfoPtr = Module._malloc(40);
+                        Module._retro_get_system_av_info(avInfoPtr);
+                        // retro_system_timing nằm ở offset 20-35. Sample rate là double ở offset 32.
+                        const sampleRate = Module.getValue(avInfoPtr + 32, 'double');
+                        const ratio = sampleRate / 48000;
+                        console.log("Core Sample Rate:", sampleRate, "-> Audio Ratio:", ratio);
+                        
+                        initAudio(ratio); 
+                        window.isRunning = true;
+                        Module._free(avInfoPtr);
+
+                        statusEl.innerText = "Running: " + romFile.name;
+                        const loop = () => { Module._retro_run(); requestAnimationFrame(loop); };
+                        loop();
+                    }
+                } catch(e) { console.error(e); }
+            };
+        })();
     </script>
-    <script src="nds.js"></script>
+    <script src="/desmume2015/nds.js"></script>
 </body>
 </html>

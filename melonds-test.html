@@ -43,6 +43,7 @@
         </div>
     </div>
 
+    <script src="./src/backend/audio.js"></script>
     <script>
         (function() {
             const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d', {alpha: false});
@@ -50,6 +51,7 @@
             const imgData = ctx.createImageData(256, 384);
             const statusEl = document.getElementById('status');
             
+            window.isRunning = false;
             let _pX = 0, _pY = 0, _pD = 0;
             const _btn = new Int16Array(16);
             window.setK = (i, v) => { _btn[i] = v ? 32767 : 0; };
@@ -66,7 +68,18 @@
 
             function _v_refresh(ptr) {
                 if (!ptr) return;
-                new Uint32Array(imgData.data.buffer).set(new Uint32Array(Module.HEAPU8.buffer, ptr, 256 * 384));
+                const src = new Uint32Array(Module.HEAPU8.buffer, ptr, 256 * 384);
+                const dst = new Uint32Array(imgData.data.buffer);
+                
+                for (let i = 0; i < 256 * 384; i++) {
+                    const p = src[i];
+                    // Hoán đổi R và B (đổi BGR thành RGB)
+                    // XRGB/BGRX -> RGBA
+                    const r = (p >> 16) & 0xFF;
+                    const g = (p >> 8) & 0xFF;
+                    const b = p & 0xFF;
+                    dst[i] = (255 << 24) | (b << 16) | (g << 8) | r;
+                }
                 ctx.putImageData(imgData, 0, 0);
             }
 
@@ -94,7 +107,10 @@
             canvas.onpointerup = () => { _pD = 0; };
 
             window.runCore = async function() {
-                const romData = new Uint8Array(await document.getElementById('rom').files[0].arrayBuffer());
+                const romFile = document.getElementById('rom').files[0];
+                if (!romFile) return;
+                const romData = new Uint8Array(await romFile.arrayBuffer());
+
                 for (let f of ['bios7.bin', 'bios9.bin', 'firmware.bin']) {
                     try {
                         const res = await fetch(`nds bios/${f}`);
@@ -119,7 +135,7 @@
                     
                     Module._retro_set_environment(Module.addFunction(_env, 'iii'));
                     Module._retro_set_audio_sample(Module.addFunction(()=>{}, 'vii'));
-                    Module._retro_set_audio_sample_batch(Module.addFunction((d,f)=>f, 'iii'));
+                    Module._retro_set_audio_sample_batch(Module.addFunction(audio_batch_cb, 'iii'));
                     Module._retro_init();
 
                     if (Module._retro_set_controller_port_device) Module._retro_set_controller_port_device(0, 6);
@@ -132,6 +148,19 @@
                     Module.HEAP32[(iP>>2)+1]=rP; Module.HEAP32[(iP>>2)+2]=romData.length;
 
                     if (Module._retro_load_game(iP)) {
+                        // Lấy thông tin AV và tính Ratio chính xác
+                        const avInfoPtr = Module._malloc(40);
+                        Module._retro_get_system_av_info(avInfoPtr);
+                        const sampleRate = Module.getValue(avInfoPtr + 32, 'double');
+                        const fps = Module.getValue(avInfoPtr + 24, 'double');
+                        const ratio = sampleRate / 48000;
+                        console.log(`melonDS AV Info: ${sampleRate}Hz, ${fps}FPS -> Ratio: ${ratio}`);
+                        
+                        initAudio(ratio);
+                        window.isRunning = true;
+                        Module._free(avInfoPtr);
+
+                        statusEl.innerText = "Running: " + romFile.name;
                         const loop = () => { Module._retro_run(); requestAnimationFrame(loop); };
                         loop();
                     }
