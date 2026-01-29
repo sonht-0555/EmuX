@@ -1,4 +1,4 @@
-let revision = 'EmuX_2.38';
+let revision = 'EmuX_2.40';
 var urlsToCache = [
     '/', 
     './index.html',
@@ -16,6 +16,7 @@ var urlsToCache = [
     './src/core/nds.zip',
     './src/core/arcade.zip',
     './src/core/bios/neogeo.zip',
+    './src/core/bios/scph5501.bin',
     './src/core/bios/bios7.bin',
     './src/core/bios/bios9.bin',
     './src/core/bios/firmware.bin',

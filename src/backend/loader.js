@@ -16,9 +16,10 @@ const CORE_CONFIG = [
     { ext: '.smc,.sfc', script: './src/core/snes2010.zip' },
     { ext: '.nes', script: './src/core/nes.zip' },
     { ext: '.zip', script: './src/core/arcade.zip', bios: ['./src/core/bios/neogeo.zip'] },
-    { ext: '.md,.bin,.gen', script: './src/core/genesis.zip' },
+    { ext: '.md,.gen', script: './src/core/genesis.zip' },
     { ext: '.ngp,.ngc', script: './src/core/ngp.zip' },
     { ext: '.nds', script: './src/core/nds.zip', bios: ['./src/core/bios/bios7.bin', './src/core/bios/bios9.bin', './src/core/bios/firmware.bin'] },
+    { ext: '.bin,.iso,.img,.cue,.pbp', script: './src/core/ps1.zip', bios: ['./src/core/bios/scph5501.bin'] },
 ];
 var isRunning = false;
 // ===== Unzip ====
@@ -45,7 +46,7 @@ async function initCore(romFile) {
     const romBuffer = await romFile.arrayBuffer();
     const binaryData = new Uint8Array(romBuffer);
     let finalRomName = romFile.name, finalRomData = binaryData;
-    const consoleExts = /\.(gba|gbc|gb|smc|sfc|nes|md|gen|ngp|ngc|nds)$/i;
+    const consoleExts = /\.(gba|gbc|gb|smc|sfc|nes|md|gen|ngp|ngc|nds|bin|iso|img|cue|pbp)$/i;
     if (isZip) {
         notifi("","","---","")
         const extracted = await unzip(binaryData, consoleExts);

@@ -52,9 +52,9 @@ jobs:
         cd $GITHUB_WORKSPACE/libretro-super/libretro-${{ matrix.core.fetch }}
         
         if [ "${{ matrix.core.method }}" == "arcade" ]; then
-          emcc -c $GITHUB_WORKSPACE/emux/.github/workflows/retro_glue.c -o retro_glue.o -O3 -msimd128 -flto -DNDEBUG -s USE_ZLIB=1
+          emcc -c $GITHUB_WORKSPACE/emux/.github/workflows/retro_glue.c -o retro_glue.o -Oz -flto -DNDEBUG -s USE_ZLIB=1
           ALL_OBJS=$(find . -name "*.o")
-          emcc $ALL_OBJS retro_glue.o -O3 -msimd128 -flto -DNDEBUG \
+          emcc $ALL_OBJS retro_glue.o -Oz -flto -DNDEBUG \
             -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web \
             -s ALLOW_MEMORY_GROWTH=1 -s WASM_BIGINT=1 --no-heap-copy -s ALLOW_TABLE_GROWTH=1 \
             -s INITIAL_MEMORY=${{ matrix.core.initial_mem }} -s STACK_SIZE=${{ matrix.core.stack }} -s FORCE_FILESYSTEM=1 \
@@ -66,7 +66,7 @@ jobs:
 
         elif [ "${{ matrix.core.method }}" == "objects" ]; then
           ALL_OBJS=$(find . -name "*.o")
-          emcc $ALL_OBJS -O3 -msimd128 -flto -DNDEBUG \
+          emcc $ALL_OBJS -Oz -flto -DNDEBUG \
             -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web \
             -s ALLOW_MEMORY_GROWTH=1 -s WASM_BIGINT=1 --no-heap-copy -s ALLOW_TABLE_GROWTH=1 \
             -s INITIAL_MEMORY=${{ matrix.core.initial_mem }} -s STACK_SIZE=${{ matrix.core.stack }} \
