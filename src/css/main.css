@@ -183,15 +183,18 @@
     text-align: left;
     align-items: end;
   }
-  notification title1, time1{
+  notification title1, time1 {
     line-height: 6px;
     height: 7px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: calc(100vw - 120px);
+    background-color: var(--profile-black);
   }
-  notification time1{
+  notification title1 {
+    max-width: 75%
+  }
+  notification time1 {
     font-family: "04bf";
     position: absolute;
     right: -1px;
