@@ -58,6 +58,7 @@ async function gameView(romName) {
     integer = Math.min(6, Math.floor((window.innerWidth * window.devicePixelRatio) / gameWidth));
     display.style.height = `${Math.ceil(gameHeight * (integer/window.devicePixelRatio)) + 10}px`;
     display.style.width  = `${Math.ceil(gameWidth  * (integer/window.devicePixelRatio))}px`;
+    canvasB.style.width  = `${Math.ceil(gameWidth  * (integer/window.devicePixelRatio))}px`;
     screen.style.width   = `${gameWidth * (integer/window.devicePixelRatio)}px`;
     screen.style.setProperty("--size", `${integer}px`);
     // notification
@@ -66,7 +67,7 @@ async function gameView(romName) {
     const base = Math.round((window.innerWidth - 12 - 8 - 16) / 8);
     const adjust = base % 2 === 0 ? base - 1 : base;
     gamepad.style.gridTemplateColumns = `${adjust}px 1px ${adjust}px 1px ${adjust}px 1px ${adjust}px 1px auto 1px ${adjust}px 1px ${adjust}px 1px ${adjust}px 1px ${adjust}px`;
-    page02.style.gridTemplateRows  =  `auto ${window.innerWidth - (adjust * 8 + 8) - 12}px ${(adjust * 4) + 4 + 8 + 26}px 1fr 20px`;
+    page02.style.gridTemplateRows  =  `auto ${window.innerWidth - (adjust * 8 + 8) - 22}px ${(adjust * 4) + 4 + 8 + 26}px ${window.innerWidth - (adjust * 8 + 8) - 12}px 1fr 20px`;
     joy.style.width = `${(adjust * 4 + 3)}px`;
     // action
     page00.hidden = true;
