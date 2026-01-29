@@ -30,38 +30,29 @@ document.addEventListener("DOMContentLoaded", function() {
             setState(e.pointerId, element);
         }
     };
-    canvas.onpointerdown = e => {
+    canvas.onpointerdown = canvas.onpointermove = e => {
         const r = canvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
-        if (Date.now() - lastTap < 300) {
-            x < r.width / 2 ? (y < r.height / 2 ? Main.loadState(3) : Main.loadState(2)) : (y < r.height / 2 ? Main.saveState(3) : Main.saveState(2));
-        }
-        lastTap = Date.now(), startY = e.clientY, swiping = e.clientX > (r.right - 40);
-    };
-    const canvasB = document.getElementById("canvas-bottom");
-    canvasB.onpointerdown = canvasB.onpointermove = e => {
-        if (!Module.isNDS) return;
-        const r = canvasB.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
         if (e.type === 'pointerdown') {
             if (Date.now() - lastTap < 300) {
                 x < r.width / 2 ? (y < r.height / 2 ? Main.loadState(3) : Main.loadState(2)) : (y < r.height / 2 ? Main.saveState(3) : Main.saveState(2));
             }
             lastTap = Date.now(), startY = e.clientY, swiping = e.clientX > (r.right - 40);
         }
-        window._pD = 1;
-        window._pX = Math.floor(x / r.width * 65535 - 32768);
-        window._pY = Math.floor(y / r.height * 32767);
-        e.preventDefault();
-    };
-    canvasB.onpointerup = canvasB.onpointercancel = () => { window._pD = 0; swiping = false; };
-    canvas.onpointermove = e => {
-        if (!swiping) return;
-        if (Math.abs(startY - e.clientY) >= 20) {
-            value = startY - e.clientY > 0 ? Math.min(10, value + 1) : Math.max(0, value - 1);
-            gamepad.style.opacity = value / 10;
-            message(`Brightness_${value}0.nit`);
-            startY = e.clientY;
+        if (Module.isNDS) {
+            window._pD = (e.type !== 'pointerup' && e.type !== 'pointercancel') ? 1 : 0;
+            window._pX = Math.floor(x / r.width * 65535 - 32768);
+            window._pY = Math.floor(y / r.height * 65535 - 32768);
+        }
+        if (swiping && e.type === 'pointermove') {
+            if (Math.abs(startY - e.clientY) >= 20) {
+                value = startY - e.clientY > 0 ? Math.min(10, value + 1) : Math.max(0, value - 1);
+                gamepad.style.opacity = value / 10;
+                message(`Brightness_${value}0.nit`);
+                startY = e.clientY;
+            }
         }
     };
+    canvas.onpointerup = canvas.onpointercancel = () => { window._pD = 0; swiping = false; };
     state.onpointerdown = () => {
         tap++;
         setTimeout(() => {
