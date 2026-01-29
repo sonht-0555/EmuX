@@ -1,5 +1,5 @@
 let ctx, imgData, data32;
-let ctxB, imgDataB, data32B, canvasB, lastBottom;
+let ctxB, imgDataB, data32B, lastBottom;
 const lut565 = new Uint32Array(65536);
 for (let i = 0; i < 65536; i++) {
     lut565[i] = 0xFF000000 | ((i & 0x001F) << 19) | ((i & 0x07E0) << 5) | ((i & 0xF800) >> 8);
@@ -35,8 +35,8 @@ function video_cb(pointer, width, height, pitch) {
     if (!ctx) {
         ctx = Module.canvas.getContext('2d', { alpha: false, desynchronized: true, willReadFrequently: false });
         if (Module.isNDS) {
-            canvasB = document.getElementById("canvas-bottom");
             canvasB.style.display = "block";
+            page02.style.paddingTop = "5px";
             joypad.style.justifyContent = "center";
             ctxB = canvasB.getContext('2d', { alpha: false, desynchronized: true, willReadFrequently: false });
         }
@@ -44,8 +44,9 @@ function video_cb(pointer, width, height, pitch) {
 
     const src32 = new Uint32Array(Module.HEAPU8.buffer, pointer, width * height);
     if (Module.isNDS) {
+        const resized = (Module.canvas.width !== width || Module.canvas.height !== (height >> 1));
         renderNDS(src32, width, height);
-        if (window.gameView) gameView(gameName);
+        if (resized && window.gameView) gameView(gameName);
         return;
     }
 

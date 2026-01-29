@@ -41,7 +41,7 @@ async function listGame() {
     });
 }
 //verticalSetting
-async function verSetting(values=[80, 160, 6]) {
+async function verSetting(values=[80, 160, 5]) {
     page02.style.paddingTop = `${values[current]}px`;
     values.map(value => `k${value}`).forEach((id, index) => {
         document.getElementById(id).style.stroke = index === current ? "var(--profile-1)" : 'var(--profile-4)';

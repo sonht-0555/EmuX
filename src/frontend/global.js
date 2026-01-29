@@ -1,5 +1,5 @@
 tag("html"), tag("body"), tag("page00"), tag("page01"), tag("page02"), tag("logo"), tag("page02"), tag("notification"), tag("display"), tag("list"), tag("list01"), tag("list02"), tag("name"), tag("ver"), tag("gamepad"), tag("title1"), tag("vertical"), tag("screen"), tag("invis"), tag("joypad"), tag("green0"), tag("white0"), tag("gray0"), tag("message0");
-let gameName, gameType, gameWidth, gameHeight, integer, timerId, count = null, canSync = true, recCount = 1, isReload = false, swipe;
+let gameName, gameType, gameWidth, gameHeight, integer, timerId, count = null, canSync = true, recCount = 1, isReload = false, swipe, canvasB;
 const canvas = document.getElementById('canvas');
 let [hours, minutes, seconds, count1] = [0, 0, 0, 0, 0];
 let current = parseInt(local('vertical')) || 0;
@@ -56,9 +56,11 @@ async function gameView(romName) {
     [gameWidth, gameHeight] = [canvas.width, canvas.height];
     title1.textContent = romName;
     integer = Math.min(6, Math.floor((window.innerWidth * window.devicePixelRatio) / gameWidth));
-    display.style.height = `${Math.ceil(gameHeight * (integer/window.devicePixelRatio)) + 10}px`;
-    display.style.width  = `${Math.ceil(gameWidth  * (integer/window.devicePixelRatio))}px`;
-    canvasB.style.width  = `${Math.ceil(gameWidth  * (integer/window.devicePixelRatio))}px`;
+    document.querySelectorAll('display').forEach(e => {
+        e.style.height = `${Math.ceil(gameHeight * (integer/window.devicePixelRatio)) + 10}px`;
+        e.style.width  = `${Math.ceil(gameWidth  * (integer/window.devicePixelRatio))}px`;
+    });
+    canvasB.style.width  = `${gameWidth * (integer/window.devicePixelRatio)}px`;
     screen.style.width   = `${gameWidth * (integer/window.devicePixelRatio)}px`;
     screen.style.setProperty("--size", `${integer}px`);
     // notification
@@ -80,5 +82,6 @@ async function gameView(romName) {
 }
 document.addEventListener("DOMContentLoaded", function(){
     body.removeAttribute('hide')
+    canvasB = document.getElementById("canvas-bottom");
     body.style.setProperty("--background", svgGen(1, window.devicePixelRatio, "0.0.1.0.1.0.1.0.0"));
 });

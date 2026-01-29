@@ -34,7 +34,7 @@
     --profile-green: rgba(36, 62, 46, 1);
     --profile-green-dark: rgba(36, 62, 46, 0.4);
   }
-  body::after, page00::after, screen::after {
+  body::after, page00::after, screen::after, joypad::after {
     content: "";
     position: absolute;
     top: 0;
@@ -59,7 +59,7 @@
     height: 100vh;
     overflow: hidden;
   }
-  body::after, page00::after {
+  body::after, page00::after, joypad::after {
     background-image: var(--background);
   }
 }
@@ -261,6 +261,8 @@
     background-repeat: no-repeat !important;
   }
   joypad {
+    position: relative;
+    z-index: 2;
     justify-content:end;
   }
   invis {width: 90%}
