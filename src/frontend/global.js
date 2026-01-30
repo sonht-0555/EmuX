@@ -3,19 +3,23 @@ let gameName, gameType, gameWidth, gameHeight, integer, timerId, count = null, c
 const canvas = document.getElementById('canvas');
 let [hours, minutes, seconds, count1] = [0, 0, 0, 0, 0];
 let current = parseInt(local('vertical')) || 0;
+// tag
 function tag(selector) {
     const element = document.querySelector(selector)
     window[selector] = element;
     return element;
 }
+// local
 function local(key, value) {
     return arguments.length < 2 || value === null
         ? localStorage.getItem(key)
         : localStorage.setItem(key, value);
 }
+// delay
 async function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
+// svgGen
 function svgGen(repeat, size, string) {
     const N = repeat * size;
     const c = document.createElement('canvas');
@@ -31,6 +35,7 @@ function svgGen(repeat, size, string) {
     }
     return `url(${c.toDataURL()})`;
 }
+// message
 async function message(mess, second = 2000) {
     if (count) count.cancelled = true;
     const task = { cancelled: false };
@@ -42,6 +47,7 @@ async function message(mess, second = 2000) {
         count = null;
     }
 }
+// notifi
 async function notifi(green, white, gray, message) {
     page00.hidden = false;
     green0.textContent = green;
@@ -49,6 +55,7 @@ async function notifi(green, white, gray, message) {
     gray0.textContent = gray;
     message0.textContent = message;
 }
+// gameView
 async function gameView(romName) {
     // global
     page02.ontouchstart = (e) => { e.preventDefault(); }
@@ -56,12 +63,8 @@ async function gameView(romName) {
     [gameWidth, gameHeight] = [canvas.width, canvas.height];
     title1.textContent = romName;
     integer = Math.min(6, Math.floor((window.innerWidth * window.devicePixelRatio) / gameWidth));
-    document.querySelectorAll('display').forEach(e => {
-        e.style.height = `${Math.ceil(gameHeight * (integer/window.devicePixelRatio)) + 10}px`;
-        e.style.width  = `${Math.ceil(gameWidth  * (integer/window.devicePixelRatio))}px`;
-        e.style.display = "block";
-    });
-    canvasB.style.width  = `${gameWidth * (integer/window.devicePixelRatio)}px`;
+    display.style.height = `${Math.ceil(gameHeight * (integer/window.devicePixelRatio)) + 10}px`;
+    display.style.width  = `${Math.ceil(gameWidth  * (integer/window.devicePixelRatio))}px`;
     screen.style.width   = `${gameWidth * (integer/window.devicePixelRatio)}px`;
     screen.style.setProperty("--size", `${integer}px`);
     // notification
@@ -81,6 +84,7 @@ async function gameView(romName) {
     list02.hidden = true;
     screen.style.setProperty("--shader", svgGen(integer, window.devicePixelRatio, "0.0.1.0.1.0.1.0.0"));
 }
+// DOMContentLoaded
 document.addEventListener("DOMContentLoaded", function(){
     body.removeAttribute('hide')
     canvasB = document.getElementById("canvas-bottom");

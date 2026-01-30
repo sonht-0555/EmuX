@@ -34,7 +34,7 @@
     --profile-green: rgba(36, 62, 46, 1);
     --profile-green-dark: rgba(36, 62, 46, 0.4);
   }
-  body::after, page00::after, screen::after, joypad::after {
+  body::after, page00::after, screen::after {
     content: "";
     position: absolute;
     top: 0;
@@ -59,7 +59,7 @@
     height: 100vh;
     overflow: hidden;
   }
-  body::after, page00::after, joypad::after {
+  body::after, page00::after {
     background-image: var(--background);
   }
 }
@@ -264,10 +264,14 @@
     background-repeat: no-repeat !important;
   }
   joypad {
-    position: relative;
-    z-index: 2;
     justify-content:end;
   }
-  invis {width: 90%}
+  invis {
+    width: 90%;
+    height: 10px;
+    position: absolute;
+    bottom: 0;
+    z-index: 10;
+  }
 }
 @layer page-3 {}

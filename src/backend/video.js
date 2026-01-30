@@ -3,12 +3,12 @@ let ctxB, imgDataB, data32B, lastMain, lastMain16, lastBottom;
 const lut565 = new Uint32Array(65536);
 for (let i = 0; i < 65536; i++) lut565[i] = 0xFF000000 | ((i & 0x001F) << 19) | ((i & 0x07E0) << 5) | ((i & 0xF800) >> 8);
 const swizzle = c => 0xFF000000 | (c & 0xFF) << 16 | (c & 0xFF00) | (c >> 16) & 0xFF;
-
+// logSkip
 function logSkip() {
     if (fT > 0 && fT % 60 === 0 && window.skip1) skip1.textContent = `${((fS / fT) * 100).toFixed(2)}% `;
     if (fT > 1000) { fT = 0; fS = 0; }
 }
-
+// render32
 function render32(src, last, target, context, img, len, offset = 0) {
     fT++;
     for (let i = 0; i < len; i++) if (src[i + offset] !== last[i]) {
@@ -18,7 +18,7 @@ function render32(src, last, target, context, img, len, offset = 0) {
     }
     fS++;
 }
-
+// render16
 function render16(src, last, target, img, width, height, stride) {
     fT++;
     for (let y = 0; y < height; y++) {
@@ -30,7 +30,7 @@ function render16(src, last, target, img, width, height, stride) {
     }
     fS++;
 }
-
+// renderNDS
 function renderNDS(src, w, h) {
     const hh = h >> 1, len = w * hh;
     if (Module.canvas.width !== w || Module.canvas.height !== hh) {
@@ -48,13 +48,15 @@ function renderNDS(src, w, h) {
     render32(src, lastBottom, data32B, ctxB, imgDataB, len, len);
     logSkip();
 }
-
+// video_cb
 function video_cb(ptr, w, h, pitch) {
     if (!ctx) {
         ctx = Module.canvas.getContext('2d', { alpha: false, desynchronized: true, willReadFrequently: false });
         if (Module.isNDS) {
             page02.style.paddingTop = "5px";
+            canvasB.style.display = "block";
             joypad.style.justifyContent = "center";
+            joy.style.display = "none";
             ctxB = canvasB.getContext('2d', { alpha: false, desynchronized: true, willReadFrequently: false });
         }
     }

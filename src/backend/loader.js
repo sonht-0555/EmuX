@@ -46,7 +46,7 @@ async function initCore(romFile) {
     const romBuffer = await romFile.arrayBuffer();
     const binaryData = new Uint8Array(romBuffer);
     let finalRomName = romFile.name, finalRomData = binaryData;
-    const consoleExts = /\.(gba|gbc|gb|smc|sfc|nes|md|gen|ngp|ngc|nds|bin|iso|img|cue|pbp)$/i;
+    const consoleExts = /\.(gba|gbc|gb|smc|sfc|nes|md|gen|ngp|ngc|nds|img|cue|pbp)$/i;
     if (isZip) {
         notifi("","","---","")
         const extracted = await unzip(binaryData, consoleExts);
@@ -62,7 +62,7 @@ async function initCore(romFile) {
             finalLowName.endsWith(ext) || finalLowName === ext.replace('.', '')
         )
     ); 
-    if (!coreConfig) return;
+    if (!coreConfig) return notifi("Error","Unknown","Core","");
     let scriptSource = coreConfig.script;
     const isArcade = scriptSource.includes('arcade');
     const isNDS = scriptSource.includes('nds');
