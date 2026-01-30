@@ -120,6 +120,8 @@ async function initCore(romFile) {
                 audioCtx.resume();
                 Module._free(avInfo);
                 (function mainLoop() { if (isRunning) Module._retro_run(); requestAnimationFrame(mainLoop) })();
+                await loadState();
+                await timer(true);
                 resolve();
             }
         };
