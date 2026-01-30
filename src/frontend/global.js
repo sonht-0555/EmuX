@@ -26,14 +26,25 @@ function svgGen(repeat, size, string) {
     c.width = c.height = N;
     const ctx = c.getContext('2d');
     const cells = string.split('.');
+    const ps = Math.sqrt(cells.length); 
     for (let i = 0; i < N; i++) {
         for (let j = 0; j < N; j++) {
-            if (cells[(i % size) * size + (j % size)] === '1') {
+            // Tính toán vị trí tương ứng trong mẫu hoa văn bằng cách co giãn
+            const r = Math.floor((i % size) * ps / size);
+            const col = Math.floor((j % size) * ps / size);
+            if (cells[r * ps + col] === '1') {
                 ctx.fillRect(j, i, 1, 1);
             }
         }
     }
     return `url(${c.toDataURL()})`;
+}
+// genPattern: Tạo chuỗi hoa văn tự động (backslash \)
+function genPattern(n) {
+    return Array.from({length: n*n}, (_, i) => {
+        const x = i % n, y = Math.floor(i / n);
+        return (Math.abs(x - y) % n === 0) ? "1" : "0";
+    }).join(".");
 }
 // message
 async function message(mess, second = 2000) {
@@ -66,7 +77,7 @@ async function gameView(romName) {
     display.style.height = `${Math.ceil(gameHeight * (integer/window.devicePixelRatio)) + 10}px`;
     display.style.width  = `${Math.ceil(gameWidth  * (integer/window.devicePixelRatio))}px`;
     screen.style.width   = `${gameWidth * (integer/window.devicePixelRatio)}px`;
-    screen.style.setProperty("--size", `${integer}px`);
+    screen.style.setProperty("--size", `${window.devicePixelRatio}px`);
     // notification
     title1.textContent = romName;
     // gamepad
@@ -82,11 +93,22 @@ async function gameView(romName) {
     list.hidden   = false; 
     list01.hidden = true; 
     list02.hidden = true;
-    screen.style.setProperty("--shader", svgGen(integer, window.devicePixelRatio, "0.0.1.0.1.0.1.0.0"));
+    // Logic Shader: 3 và 4 chỉ dùng 1 dòng cho thoáng. 6 trở lên (chẵn) mới dùng 2 dòng.
+    let shaderPattern;
+    if (integer <= 4) {
+        shaderPattern = genPattern(integer);         // 1 dòng (3x3 hoặc 4x4)
+    } else if (integer % 2 === 0) {
+        shaderPattern = genPattern(integer / 2);     // 2 dòng (vd: 6 dùng 3x3)
+    } else {
+        shaderPattern = genPattern(integer);         // 1 dòng cho số lẻ lớn (5, 7...)
+    }
+
+    screen.style.setProperty("--shader", svgGen(window.devicePixelRatio, integer, local(`shader0${local("shader")}`) || shaderPattern));
 }
 // DOMContentLoaded
 document.addEventListener("DOMContentLoaded", function(){
     body.removeAttribute('hide')
     canvasB = document.getElementById("canvas-bottom");
-    body.style.setProperty("--background", svgGen(1, window.devicePixelRatio, "0.0.1.0.1.0.1.0.0"));
+    const dprPattern = genPattern(window.devicePixelRatio);
+    body.style.setProperty("--background", svgGen(1, window.devicePixelRatio, dprPattern));
 });

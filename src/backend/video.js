@@ -5,7 +5,7 @@ for (let i = 0; i < 65536; i++) lut565[i] = 0xFF000000 | ((i & 0x001F) << 19) | 
 const swizzle = c => 0xFF000000 | (c & 0xFF) << 16 | (c & 0xFF00) | (c >> 16) & 0xFF;
 // logSkip
 function logSkip() {
-    if (fT > 0 && fT % 60 === 0 && window.skip1) skip1.textContent = `${((fS / fT) * 100).toFixed(2)}% `;
+    if (fT > 0 && fT % 60 === 0 && window.skip1) skip1.textContent = `${Math.floor((fS / fT) * 100)}% `;
     if (fT > 1000) { fT = 0; fS = 0; }
 }
 // render32
