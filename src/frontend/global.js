@@ -59,6 +59,7 @@ async function gameView(romName) {
     document.querySelectorAll('display').forEach(e => {
         e.style.height = `${Math.ceil(gameHeight * (integer/window.devicePixelRatio)) + 10}px`;
         e.style.width  = `${Math.ceil(gameWidth  * (integer/window.devicePixelRatio))}px`;
+        e.style.display = "block";
     });
     canvasB.style.width  = `${gameWidth * (integer/window.devicePixelRatio)}px`;
     screen.style.width   = `${gameWidth * (integer/window.devicePixelRatio)}px`;

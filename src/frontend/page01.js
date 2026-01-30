@@ -1,17 +1,17 @@
-//listGame
-function showFileGroups(gameName) {
+//listfileongame
+async function showFileGroups(gameName) {
     const fileGroups = [
-        { title: "saves", files: Main.listFiles("saves").filter(file => file.startsWith(gameName)) },
-        { title: "states", files: Main.listFiles("states").filter(file => file.startsWith(gameName)) },
-        { title: "games", files: Main.listFiles("games").filter(file => file.startsWith(gameName)) }
+        { title: "saves", files: (await listStore("saves")).filter(file => file.startsWith(gameName)) },
+        { title: "states", files: (await listStore("states")).filter(file => file.startsWith(gameName)) },
+        { title: "games", files: (await listStore("games")).filter(file => file.startsWith(gameName)) }
     ];
     list01.innerHTML = fileGroups.map(group => group.files.length ? `${group.files.map(fileName => `<file data="${group.title}"><name>${fileName}</name><dele></dele></file>`).join('')}<titl>${group.title}.</titl>`: '').join('');
     list01.querySelectorAll('name').forEach(btn => {
         btn.onclick = async () => {
             const nameEl = btn.parentElement.querySelector('name').textContent;
             if (window.confirm(`Download this file?  ${nameEl}`)) {
-                Main.downloadFiles(`/data/${btn.parentElement.getAttribute('data')}/${nameEl}`, nameEl);
-                showFileGroups(gameName);
+                await downloadFromStore(nameEl);
+                await showFileGroups(gameName);
             }
         };
     });
@@ -19,8 +19,8 @@ function showFileGroups(gameName) {
         btn.onclick = async () => {
             const nameEl = btn.parentElement.querySelector('name').textContent;
             if (window.confirm(`Delete this file?  ${nameEl}`)) {
-                Main.deleteFiles(`/data/${btn.parentElement.getAttribute('data')}/${nameEl}`);
-                showFileGroups(gameName);
+                await deleteFromStore(nameEl);
+                await showFileGroups(gameName);
             }
         };
     });

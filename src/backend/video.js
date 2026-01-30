@@ -53,7 +53,6 @@ function video_cb(ptr, w, h, pitch) {
     if (!ctx) {
         ctx = Module.canvas.getContext('2d', { alpha: false, desynchronized: true, willReadFrequently: false });
         if (Module.isNDS) {
-            canvasB.style.display = "block";
             page02.style.paddingTop = "5px";
             joypad.style.justifyContent = "center";
             ctxB = canvasB.getContext('2d', { alpha: false, desynchronized: true, willReadFrequently: false });

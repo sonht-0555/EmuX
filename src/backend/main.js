@@ -2,7 +2,6 @@ async function inputGame(e) {
   const file = e.target.files[0];
   await emuxDB(await file.arrayBuffer(), file.name);
   await initCore(file);
-  //listGame();
 }
 async function loadGame(name) {
   await initCore(new File([await emuxDB(name)], name));
@@ -51,10 +50,12 @@ async function resumeGame() {
   timer(true);
   isRunning = true;
   if (audioCtx && (audioCtx.state === 'suspended' || audioCtx.state === 'interrupted')) { audioCtx.resume() }
+  fadeAudioIn();
   message("[_] Resumed!");
 }
 async function pauseGame() {
   timer(false);
   isRunning = false;
+  if (gainNode) gainNode.gain.value = 0;
   message("[_] Paused!");
 }
