@@ -19,30 +19,39 @@ function local(key, value) {
 async function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
-// svgGen
+// svgGen: Tạo shader pattern dạng SVG
 function svgGen(repeat, size, pattern) {
     const N = repeat * size;
-    const c = document.createElement('canvas');
-    c.width = c.height = N;
-    const ctx = c.getContext('2d');
+    let rects = "";
     
+    // Nếu pattern là số, tự động tạo Backslash diagonal
+    let cells, ps;
     if (typeof pattern === 'number') {
-        for (let i = 0; i < N; i++) {
-            for (let j = 0; j < N; j++) {
-                const gx = Math.floor(j / repeat), gy = Math.floor(i / repeat);
-                if (Math.abs(gx - gy) % pattern === 0) ctx.fillRect(j, i, 1, 1);
+        cells = [];
+        for (let y = 0; y < pattern; y++) {
+            for (let x = 0; x < pattern; x++) {
+                cells.push((Math.abs(x - y) % pattern === 0) ? "1" : "0");
             }
         }
+        ps = pattern;
     } else {
-        const cells = pattern.split('.'), ps = Math.sqrt(cells.length);
-        for (let i = 0; i < N; i++) {
-            for (let j = 0; j < N; j++) {
-                const gx = Math.floor(j / repeat), gy = Math.floor(i / repeat);
-                if (cells[Math.floor(gy % ps) * ps + Math.floor(gx % ps)] === '1') ctx.fillRect(j, i, 1, 1);
+        cells = pattern.split('.');
+        ps = Math.sqrt(cells.length);
+    }
+    
+    // Vẽ đầy đủ N×N pixel, ánh xạ về pattern
+    for (let i = 0; i < N; i++) {
+        for (let j = 0; j < N; j++) {
+            const r = Math.floor((i % size) * ps / size);
+            const col = Math.floor((j % size) * ps / size);
+            if (cells[r * ps + col] === '1') {
+                rects += `<rect x="${j}" y="${i}" width="1" height="1"/>`;
             }
         }
     }
-    return `url(${c.toDataURL()})`;
+    
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${N}' height='${N}'>${rects}</svg>`;
+    return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 }
 // message
 async function message(mess, second = 2000) {
@@ -74,8 +83,10 @@ async function gameView(romName) {
     integer = Math.min(6, Math.floor((window.innerWidth * window.devicePixelRatio) / gameWidth));
     display.style.height = `${Math.ceil(gameHeight * (integer/window.devicePixelRatio)) + 10}px`;
     display.style.width  = `${Math.ceil(gameWidth  * (integer/window.devicePixelRatio))}px`;
-    screen.style.width   = `${gameWidth * (integer/window.devicePixelRatio)}px`;
-    screen.style.setProperty("--size", `${window.devicePixelRatio}px`);
+    screen.style.width   = `${gameWidth}px`;
+    screen.style.height   = `${gameHeight}px`;
+    screen.style.transform = `scale(${integer / window.devicePixelRatio})`;
+    screen.style.transformOrigin = 'top left';
     // notification
     title1.textContent = romName;
     // gamepad
@@ -91,17 +102,14 @@ async function gameView(romName) {
     list.hidden   = false; 
     list01.hidden = true; 
     list02.hidden = true;
-    // Logic Shader: 3 và 4 chỉ dùng 1 dòng cho thoáng. 6 trở lên (chẵn) mới dùng 2 dòng.
-    let shaderPattern;
-    if (integer <= 4) {
-        shaderPattern = integer;         // 1 dòng (3x3 hoặc 4x4)
-    } else if (integer % 2 === 0) {
-        shaderPattern = integer / 2;     // 2 dòng (vd: 6 dùng 3x3)
-    } else {
-        shaderPattern = integer;         // 1 dòng cho số lẻ lớn (5, 7...)
-    }
-
-    screen.style.setProperty("--shader", svgGen(window.devicePixelRatio, integer, local(`shader0${local("shader")}`) || shaderPattern));
+    
+    // Logic Shader: 3-4 lẻ dùng 1 dòng, 6 chẵn dùng 2 dòng
+    const ps = (integer <= 4 || integer % 2 !== 0) ? integer : (integer / 2);
+    const pattern = local(`shader0${local("shader")}`) || ps;
+    
+    // repeat = integer / ps để Render Size luôn bằng Integer vật lý
+    const repeat = integer / ps;
+    screen.style.setProperty("--shader", svgGen(repeat, ps, pattern));
 }
 // DOMContentLoaded
 document.addEventListener("DOMContentLoaded", function(){
