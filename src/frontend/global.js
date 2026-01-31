@@ -20,31 +20,29 @@ async function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 // svgGen
-function svgGen(repeat, size, string) {
+function svgGen(repeat, size, pattern) {
     const N = repeat * size;
     const c = document.createElement('canvas');
     c.width = c.height = N;
     const ctx = c.getContext('2d');
-    const cells = string.split('.');
-    const ps = Math.sqrt(cells.length); 
-    for (let i = 0; i < N; i++) {
-        for (let j = 0; j < N; j++) {
-            // Tính toán vị trí tương ứng trong mẫu hoa văn bằng cách co giãn
-            const r = Math.floor((i % size) * ps / size);
-            const col = Math.floor((j % size) * ps / size);
-            if (cells[r * ps + col] === '1') {
-                ctx.fillRect(j, i, 1, 1);
+    
+    if (typeof pattern === 'number') {
+        for (let i = 0; i < N; i++) {
+            for (let j = 0; j < N; j++) {
+                const gx = Math.floor(j / repeat), gy = Math.floor(i / repeat);
+                if (Math.abs(gx - gy) % pattern === 0) ctx.fillRect(j, i, 1, 1);
+            }
+        }
+    } else {
+        const cells = pattern.split('.'), ps = Math.sqrt(cells.length);
+        for (let i = 0; i < N; i++) {
+            for (let j = 0; j < N; j++) {
+                const gx = Math.floor(j / repeat), gy = Math.floor(i / repeat);
+                if (cells[Math.floor(gy % ps) * ps + Math.floor(gx % ps)] === '1') ctx.fillRect(j, i, 1, 1);
             }
         }
     }
     return `url(${c.toDataURL()})`;
-}
-// genPattern: Tạo chuỗi hoa văn tự động (backslash \)
-function genPattern(n) {
-    return Array.from({length: n*n}, (_, i) => {
-        const x = i % n, y = Math.floor(i / n);
-        return (Math.abs(x - y) % n === 0) ? "1" : "0";
-    }).join(".");
 }
 // message
 async function message(mess, second = 2000) {
@@ -96,11 +94,11 @@ async function gameView(romName) {
     // Logic Shader: 3 và 4 chỉ dùng 1 dòng cho thoáng. 6 trở lên (chẵn) mới dùng 2 dòng.
     let shaderPattern;
     if (integer <= 4) {
-        shaderPattern = genPattern(integer);         // 1 dòng (3x3 hoặc 4x4)
+        shaderPattern = integer;         // 1 dòng (3x3 hoặc 4x4)
     } else if (integer % 2 === 0) {
-        shaderPattern = genPattern(integer / 2);     // 2 dòng (vd: 6 dùng 3x3)
+        shaderPattern = integer / 2;     // 2 dòng (vd: 6 dùng 3x3)
     } else {
-        shaderPattern = genPattern(integer);         // 1 dòng cho số lẻ lớn (5, 7...)
+        shaderPattern = integer;         // 1 dòng cho số lẻ lớn (5, 7...)
     }
 
     screen.style.setProperty("--shader", svgGen(window.devicePixelRatio, integer, local(`shader0${local("shader")}`) || shaderPattern));
@@ -109,6 +107,5 @@ async function gameView(romName) {
 document.addEventListener("DOMContentLoaded", function(){
     body.removeAttribute('hide')
     canvasB = document.getElementById("canvas-bottom");
-    const dprPattern = genPattern(window.devicePixelRatio);
-    body.style.setProperty("--background", svgGen(1, window.devicePixelRatio, dprPattern));
+    body.style.setProperty("--background", svgGen(1, window.devicePixelRatio, window.devicePixelRatio));
 });

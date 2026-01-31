@@ -1,4 +1,4 @@
-let revision = 'EmuX_2.53';
+let revision = 'EmuX_2.54';
 var urlsToCache = [
     '/', 
     './index.html',
