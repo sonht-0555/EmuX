@@ -169,6 +169,9 @@
   screen::after { 
     background-image: var(--shader);
     background-size: var(--size);
+    width: var(--width);
+    height: var(--height);
+    transform: scale(var(--scale));
   }
   canvas {
     width:100%;

@@ -1,18 +1,14 @@
 let gl, glB, program, programB, texture, textureB, fT = 0, fS = 0;
 let lastMain, lastMain16, lastBottom, pixelBuffer, pixelBufferB;
-let pixelView, pixelViewB; // Reusable Uint8Array views - avoid allocation per frame
-let srcView32, srcView16, srcViewNDS; // Cached typed array views for source data
-let cachedW = 0, cachedH = 0, cachedPitch = 0; // Cache dimensions to detect changes
+let tIM = 0, tIB = 0;
+let pixelView, pixelViewB, lastView16as32, srcView;
+let cachedW = 0, cachedH = 0, cachedPitch = 0, cachedBuf = null;
 
-// Pre-computed LUT for RGB565 -> RGBA8888 conversion
 const lut565 = new Uint32Array(65536);
-for (let i = 0; i < 65536; i++) lut565[i] = 0xFF000000 | ((i & 0x001F) << 19) | ((i & 0x07E0) << 5) | ((i & 0xF800) >> 8);
-
-// Pre-computed LUT for XRGB8888 swizzle (BGRA -> RGBA) - eliminates function call per pixel
-const lutSwizzle = new Uint32Array(256);
-for (let i = 0; i < 256; i++) lutSwizzle[i] = i; // Identity for single byte, used in manual swizzle
-
-// Inline swizzle as bitwise ops (kept for reference, but LUT approach below is faster)
+for (let i = 0; i < 65536; i++) {
+    const r = (i & 0xF800) >> 8, g = (i & 0x07E0) >> 3, b = (i & 0x001F) << 3;
+    lut565[i] = 0xFF000000 | (b << 16) | (g << 8) | r;
+}
 const swizzle = c => 0xFF000000 | (c & 0xFF) << 16 | (c & 0xFF00) | (c >> 16) & 0xFF;
 
 const vShaderSource = `attribute vec2 p;attribute vec2 t;varying vec2 v;void main(){gl_Position=vec4(p,0,1);v=t;}`;
@@ -39,124 +35,93 @@ function initGL(canvas) {
 }
 
 function logSkip() {
-    if (fT > 0 && (fT & 63) === 0 && window.skip1) skip1.textContent = `${(fS * 100 / fT) | 0}% `; // Bitwise AND faster than modulo
+    if (fT > 0 && (fT & 63) === 0 && window.skip1) skip1.textContent = `${(fS * 100 / fT) | 0}% `;
     if (fT > 1000) { fT = 0; fS = 0; }
 }
 
-// Optimized render32 - uses pre-allocated pixelView
-function render32(src, last, buf, view, ctx, tex, w, h, len, offset) {
+function render32(src, last, buf, view, ctx, tex, w, h, len, offset, tType) {
     fT++;
-    // Early-exit check with unrolled loop for common case
-    let changed = false;
-    const end = len + offset;
-    for (let i = offset; i < end; i++) if (src[i] !== last[i - offset]) { changed = true; break; }
-    
-    if (!changed) { fS++; return; }
-    
-    // Swizzle and copy - unrolled for better performance
-    for (let j = 0, k = offset; j < len; j++, k++) {
-        const c = last[j] = src[k];
-        buf[j] = 0xFF000000 | (c & 0xFF) << 16 | (c & 0xFF00) | (c >>> 16) & 0xFF;
-    }
-    ctx.bindTexture(ctx.TEXTURE_2D, tex);
-    ctx.texImage2D(ctx.TEXTURE_2D, 0, ctx.RGBA, w, h, 0, ctx.RGBA, ctx.UNSIGNED_BYTE, view);
-    ctx.drawArrays(ctx.TRIANGLES, 0, 6);
+    let ch = 0;
+    for (let i = len + offset - 1; i >= offset; i--) if (src[i] !== last[i - offset]) { ch = 1; break; }
+    if (ch) {
+        for (let j = 0; j < len; j++) buf[j] = swizzle(last[j] = src[j + offset]);
+        ctx.bindTexture(ctx.TEXTURE_2D, tex);
+        if (tType ? tIB : tIM) ctx.texSubImage2D(ctx.TEXTURE_2D, 0, 0, 0, w, h, ctx.RGBA, ctx.UNSIGNED_BYTE, view);
+        else { ctx.texImage2D(ctx.TEXTURE_2D, 0, ctx.RGBA, w, h, 0, ctx.RGBA, ctx.UNSIGNED_BYTE, view); if(tType) tIB=1; else tIM=1; }
+        ctx.drawArrays(ctx.TRIANGLES, 0, 6);
+    } else fS++;
 }
 
-// Optimized render16 - uses pre-allocated pixelView
-function render16(src, last, buf, view, ctx, tex, w, h, stride) {
+function render16(src, last32, buf, view, ctx, tex, w, h, stride, tType) {
     fT++;
-    // Early-exit check
-    let changed = false;
-    outer: for (let y = 0; y < h; y++) {
-        const si = y * stride, li = y * w;
-        for (let x = 0; x < w; x++) if (src[si + x] !== last[li + x]) { changed = true; break outer; }
+    let ch = 0;
+    const sw = w >> 1, ss = stride >> 1;
+    const src32 = new Uint32Array(src.buffer, src.byteOffset, (stride * h) >> 1);
+    outer: for (let y = h - 1; y >= 0; y--) {
+        const si = y * ss, li = y * sw;
+        for (let x = sw - 1; x >= 0; x--) if (src32[si + x] !== last32[li + x]) { ch = 1; break outer; }
     }
-    
-    if (!changed) { fS++; return; }
-    
-    // Convert RGB565 to RGBA8888 using LUT
-    for (let y = 0; y < h; y++) {
-        const si = y * stride, di = y * w;
-        for (let x = 0; x < w; x++) buf[di + x] = lut565[last[di + x] = src[si + x]];
-    }
-    ctx.bindTexture(ctx.TEXTURE_2D, tex);
-    ctx.texImage2D(ctx.TEXTURE_2D, 0, ctx.RGBA, w, h, 0, ctx.RGBA, ctx.UNSIGNED_BYTE, view);
-    ctx.drawArrays(ctx.TRIANGLES, 0, 6);
+    if (ch) {
+        for (let y = 0; y < h; y++) {
+            const si = y * stride, li = y * w;
+            for (let x = 0; x < w; x++) buf[li + x] = lut565[src[si + x]];
+        }
+        last32.set(new Uint32Array(buf.buffer, 0, (w * h) >> 1)); // Sync last32 with new pixels
+        ctx.bindTexture(ctx.TEXTURE_2D, tex);
+        if (tType ? tIB : tIM) ctx.texSubImage2D(ctx.TEXTURE_2D, 0, 0, 0, w, h, ctx.RGBA, ctx.UNSIGNED_BYTE, view);
+        else { ctx.texImage2D(ctx.TEXTURE_2D, 0, ctx.RGBA, w, h, 0, ctx.RGBA, ctx.UNSIGNED_BYTE, view); if(tType) tIB=1; else tIM=1; }
+        ctx.drawArrays(ctx.TRIANGLES, 0, 6);
+    } else fS++;
 }
 
 function renderNDS(ptr, w, h) {
-    const hh = h >>> 1, len = w * hh; // unsigned right shift
+    const hh = h >> 1, len = w * hh;
+    const buf = Module.HEAPU8.buffer;
     if (Module.canvas.width !== w || Module.canvas.height !== hh) {
         Module.canvas.width = canvasB.width = w;
         Module.canvas.height = canvasB.height = hh;
-        gl.viewport(0, 0, w, hh);
-        glB.viewport(0, 0, w, hh);
-        lastMain = new Uint32Array(len);
-        lastBottom = new Uint32Array(len);
-        pixelBuffer = new Uint32Array(len);
-        pixelBufferB = new Uint32Array(len);
-        pixelView = new Uint8Array(pixelBuffer.buffer);
-        pixelViewB = new Uint8Array(pixelBufferB.buffer);
-        srcViewNDS = null; // Will be recreated with new dimensions
+        gl.viewport(0, 0, w, hh); glB.viewport(0, 0, w, hh);
+        lastMain = new Uint32Array(len); lastBottom = new Uint32Array(len);
+        pixelBuffer = new Uint32Array(len); pixelBufferB = new Uint32Array(len);
+        pixelView = new Uint8Array(pixelBuffer.buffer); pixelViewB = new Uint8Array(pixelBufferB.buffer);
+        tIM = 0; tIB = 0;
         if (window.gameView) gameView(gameName);
     }
-    // Create view only if buffer changed (WASM memory can grow)
-    const buf = Module.HEAPU8.buffer;
-    if (!srcViewNDS || srcViewNDS.buffer !== buf) srcViewNDS = new Uint32Array(buf, ptr, w * h);
-    else if (srcViewNDS.byteOffset !== ptr) srcViewNDS = new Uint32Array(buf, ptr, w * h);
-    
-    render32(srcViewNDS, lastMain, pixelBuffer, pixelView, gl, texture, w, hh, len, 0);
-    render32(srcViewNDS, lastBottom, pixelBufferB, pixelViewB, glB, textureB, w, hh, len, len);
+    if (!srcView || srcView.buffer !== buf) srcView = new Uint32Array(buf);
+    const src = srcView.subarray(ptr >> 2, (ptr >> 2) + (w * h));
+    render32(src, lastMain, pixelBuffer, pixelView, gl, texture, w, hh, len, 0, 0);
+    render32(src, lastBottom, pixelBufferB, pixelViewB, glB, textureB, w, hh, len, len, 1);
     logSkip();
 }
 
 function video_cb(ptr, w, h, pitch) {
     if (!gl) {
-        const r = initGL(Module.canvas);
-        if (!r) return;
+        const r = initGL(Module.canvas); if (!r) return;
         gl = r.c; program = r.pg; texture = r.tx;
         if (Module.isNDS) {
-            page02.style.paddingTop = "5px";
             canvasB.style.display = "block";
-            joypad.style.justifyContent = "center";
-            joy.style.display = "none";
-            const rB = initGL(canvasB);
-            glB = rB.c; programB = rB.pg; textureB = rB.tx;
+            const rB = initGL(canvasB); glB = rB.c; programB = rB.pg; textureB = rB.tx;
         }
     }
-
     if (Module.isNDS) return renderNDS(ptr, w, h);
-
     const len = w * h, is32 = (pitch / w) === 4;
     const buf = Module.HEAPU8.buffer;
-    
-    // Reallocate buffers only when dimensions change
     if (w !== cachedW || h !== cachedH || pitch !== cachedPitch) {
         cachedW = w; cachedH = h; cachedPitch = pitch;
-        Module.canvas.width = w;
-        Module.canvas.height = h;
-        gl.viewport(0, 0, w, h);
+        Module.canvas.width = w; Module.canvas.height = h;
+        gl.viewport(0, 0, w, h); tIM = 0;
         pixelBuffer = new Uint32Array(len);
         pixelView = new Uint8Array(pixelBuffer.buffer);
-        if (is32) {
-            lastMain = new Uint32Array(len);
-            srcView32 = null;
-        } else {
-            lastMain16 = new Uint16Array(len);
-            srcView16 = null;
-        }
+        if (is32) lastMain = new Uint32Array(len); 
+        else lastView16as32 = new Uint32Array(len >> 1);
         if (window.gameView) gameView(gameName);
     }
-
-    // Recreate views if WASM memory grew or ptr changed
     if (is32) {
-        if (!srcView32 || srcView32.buffer !== buf || srcView32.byteOffset !== ptr) srcView32 = new Uint32Array(buf, ptr, len);
-        render32(srcView32, lastMain, pixelBuffer, pixelView, gl, texture, w, h, len, 0);
+        const src = new Uint32Array(buf, ptr, len);
+        render32(src, lastMain, pixelBuffer, pixelView, gl, texture, w, h, len, 0, 0);
     } else {
-        const stride = pitch >>> 1;
-        if (!srcView16 || srcView16.buffer !== buf || srcView16.byteOffset !== ptr) srcView16 = new Uint16Array(buf, ptr, stride * h);
-        render16(srcView16, lastMain16, pixelBuffer, pixelView, gl, texture, w, h, stride);
+        const src = new Uint16Array(buf, ptr, (pitch >> 1) * h);
+        render16(src, lastView16as32, pixelBuffer, pixelView, gl, texture, w, h, pitch >> 1, 0);
     }
     logSkip();
 }
