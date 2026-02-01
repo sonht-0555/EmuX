@@ -69,7 +69,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 number = number % 5 + 1;
                 local("shader", number);
                 const shader = local(`shader0${number}`) || "0.0.0.1.0.0.1.0.0.1.0.0.1.0.0.0";
-                screen.style.setProperty("--shader", svgGen(window.devicePixelRatio, integer, shader)); 
+                screen.style.setProperty("--shader", pngGen(window.devicePixelRatio, integer, shader)); 
                 message(`[0${number}] Matrix!`);
             }
             tap = 0;
