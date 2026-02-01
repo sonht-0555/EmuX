@@ -1,110 +1,156 @@
-let gl, glB, pg, pgB, tx, txB, fT = 0, fS = 0, lM, lB, pB, pBB, tM = 0, tB = 0, pV, pVB, l16, s32, s16, cW = 0, cH = 0, cP = 0, cB = null, cPr = 0, nP = 0, nW = 0, nH = 0;
-const lut = new Uint32Array(65536);
+// ===== WebGL Variables =====
+let gl, glB, program, programB, texture, textureB, frameCount = 0, skippedFrames = 0;
+let lastMain, lastBottom, pixelBuffer, pixelBufferBottom, textureInitializedMain = 0, textureInitializedBottom = 0;
+let pixelView, pixelViewBottom, lastView16as32, srcView32, srcView16;
+let cachedWidth = 0, cachedHeight = 0, cachedPitch = 0, cachedBuffer = null, cachedPointer = 0, ndsPointer = 0, ndsWidth = 0, ndsHeight = 0;
+// ===== LUT & Shaders =====
+const lut565 = new Uint32Array(65536);
 for (let i = 0; i < 65536; i++) {
-    const r = (i & 0xF800) >> 8, g = (i & 0x07E0) >> 3, b = (i & 0x001F) << 3;
-    lut[i] = 0xFF000000 | (b << 16) | (g << 8) | r;
+  const r = (i & 0xF800) >> 8, g = (i & 0x07E0) >> 3, b = (i & 0x001F) << 3;
+  lut565[i] = 0xFF000000 | (b << 16) | (g << 8) | r;
 }
-const vsS = `attribute vec2 p;attribute vec2 t;varying vec2 v;void main(){gl_Position=vec4(p,0,1);v=t;}`;
-const fsS = `precision mediump float;varying vec2 v;uniform sampler2D s;void main(){gl_FragColor=texture2D(s,v);}`;
-function initGL(can) {
-    const c = can.getContext('webgl', { alpha: false, antialias: false, desynchronized: true, preserveDrawingBuffer: false, powerPreference: 'high-performance' });
-    if (!c) return null;
-    const vs = c.createShader(c.VERTEX_SHADER); c.shaderSource(vs, vsS); c.compileShader(vs);
-    const fs = c.createShader(c.FRAGMENT_SHADER); c.shaderSource(fs, fsS); c.compileShader(fs);
-    const p = c.createProgram(); c.attachShader(p, vs); c.attachShader(p, fs); c.linkProgram(p); c.useProgram(p);
-    const pb = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, pb);
-    c.bufferData(c.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]), c.STATIC_DRAW);
-    const pl = c.getAttribLocation(p, 'p'); c.enableVertexAttribArray(pl); c.vertexAttribPointer(pl, 2, c.FLOAT, false, 0, 0);
-    const tb = c.createBuffer(); c.bindBuffer(c.ARRAY_BUFFER, tb);
-    c.bufferData(c.ARRAY_BUFFER, new Float32Array([0,1,1,1,0,0,0,0,1,1,1,0]), c.STATIC_DRAW);
-    const tl = c.getAttribLocation(p, 't'); c.enableVertexAttribArray(tl); c.vertexAttribPointer(tl, 2, c.FLOAT, false, 0, 0);
-    const t = c.createTexture(); c.bindTexture(c.TEXTURE_2D, t);
-    c.texParameteri(c.TEXTURE_2D, c.TEXTURE_WRAP_S, c.CLAMP_TO_EDGE);
-    c.texParameteri(c.TEXTURE_2D, c.TEXTURE_WRAP_T, c.CLAMP_TO_EDGE);
-    c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MIN_FILTER, c.NEAREST);
-    c.texParameteri(c.TEXTURE_2D, c.TEXTURE_MAG_FILTER, c.NEAREST);
-    return { c, p, t };
+const vertexShaderSource = `attribute vec2 p;attribute vec2 t;varying vec2 v;void main(){gl_Position=vec4(p,0,1);v=t;}`;
+const fragmentShaderSource = `precision mediump float;varying vec2 v;uniform sampler2D s;void main(){gl_FragColor=texture2D(s,v);}`;
+// ===== WebGL Functions =====
+function initGL(canvas) {
+  const glContext = canvas.getContext('webgl', { alpha: false, antialias: false, desynchronized: true, preserveDrawingBuffer: false, powerPreference: 'high-performance' });
+  if (!glContext) return null;
+  const vertexShader = glContext.createShader(glContext.VERTEX_SHADER);
+  glContext.shaderSource(vertexShader, vertexShaderSource);
+  glContext.compileShader(vertexShader);
+  const fragmentShader = glContext.createShader(glContext.FRAGMENT_SHADER);
+  glContext.shaderSource(fragmentShader, fragmentShaderSource);
+  glContext.compileShader(fragmentShader);
+  const glProgram = glContext.createProgram();
+  glContext.attachShader(glProgram, vertexShader);
+  glContext.attachShader(glProgram, fragmentShader);
+  glContext.linkProgram(glProgram);
+  glContext.useProgram(glProgram);
+  const positionBuffer = glContext.createBuffer();
+  glContext.bindBuffer(glContext.ARRAY_BUFFER, positionBuffer);
+  glContext.bufferData(glContext.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), glContext.STATIC_DRAW);
+  const positionLocation = glContext.getAttribLocation(glProgram, 'p');
+  glContext.enableVertexAttribArray(positionLocation);
+  glContext.vertexAttribPointer(positionLocation, 2, glContext.FLOAT, false, 0, 0);
+  const texCoordBuffer = glContext.createBuffer();
+  glContext.bindBuffer(glContext.ARRAY_BUFFER, texCoordBuffer);
+  glContext.bufferData(glContext.ARRAY_BUFFER, new Float32Array([0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0]), glContext.STATIC_DRAW);
+  const texCoordLocation = glContext.getAttribLocation(glProgram, 't');
+  glContext.enableVertexAttribArray(texCoordLocation);
+  glContext.vertexAttribPointer(texCoordLocation, 2, glContext.FLOAT, false, 0, 0);
+  const glTexture = glContext.createTexture();
+  glContext.bindTexture(glContext.TEXTURE_2D, glTexture);
+  glContext.texParameteri(glContext.TEXTURE_2D, glContext.TEXTURE_WRAP_S, glContext.CLAMP_TO_EDGE);
+  glContext.texParameteri(glContext.TEXTURE_2D, glContext.TEXTURE_WRAP_T, glContext.CLAMP_TO_EDGE);
+  glContext.texParameteri(glContext.TEXTURE_2D, glContext.TEXTURE_MIN_FILTER, glContext.NEAREST);
+  glContext.texParameteri(glContext.TEXTURE_2D, glContext.TEXTURE_MAG_FILTER, glContext.NEAREST);
+  return { glContext, glProgram, glTexture };
 }
 function logSkip() {
-    if (fT > 0 && (fT & 63) === 0 && window.skip1) skip1.textContent = `${(fS * 100 / fT) | 0}% `;
-    if (fT > 1000) { fT = 0; fS = 0; }
+  if (frameCount > 0 && (frameCount & 63) === 0 && window.skip1) {
+    skip1.textContent = `${(skippedFrames * 100 / frameCount) | 0}% `;
+  }
+  if (frameCount > 1000) { frameCount = 0; skippedFrames = 0; }
 }
-function r32(src, sO, last, buf, view, ctx, tex, w, h, len, ty) {
-    fT++;
-    const end = sO + len;
-    for (let i = end - 1; i >= sO; i--) if (src[i] !== last[i - sO]) {
-        for (let j = 0, k = sO; j < len; j++, k++) {
-            const c = last[j] = src[k];
-            buf[j] = 0xFF000000 | (c & 0xFF) << 16 | (c & 0xFF00) | (c >> 16) & 0xFF;
+// ===== Rendering =====
+function render32(source, sourceOffset, last, buffer, view, context, texture, width, height, length, textureType) {
+  frameCount++;
+  const end = sourceOffset + length;
+  for (let i = end - 1; i >= sourceOffset; i--) {
+    if (source[i] !== last[i - sourceOffset]) {
+      for (let j = 0, k = sourceOffset; j < length; j++, k++) {
+        const color = last[j] = source[k];
+        buffer[j] = 0xFF000000 | (color & 0xFF) << 16 | (color & 0xFF00) | (color >> 16) & 0xFF;
+      }
+      context.bindTexture(context.TEXTURE_2D, texture);
+      if (textureType ? textureInitializedBottom : textureInitializedMain) {
+        context.texSubImage2D(context.TEXTURE_2D, 0, 0, 0, width, height, context.RGBA, context.UNSIGNED_BYTE, view);
+      } else {
+        context.texImage2D(context.TEXTURE_2D, 0, context.RGBA, width, height, 0, context.RGBA, context.UNSIGNED_BYTE, view);
+        if (textureType) textureInitializedBottom = 1; else textureInitializedMain = 1;
+      }
+      context.drawArrays(context.TRIANGLES, 0, 6);
+      return;
+    }
+  }
+  skippedFrames++;
+}
+function render16(source16, source32, last32, buffer, view, context, texture, width, height, stride, textureType) {
+  frameCount++;
+  const widthWords = width >> 1;
+  const strideWords = stride >> 1;
+  for (let y = height - 1; y >= 0; y--) {
+    const sourceIndex = y * strideWords, lastIndex = y * widthWords;
+    for (let x = widthWords - 1; x >= 0; x--) {
+      if (source32[sourceIndex + x] !== last32[lastIndex + x]) {
+        for (let y2 = 0; y2 < height; y2++) {
+          const si2 = y2 * stride, li2 = y2 * width, si32 = y2 * strideWords, li32 = y2 * widthWords;
+          for (let x2 = 0; x2 < widthWords; x2++) {
+            const i = x2 << 1;
+            buffer[li2 + i] = lut565[source16[si2 + i]];
+            buffer[li2 + i + 1] = lut565[source16[si2 + i + 1]];
+            last32[li32 + x2] = source32[si32 + x2];
+          }
         }
-        ctx.bindTexture(ctx.TEXTURE_2D, tex);
-        if (ty ? tB : tM) ctx.texSubImage2D(ctx.TEXTURE_2D, 0, 0, 0, w, h, ctx.RGBA, ctx.UNSIGNED_BYTE, view);
-        else { ctx.texImage2D(ctx.TEXTURE_2D, 0, ctx.RGBA, w, h, 0, ctx.RGBA, ctx.UNSIGNED_BYTE, view); if(ty) tB=1; else tM=1; }
-        ctx.drawArrays(ctx.TRIANGLES, 0, 6); return;
-    }
-    fS++;
-}
-function r16(s16, s32, l32, buf, view, ctx, tex, w, h, st, ty) {
-    fT++;
-    const sw = w >> 1, ss = st >> 1;
-    for (let y = h - 1; y >= 0; y--) {
-        const si = y * ss, li = y * sw;
-        for (let x = sw - 1; x >= 0; x--) if (s32[si + x] !== l32[li + x]) {
-            for (let y2 = 0; y2 < h; y2++) {
-                const si2 = y2 * st, li2 = y2 * w, si32 = y2 * ss, li32 = y2 * sw;
-                for (let x2 = 0; x2 < sw; x2++) {
-                    const i = x2 << 1;
-                    buf[li2 + i] = lut[s16[si2 + i]];
-                    buf[li2 + i + 1] = lut[s16[si2 + i + 1]];
-                    l32[li32 + x2] = s32[si32 + x2];
-                }
-            }
-            ctx.bindTexture(ctx.TEXTURE_2D, tex);
-            if (ty ? tB : tM) ctx.texSubImage2D(ctx.TEXTURE_2D, 0, 0, 0, w, h, ctx.RGBA, ctx.UNSIGNED_BYTE, view);
-            else { ctx.texImage2D(ctx.TEXTURE_2D, 0, ctx.RGBA, w, h, 0, ctx.RGBA, ctx.UNSIGNED_BYTE, view); if(ty) tB=1; else tM=1; }
-            ctx.drawArrays(ctx.TRIANGLES, 0, 6); return;
+        context.bindTexture(context.TEXTURE_2D, texture);
+        if (textureType ? textureInitializedBottom : textureInitializedMain) {
+          context.texSubImage2D(context.TEXTURE_2D, 0, 0, 0, width, height, context.RGBA, context.UNSIGNED_BYTE, view);
+        } else {
+          context.texImage2D(context.TEXTURE_2D, 0, context.RGBA, width, height, 0, context.RGBA, context.UNSIGNED_BYTE, view);
+          if (textureType) textureInitializedBottom = 1; else textureInitializedMain = 1;
         }
+        context.drawArrays(context.TRIANGLES, 0, 6);
+        return;
+      }
     }
-    fS++;
+  }
+  skippedFrames++;
 }
-function renderNDS(ptr, w, h) {
-    const hh = h >> 1, len = w * hh, b = Module.HEAPU8.buffer;
-    if (Module.canvas.width !== w || Module.canvas.height !== hh) {
-        Module.canvas.width = canvasB.width = w; Module.canvas.height = canvasB.height = hh;
-        gl.viewport(0, 0, w, hh); glB.viewport(0, 0, w, hh);
-        lM = new Uint32Array(len); lB = new Uint32Array(len);
-        pB = new Uint32Array(len); pBB = new Uint32Array(len);
-        pV = new Uint8Array(pB.buffer); pVB = new Uint8Array(pBB.buffer);
-        s32 = null; tM = 0; tB = 0;
-        if (window.gameView) gameView(gameName);
-    }
-    if (!s32 || s32.buffer !== b || nP !== ptr || nW !== w || nH !== h) { nP = ptr; nW = w; nH = h; s32 = new Uint32Array(b, ptr, w * h); }
-    r32(s32, 0, lM, pB, pV, gl, texture, w, hh, len, 0);
-    r32(s32, len, lB, pBB, pVB, glB, textureB, w, hh, len, 1);
-    logSkip();
+function renderNDS(pointer, width, height) {
+  const halfHeight = height >> 1, length = width * halfHeight, buffer = Module.HEAPU8.buffer;
+  if (Module.canvas.width !== width || Module.canvas.height !== halfHeight) {
+    Module.canvas.width = canvasB.width = width; Module.canvas.height = canvasB.height = halfHeight;
+    gl.viewport(0, 0, width, halfHeight); glB.viewport(0, 0, width, halfHeight);
+    lastMain = new Uint32Array(length); lastBottom = new Uint32Array(length);
+    pixelBuffer = new Uint32Array(length); pixelBufferBottom = new Uint32Array(length);
+    pixelView = new Uint8Array(pixelBuffer.buffer); pixelViewBottom = new Uint8Array(pixelBufferBottom.buffer);
+    srcView32 = null; textureInitializedMain = 0; textureInitializedBottom = 0;
+    if (window.gameView) gameView(gameName);
+  }
+  if (!srcView32 || srcView32.buffer !== buffer || ndsPointer !== pointer || ndsWidth !== width || ndsHeight !== height) {
+    ndsPointer = pointer; ndsWidth = width; ndsHeight = height; srcView32 = new Uint32Array(buffer, pointer, width * height);
+  }
+  render32(srcView32, 0, lastMain, pixelBuffer, pixelView, gl, texture, width, halfHeight, length, 0);
+  render32(srcView32, length, lastBottom, pixelBufferBottom, pixelViewBottom, glB, textureB, width, halfHeight, length, 1);
+  logSkip();
 }
-function video_cb(ptr, w, h, pitch) {
-    if (!gl) {
-        const r = initGL(Module.canvas); if (!r) return;
-        gl = r.c; pg = r.p; texture = r.t;
-        if (Module.isNDS) { canvasB.style.display = "block"; const rB = initGL(canvasB); glB = rB.c; pgB = rB.p; textureB = rB.t; }
+function video_cb(pointer, width, height, pitch) {
+  if (!gl) {
+    const result = initGL(Module.canvas); if (!result) return;
+    gl = result.glContext; program = result.glProgram; texture = result.glTexture;
+    if (Module.isNDS) {
+      page02.style.paddingTop = "5px"; canvasB.style.display = "block"; joypad.style.justifyContent = "center"; joy.style.display = "none";
+      const resultB = initGL(canvasB); glB = resultB.glContext; programB = resultB.glProgram; textureB = resultB.glTexture;
     }
-    if (Module.isNDS) return renderNDS(ptr, w, h);
-    const len = w * h, is32 = pitch === (w << 2), b = Module.HEAPU8.buffer;
-    if (w !== cW || h !== cH || pitch !== cP) {
-        cW = w; cH = h; cP = pitch; cB = null;
-        Module.canvas.width = w; Module.canvas.height = h;
-        gl.viewport(0, 0, w, h); tM = 0;
-        pB = new Uint32Array(len); pV = new Uint8Array(pB.buffer);
-        if (is32) lM = new Uint32Array(len); else l16 = new Uint32Array(len >> 1);
-        if (window.gameView) gameView(gameName);
+  }
+  if (Module.isNDS) return renderNDS(pointer, width, height);
+  const length = width * height, is32 = pitch === (width << 2), buffer = Module.HEAPU8.buffer;
+  if (width !== cachedWidth || height !== cachedHeight || pitch !== cachedPitch) {
+    cachedWidth = width; cachedHeight = height; cachedPitch = pitch; cachedBuffer = null;
+    Module.canvas.width = width; Module.canvas.height = height; gl.viewport(0, 0, width, height);
+    textureInitializedMain = 0; pixelBuffer = new Uint32Array(length); pixelView = new Uint8Array(pixelBuffer.buffer);
+    if (is32) lastMain = new Uint32Array(length); else lastView16as32 = new Uint32Array(length >> 1);
+    if (window.gameView) gameView(gameName);
+  }
+  if (buffer !== cachedBuffer || pointer !== cachedPointer) {
+    cachedBuffer = buffer; cachedPointer = pointer;
+    if (is32) srcView32 = new Uint32Array(buffer, pointer, length);
+    else {
+      srcView16 = new Uint16Array(buffer, pointer, (pitch >> 1) * height);
+      srcView32 = new Uint32Array(buffer, pointer, ((pitch >> 1) * height) >> 1);
     }
-    if (b !== cB || ptr !== cPr) {
-        cB = b; cPr = ptr;
-        if (is32) s32 = new Uint32Array(b, ptr, len);
-        else { s16 = new Uint16Array(b, ptr, (pitch >> 1) * h); s32 = new Uint32Array(b, ptr, ((pitch >> 1) * h) >> 1); }
-    }
-    if (is32) r32(s32, 0, lM, pB, pV, gl, texture, w, h, len, 0);
-    else r16(s16, s32, l16, pB, pV, gl, texture, w, h, pitch >> 1, 0);
-    logSkip();
+  }
+  if (is32) render32(srcView32, 0, lastMain, pixelBuffer, pixelView, gl, texture, width, height, length, 0);
+  else render16(srcView16, srcView32, lastView16as32, pixelBuffer, pixelView, gl, texture, width, height, pitch >> 1, 0);
+  logSkip();
 }
