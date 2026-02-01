@@ -163,23 +163,19 @@
   display {
     position: relative;
     grid-template-rows: 1fr 10px;
-    justify-items: left;
   }
-  screen, screen::after, canvas {
-    image-rendering: pixelated;
-    image-rendering: -moz-crisp-edges;
-    image-rendering: crisp-edges;
-  }
-  screen { 
-    z-index: 2; 
-    position: relative;
-  }
+  screen { z-index: 2; position: relative; }
   screen::after { 
     background-image: var(--shader);
-    background-size: 1px;
+    background-size: var(--size);
   }
   canvas {
     width:100%;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: -webkit-crisp-edges;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    -ms-interpolation-mode: nearest-neighbor;
     transition: opacity 0.5s ease-in-out;
   }
   notification {

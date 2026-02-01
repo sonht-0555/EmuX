@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1, width=device-width, height=device-height" />
+<title>mGBA WASM</title>
+<link rel="manifest" href="/manifest.json"/>
+<script type="" src="/main.js"></script>
+<style>
+body { background:#111; color:#fff; text-align:center }
+canvas { image-rendering: pixelated; }
+</style>
+</head>
+<body>
+<h3>Retro WASM 1.12</h3>
+<canvas id="screen" width="256" height="224" style="image-rendering: pixelated !important; width:320px !important"></canvas><br><br>
+<!-- Virtual Gamepad Controls -->
+<div id="gamepad" style="display: flex; justify-content: center; gap: 40px; margin-bottom: 20px;">
+	<div id="dpad" style="display: flex; flex-direction: column; align-items: center; gap:5px">
+		<button class="btn-control" data-btn="up" style="width:40px;height:40px;">▲</button>
+		<div style="display: flex; gap:5px">
+			<button class="btn-control" data-btn="left" style="width:40px;height:40px;">◀</button>
+			<button class="btn-control" data-btn="down" style="width:40px;height:40px;">▼</button>
+			<button class="btn-control" data-btn="right" style="width:40px;height:40px;">▶</button>
+		</div>
+	</div>
+	<div id="abxy" style="display: flex; flex-direction: column; align-items: center; gap: 5px;">
+			<button class="btn-control" data-btn="y" style="width:40px;height:40px;">Y</button>
+			<button class="btn-control" data-btn="x" style="width:40px;height:40px;">X</button>
+			<button class="btn-control" data-btn="b" style="width:40px;height:40px;">B</button>
+			<button class="btn-control" data-btn="a" style="width:40px;height:40px;">A</button>
+	</div>
+	<div id="lrstartselect" style="display: flex; flex-direction: column; align-items: center; gap: 5px;">
+			<button class="btn-control" data-btn="l" style="width:40px;height:40px;">L</button>
+			<button class="btn-control" data-btn="r" style="width:40px;height:40px;">R</button>
+			<button class="btn-control" data-btn="select" style="width:40px;height:40px;">M</button>
+			<button class="btn-control" data-btn="start" style="width:40px;height:40px;">S</button>
+	</div>
+</div>
+<input type="file" id="rom" accept=".gba,.smc,.sfc">
+<button id="resume">Resume Audio</button>
+</body>
+</html>

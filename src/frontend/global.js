@@ -19,39 +19,21 @@ function local(key, value) {
 async function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
-// svgGen: Tạo shader pattern dạng SVG
-function svgGen(repeat, size, pattern) {
+// svgGen
+function svgGen(repeat, size, string) {
     const N = repeat * size;
-    let rects = "";
-    
-    // Nếu pattern là số, tự động tạo Backslash diagonal
-    let cells, ps;
-    if (typeof pattern === 'number') {
-        cells = [];
-        for (let y = 0; y < pattern; y++) {
-            for (let x = 0; x < pattern; x++) {
-                cells.push((Math.abs(x - y) % pattern === 0) ? "1" : "0");
-            }
-        }
-        ps = pattern;
-    } else {
-        cells = pattern.split('.');
-        ps = Math.sqrt(cells.length);
-    }
-    
-    // Vẽ đầy đủ N×N pixel, ánh xạ về pattern
+    const c = document.createElement('canvas');
+    c.width = c.height = N;
+    const ctx = c.getContext('2d');
+    const cells = string.split('.');
     for (let i = 0; i < N; i++) {
         for (let j = 0; j < N; j++) {
-            const r = Math.floor((i % size) * ps / size);
-            const col = Math.floor((j % size) * ps / size);
-            if (cells[r * ps + col] === '1') {
-                rects += `<rect x="${j}" y="${i}" width="1" height="1"/>`;
+            if (cells[(i % size) * size + (j % size)] === '1') {
+                ctx.fillRect(j, i, 1, 1);
             }
         }
     }
-    
-    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${N}' height='${N}'>${rects}</svg>`;
-    return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+    return `url(${c.toDataURL()})`;
 }
 // message
 async function message(mess, second = 2000) {
@@ -82,10 +64,8 @@ async function gameView(romName) {
     title1.textContent = romName;
     integer = Math.min(6, Math.floor((window.innerWidth * window.devicePixelRatio) / gameWidth));
     display.style.height = `${Math.ceil(gameHeight * (integer/window.devicePixelRatio)) + 10}px`;
-    display.style.width  = `${Math.ceil(gameWidth  * (integer/window.devicePixelRatio))}px`;
-    screen.style.width   = `${gameWidth}px`;
-    screen.style.height   = `${gameHeight}px`;
-    screen.style.zoom = integer / window.devicePixelRatio;
+    display.style.width  = `${gameWidth  * (integer/window.devicePixelRatio)}px`;
+    screen.style.setProperty("--size", `${integer}px`);
     // notification
     title1.textContent = romName;
     // gamepad
@@ -101,18 +81,11 @@ async function gameView(romName) {
     list.hidden   = false; 
     list01.hidden = true; 
     list02.hidden = true;
-    
-    // Logic Shader: 3-4 lẻ dùng 1 dòng, 6 chẵn dùng 2 dòng
-    const ps = (integer <= 4 || integer % 2 !== 0) ? integer : (integer / 2);
-    const pattern = local(`shader0${local("shader")}`) || ps;
-    
-    // repeat = integer / ps để Render Size luôn bằng Integer vật lý
-    const repeat = integer / ps;
-    screen.style.setProperty("--shader", svgGen(repeat, ps, pattern));
+    screen.style.setProperty("--shader", svgGen(window.devicePixelRatio, integer, local(`shader0${local("shader")}`) || "0.0.0.1.0.0.1.0.0.1.0.0.1.0.0.0"));
 }
 // DOMContentLoaded
 document.addEventListener("DOMContentLoaded", function(){
     body.removeAttribute('hide')
     canvasB = document.getElementById("canvas-bottom");
-    body.style.setProperty("--background", svgGen(1, window.devicePixelRatio, window.devicePixelRatio));
+    body.style.setProperty("--background", svgGen(1, window.devicePixelRatio, "0.0.1.0.1.0.1.0.0"));
 });
