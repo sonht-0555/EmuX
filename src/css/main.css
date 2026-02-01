@@ -165,14 +165,21 @@
     grid-template-rows: 1fr 10px;
     justify-items: left;
   }
-  screen { z-index: 2; position: relative; }
+  screen, screen::after, canvas {
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: crisp-edges;
+  }
+  screen { 
+    z-index: 2; 
+    position: relative;
+  }
   screen::after { 
     background-image: var(--shader);
     background-size: 1px;
   }
   canvas {
     width:100%;
-    image-rendering: pixelated;
     transition: opacity 0.5s ease-in-out;
   }
   notification {
