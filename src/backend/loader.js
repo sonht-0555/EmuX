@@ -1,10 +1,65 @@
 // ===== LibEnvironment =====
-const CORE_VARIABLES = { 'melonds_touch_mode': 'Touch', 'melonds_screen_layout': 'Top/Bottom', 'melonds_threaded_renderer': 'Disabled', 'melonds_jit_enable': 'Enabled', 'melonds_audio_interpolation': 'None', 'melonds_filtering': 'nearest', 'melonds_boot_directly': 'Enabled', 'mgba_skip_bios': 'Enabled', 'snes9x_skip_bios': 'Enabled', 'pcsx_rearmed_skip_bios': 'Enabled', 'genesis_plus_gx_bram': '64KB', 'fbneo-frameskip': '0' }, POINTER_CACHE = {};
+const CORE_VARIABLES = {
+    // GLOBAL / FRONTEND SETTINGS (Cooling & Stable)
+    'audio_sync': 'true',
+    'audio_latency': '256',
+    'audio_resampler': 'nearest',
+    'audio_mute_focus_loss': 'true',
+    'video_vsync': 'true',
+    'video_hard_sync': 'false',
+    'video_frame_delay': '0',
+    'video_threaded': 'false',
+    'video_shader_enable': 'false',
+    'video_smooth': 'false',
+    'video_max_swapchain_images': '2',
+    'video_waitable_swapchains': 'true',
+    'run_ahead_enabled': 'false',
+    'rewind_enable': 'false',
+    'frameskip': 'Auto',
+    // melonDS (Cooling Mode)
+    'melonds_renderer': 'Software',
+    'melonds_resolution': '1x',
+    'melonds_threaded_renderer': 'Disabled',
+    'melonds_audio_interpolation': 'None',
+    'melonds_filtering': 'nearest',
+    'melonds_jit_enable': 'Enabled',
+    'melonds_touch_mode': 'Touch',
+    'melonds_screen_layout': 'Top/Bottom',
+    'melonds_screen_gap': '0',
+    'melonds_hybrid_small_screen': 'Disabled',
+    'melonds_swapscreen_mode': 'Disabled',
+    'melonds_console_mode': 'DS',
+    'melonds_boot_directly': 'Enabled',
+    'melonds_language': 'English',
+    'melonds_mic_input': 'None',
+    'melonds_audio_bitrate': 'Low',
+    'melonds_randomize_mac_address': 'Disabled',
+    'melonds_dsi_sdcard': 'Disabled',
+    'melonds_use_fw_settings': 'Disabled',
+    // FBNeo (Cooling Mode)
+    'fbneo-frameskip': '1',
+    'fbneo-allow-depth-32': 'Disabled',
+    'fbneo-cpu-speed-adjust': '100',
+    'fbneo-diagnostic-input': 'Disabled',
+    // OTHER CORES
+    'ngp_language': 'english',
+    'mgba_skip_bios': 'Enabled',
+    'snes9x_skip_bios': 'Enabled',
+    'pcsx_rearmed_skip_bios': 'Enabled',
+    'pcsx_rearmed_display_internal_fps': 'Disabled',
+    'genesis_plus_gx_bram': '64KB'
+}, POINTER_CACHE = {};
 const getPointer = (string, pointer) => POINTER_CACHE[string] || (POINTER_CACHE[string] = (pointer = Module._malloc(string.length + 1), Module.stringToUTF8(string, pointer, string.length + 1), pointer));
 function env_cb(command, data) {
     if (command === 15) {
         const key = Module.UTF8ToString(Module.HEAP32[data >> 2]);
-        if (CORE_VARIABLES[key]) return (Module.HEAP32[(data >> 2) + 1] = getPointer(CORE_VARIABLES[key]), true);
+        const value = CORE_VARIABLES[key];
+        if (value) {
+            console.log(`[Env] ✅ Found: ${key} -> ${value}`);
+            return (Module.HEAP32[(data >> 2) + 1] = getPointer(value), true);
+        } else {
+            console.log(`[Env] ❓ Core asked for: ${key}`);
+        }
     }
     if (command === 9) return (Module.HEAP32[data >> 2] = getPointer('.'), true);
     return command === 10;
