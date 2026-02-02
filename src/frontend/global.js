@@ -80,7 +80,8 @@ async function gameView(romName) {
     // display
     [gameWidth, gameHeight] = [canvas.width, canvas.height];
     title1.textContent = romName;
-    integer = Math.min(6, Math.floor((window.innerWidth * window.devicePixelRatio) / gameWidth));
+    const maxInt = Math.floor((window.innerWidth * window.devicePixelRatio) / gameWidth);
+    integer = (maxInt > 6) ? maxInt - (maxInt % 2) : maxInt;
     display.style.height = `${Math.ceil(gameHeight * (integer/window.devicePixelRatio)) + 10}px`;
     display.style.width  = `${Math.ceil(gameWidth  * (integer/window.devicePixelRatio))}px`;
     screen.style.width   = `${gameWidth  * (integer/window.devicePixelRatio)}px`;

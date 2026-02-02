@@ -124,7 +124,7 @@ function renderNDS(pointer, width, height) {
   render32(srcView32, length, lastBottom, pixelBufferBottom, pixelViewBottom, glB, textureB, width, halfHeight, length, 1);
   logSkip();
 }
-function video_cb(pointer, width, height, pitch) {
+window.activeRenderFn = function(pointer, width, height, pitch) {
   if (!gl) {
     const result = initGL(Module.canvas); if (!result) return;
     gl = result.glContext; program = result.glProgram; texture = result.glTexture;
@@ -153,4 +153,4 @@ function video_cb(pointer, width, height, pitch) {
   if (is32) render32(srcView32, 0, lastMain, pixelBuffer, pixelView, gl, texture, width, height, length, 0);
   else render16(srcView16, srcView32, lastView16as32, pixelBuffer, pixelView, gl, texture, width, height, pitch >> 1, 0);
   logSkip();
-}
+};
