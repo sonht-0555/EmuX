@@ -15,7 +15,7 @@ function video_cb(pointer, width, height, pitch) {
   if (rendererReady) return; rendererReady = true;
   const maxInt = Math.floor((window.innerWidth * window.devicePixelRatio) / width);
   const integer = (maxInt > 6) ? maxInt - (maxInt % 2) : maxInt;
-  const scriptName = ((integer / window.devicePixelRatio) % 1 === 0) ? 'web2d.js' : 'webgl.js';
+  const scriptName = ((integer / window.devicePixelRatio) % 1 === 0) ? 'web2d.js' : 'webgpu.js';
   console.log(`[EmuX] Res: ${width}x${height}, Scale: ${integer / window.devicePixelRatio}x. Loading ${scriptName}...`);
   const script = document.createElement('script');
   script.src = `./src/backend/${scriptName}`;
