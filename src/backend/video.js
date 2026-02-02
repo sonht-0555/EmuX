@@ -13,12 +13,9 @@ function logSkip() {
 function video_cb(pointer, width, height, pitch) {
   if (renderFn) return renderFn(pointer, width, height, pitch);
   if (rendererReady) return; rendererReady = true;
-  const maxInt = Math.floor((window.innerWidth * window.devicePixelRatio) / width);
-  const integer = (maxInt > 6) ? maxInt - (maxInt % 2) : maxInt;
-  const scriptName = ((integer / window.devicePixelRatio) % 1 === 0) ? 'web2d.js' : 'webgpu.js';
-  console.log(`[EmuX] Res: ${width}x${height}, Scale: ${integer / window.devicePixelRatio}x. Loading ${scriptName}...`);
-  const script = document.createElement('script');
-  script.src = `./src/backend/${scriptName}`;
+  const dpr = window.devicePixelRatio, max = Math.floor((window.innerWidth * dpr) / width);
+  const integer = (max > 6) ? max - (max % 2) : max, scriptName = ((integer / dpr) % 1 === 0) ? 'web2d.js' : 'webgpu.js';
+  const script = document.createElement('script'); script.src = `./src/backend/${scriptName}`;
   script.onload = () => { renderFn = window.activeRenderFn; if (renderFn) renderFn(pointer, width, height, pitch); };
   document.body.appendChild(script);
 }

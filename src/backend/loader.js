@@ -1,5 +1,5 @@
 // ===== LibEnvironment =====
-const CORE_VARIABLES = { 'melonds_touch_mode': 'Touch', 'melonds_screen_layout': 'Top/Bottom' }, POINTER_CACHE = {};
+const CORE_VARIABLES = { 'melonds_touch_mode': 'Touch', 'melonds_screen_layout': 'Top/Bottom', 'melonds_threaded_renderer': 'Disabled', 'melonds_jit_enable': 'Enabled', 'melonds_filtering': 'nearest', 'melonds_improved_polygon_splitting': 'Disabled', 'melonds_boot_directly': 'Enabled' }, POINTER_CACHE = {};
 const getPointer = (string, pointer) => POINTER_CACHE[string] || (POINTER_CACHE[string] = (pointer = Module._malloc(string.length + 1), Module.stringToUTF8(string, pointer, string.length + 1), pointer));
 function env_cb(command, data) {
     if (command === 15) {
