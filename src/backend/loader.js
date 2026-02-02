@@ -1,5 +1,5 @@
 // ===== LibEnvironment =====
-const CORE_VARIABLES = { 'melonds_touch_mode': 'Touch', 'melonds_screen_layout': 'Top/Bottom', 'melonds_threaded_renderer': 'Disabled', 'melonds_jit_enable': 'Enabled', 'melonds_filtering': 'nearest', 'melonds_improved_polygon_splitting': 'Disabled', 'melonds_boot_directly': 'Enabled' }, POINTER_CACHE = {};
+const CORE_VARIABLES = { 'melonds_touch_mode': 'Touch', 'melonds_screen_layout': 'Top/Bottom', 'melonds_threaded_renderer': 'Disabled', 'melonds_jit_enable': 'Enabled', 'melonds_audio_interpolation': 'None', 'melonds_filtering': 'nearest', 'melonds_boot_directly': 'Enabled', 'mgba_skip_bios': 'Enabled', 'snes9x_skip_bios': 'Enabled', 'pcsx_rearmed_skip_bios': 'Enabled', 'genesis_plus_gx_bram': '64KB', 'fbneo-frameskip': '0' }, POINTER_CACHE = {};
 const getPointer = (string, pointer) => POINTER_CACHE[string] || (POINTER_CACHE[string] = (pointer = Module._malloc(string.length + 1), Module.stringToUTF8(string, pointer, string.length + 1), pointer));
 function env_cb(command, data) {
     if (command === 15) {
