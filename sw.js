@@ -1,4 +1,4 @@
-let revision = 'EmuX_2.70';
+let revision = 'EmuX_2.71';
 var urlsToCache = [
     '/', 
     './index.html',
@@ -29,6 +29,7 @@ var urlsToCache = [
     './src/backend/audio-processor.js',
     './src/backend/video.js',
     './src/backend/webgl.js',
+    './src/backend/webgpu.js',
     './src/backend/gamepad.js',
     './src/backend/storage.js',
     './src/backend/main.js',
