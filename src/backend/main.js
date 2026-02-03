@@ -59,3 +59,6 @@ async function pauseGame() {
   if (gainNode) gainNode.gain.value = 0;
   message("[_] Paused!");
 }
+async function rebootGame() {
+  location.reload()
+}
