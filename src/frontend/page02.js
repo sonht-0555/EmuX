@@ -1,4 +1,4 @@
-let value = 5, startY = 0, swiping = false, lastTap = 0, number = 1, active = null, tap = 0;
+let value = 5, startY = 0, swiping = false, number = 1, active = null;
 const activePointers = new Map();
 function handleButton(press, element) {
     const parts = element?.getAttribute('data')?.split('-').slice(1) || [];
@@ -32,10 +32,10 @@ document.addEventListener("DOMContentLoaded", function() {
     };
     canvas.onpointerdown = e => {
         const r = canvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
-        if (Date.now() - lastTap < 300) {
+        if (doubleTap(e, canvas, 1)) {
             x < r.width / 2 ? (y < r.height / 2 ? loadState(3) : loadState(2)) : (y < r.height / 2 ? saveState(3) : saveState(2));
         }
-        lastTap = Date.now(), startY = e.clientY, swiping = e.clientX > (r.right - 40);
+        startY = e.clientY, swiping = e.clientX > (r.right - 40);
     };
     canvas.onpointermove = e => {
         if (!swiping) return;
@@ -55,39 +55,34 @@ document.addEventListener("DOMContentLoaded", function() {
         e.preventDefault();
     };
     canvasB.onpointerup = canvasB.onpointercancel = () => { window._pD = 0; swiping = false; };
-    state.onpointerdown = () => {
-        tap++;
-        setTimeout(() => {
-            if (tap === 2) {
-                isRunning = false;
-                setTimeout(() => { 
-                    const input = prompt("Format [shaderxx-data]");
-                    input && local(...((() => { const [name, ...dataParts] = input.split('-'); return [name, dataParts.join('-')]; })()));
-                    isRunning = true;
-                }, 150);
-            } else if (tap === 1) {
-                number = number % 5 + 1;
-                local("shader", number);
-                const shader = local(`shader0${number}`) || "0.0.0.1.0.0.1.0.0.1.0.0.1.0.0.0";
-                screen.style.setProperty("--shader", pngGen(window.devicePixelRatio, integer, shader)); 
-                message(`[0${number}] Matrix!`);
-            }
-            tap = 0;
-        }, 300);
+    state.onpointerdown = e => {
+        if (doubleTap(e, state)) {
+            isRunning = false;
+            setTimeout(() => { 
+                const input = prompt("Format [shaderxx-data]");
+                input && local(...(input.split('-')));
+                isRunning = true;
+            }, 150);
+        } else {
+            number = number % 5 + 1;
+            local("shader", number);
+            const shader = local(`shader0${number}`) || "0.0.0.1.0.0.1.0.0.1.0.0.1.0.0.0";
+            screen.style.setProperty("--shader", pngGen(window.devicePixelRatio, integer, shader)); 
+            message(`[0${number}] Matrix!`);
+        }
     };
+    switch0.onpointerdown = () => { switchRenderer() };
     ['pointerup', 'pointercancel'].forEach(type => addEventListener(type, e => { setState(e.pointerId, null); swiping = false; joy.style.opacity = "0"}));
     joy.onpointerdown = () => {joy.style.opacity = "1"};
     // visibility
-    if (switch0) switch0.onpointerdown = () => { switchRenderer() };
     invis.onpointermove  = () => {
         page00.hidden = false;
         notifi(" pa","use.",""," double tap to resume."), pauseGame();
     };
-    page00.onpointerdown = () => {
-        if (Date.now() - lastTap < 300) {
+    page00.onpointerdown = e => {
+        if (doubleTap(e, page00)) {
             page00.hidden = true; 
             resumeGame();
         }
-        lastTap = Date.now();
     };
 });

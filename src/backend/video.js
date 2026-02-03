@@ -23,8 +23,8 @@ function video_cb(pointer, width, height, pitch) {
 }
 function switchRenderer() {
   const list = ['w2d', 'wgl', 'wgpu'];
-  const i = list.indexOf(local('render'));
-  const data = list[(i + 1) % 3];
+  const data = list[(list.indexOf(local('render')) + 1) % 3];
   local('render', data);
   switch0.textContent = data;
+  window._loadDelay = (window._loadDelay || 0) + 1000;
 }

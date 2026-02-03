@@ -1,6 +1,6 @@
 // ===== LibInput =====
 function input_poll_cb() { };
-// ===== Gamepad =====
+// ===== GamePad =====
 var padState = new Uint8Array(16), padMask = 0;
 var btnMap = { up: 4, down: 5, left: 6, right: 7, 1: 8, 3: 0, 2: 9, 4: 1, l: 10, r: 11, start: 3, select: 2 };
 window._pX = 0, window._pY = 0, window._pD = 0;

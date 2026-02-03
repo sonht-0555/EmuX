@@ -4,6 +4,13 @@ let [hours, minutes, seconds, count1] = [0, 0, 0, 0, 0], current = parseInt(loca
 const canvas = document.getElementById('canvas');
 function tag(selector) { return window[selector] = document.querySelector(selector) }
 function local(key, value) { return arguments.length < 2 || value === null ? localStorage.getItem(key) : localStorage.setItem(key, value) }
+function doubleTap(event, element, checkDistance) {
+  const isDouble = event.isPrimary && Date.now() - (element._lastTapTime || 0) < 300 && Date.now() - (element._lastTapTime || 0) > 40 && (!checkDistance || Math.hypot(event.clientX - element._lastTapX, event.clientY - element._lastTapY) < 30);
+  element._lastTapTime = Date.now();
+  element._lastTapX = event.clientX;
+  element._lastTapY = event.clientY;
+  return isDouble;
+}
 function svgGen(repeat, size, pattern) {
     const N = repeat * size, cells = typeof pattern == 'number' ? Array.from({length: pattern * pattern}, (_, i) => i % (pattern + 1) ? 0 : 1) : pattern.replace(/\s/g,'').split('.'), ps = Math.sqrt(cells.length);
     let res = `<svg xmlns='http://www.w3.org/2000/svg' width='${N}' height='${N}'>`;
@@ -11,7 +18,10 @@ function svgGen(repeat, size, pattern) {
     return `url("data:image/svg+xml,${encodeURIComponent(res + "</svg>")}")`;
 }
 async function delay(ms) { return new Promise(resolve => setTimeout(resolve, ms)) }
-async function notifi(green, white, gray, message) { [page00.hidden, green0.textContent, white0.textContent, gray0.textContent, message0.textContent] = [false, green, white, gray, message] }
+async function notifi(green, white, gray, message, shouldWait) {
+    [page00.hidden, green0.textContent, white0.textContent, gray0.textContent, message0.textContent] = [false, green, white, gray, message];
+    if (shouldWait) { window._loadDelay = 1000; while (window._loadDelay > 0) { await delay(100); window._loadDelay -= 100; } }
+}
 async function message(mess, second = 2000) {
     if (count) count.cancelled = true;
     const task = { cancelled: false };
