@@ -1,4 +1,4 @@
-// ===== webgl.js =====
+// ===== wgl.js =====
 let gl, glBottom, program, programBottom, texture, textureBottom, lastMain, lastBottom, pixelBuffer, pixelBufferBottom, pixelView, pixelViewBottom;
 let lastView16as32, srcView32, srcView16, textureInitializedMain = 0, textureInitializedBottom = 0;
 const vertexShaderSource = `attribute vec2 p;attribute vec2 t;varying vec2 v;void main(){gl_Position=vec4(p,0,1);v=t;}`;
@@ -101,3 +101,4 @@ window.activeRenderFn = function(pointer, width, height, pitch) {
   else render16(srcView16, srcView32, lastView16as32, pixelBuffer, pixelView, gl, texture, width, height, pitch >> 1, 0);
   logSkip();
 };
+console.log("wgl.js loaded");

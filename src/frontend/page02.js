@@ -78,10 +78,7 @@ document.addEventListener("DOMContentLoaded", function() {
     ['pointerup', 'pointercancel'].forEach(type => addEventListener(type, e => { setState(e.pointerId, null); swiping = false; joy.style.opacity = "0"}));
     joy.onpointerdown = () => {joy.style.opacity = "1"};
     // visibility
-    const rb = document.querySelector('reboot0');
-    if (rb) rb.onpointerdown = e => { e.stopPropagation(); rebootGame(); };
-    const vd = document.querySelector('video0');
-    if (vd) vd.onpointerdown = e => { e.stopPropagation(); switchRenderer(); };
+    if (switch0) switch0.onpointerdown = () => { switchRenderer() };
     invis.onpointermove  = () => {
         page00.hidden = false;
         notifi(" pa","use.",""," double tap to resume."), pauseGame();

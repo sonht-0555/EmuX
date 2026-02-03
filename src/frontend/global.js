@@ -1,4 +1,4 @@
-tag("html"), tag("body"), tag("page00"), tag("page01"), tag("page02"), tag("logo"), tag("page02"), tag("notification"), tag("display"), tag("list"), tag("list01"), tag("list02"), tag("name"), tag("ver"), tag("gamepad"), tag("title1"), tag("vertical"), tag("screen"), tag("invis"), tag("joypad"), tag("green0"), tag("white0"), tag("gray0"), tag("message0"), tag("skip1");
+tag("html"), tag("body"), tag("page00"), tag("page01"), tag("page02"), tag("logo"), tag("page02"), tag("notification"), tag("display"), tag("list"), tag("list01"), tag("list02"), tag("name"), tag("ver"), tag("gamepad"), tag("title1"), tag("vertical"), tag("screen"), tag("invis"), tag("joypad"), tag("green0"), tag("white0"), tag("gray0"), tag("message0"), tag("skip1"), tag("switch0");
 let gameName, gameType, gameWidth, gameHeight, integer, timerId, count = null, canSync = true, recCount = 1, isReload = false, swipe, canvasB, isStart = false;
 let [hours, minutes, seconds, count1] = [0, 0, 0, 0, 0], current = parseInt(local('vertical')) || 0;
 const canvas = document.getElementById('canvas');
@@ -21,7 +21,7 @@ async function message(mess, second = 2000) {
 }
 async function gameView(romName) {
     page02.ontouchstart = (e) => e.preventDefault();
-    [gameWidth, gameHeight, title1.textContent] = [canvas.width, canvas.height, romName];
+    [gameWidth, gameHeight, title1.textContent, switch0.textContent] = [canvas.width, canvas.height, romName, local('render')];
     const maxInt = Math.floor((window.innerWidth * window.devicePixelRatio) / gameWidth);
     integer = (maxInt > 6) ? maxInt - (maxInt % 2) : maxInt;
     const ratio = integer / window.devicePixelRatio;

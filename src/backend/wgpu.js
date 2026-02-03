@@ -1,4 +1,4 @@
-// ===== webgpu.js =====
+// ===== wgpu.js =====
 let device, queue, contextMain, contextBottom, pipeline, bindGroupMain, bindGroupBottom, textureMain, textureBottom;
 let lastMain, lastBottom, lastView16as32, lastMain16, srcView32, gpuInitializing = null, formatIs32 = true;
 const shaderSource = `
@@ -108,3 +108,4 @@ window.activeRenderFn = async function(pointer, width, height, pitch) {
   }
   queue.submit([encoder.finish()]); logSkip();
 };
+console.log("wgpu.js loaded");

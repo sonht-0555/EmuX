@@ -4,7 +4,7 @@ const getPointer = (string, pointer) => POINTER_CACHE[string] || (POINTER_CACHE[
 function env_cb(command, data) {
 if (command === 15) {
     const key = Module.UTF8ToString(Module.HEAP32[data >> 2]);
-    console.log(`[Core] ${key}`);
+    // console.log(`[Core] ${key}`);
     if (activeVars[key]) return (Module.HEAP32[(data >> 2) + 1] = getPointer(activeVars[key]), true);
 }
     if (command === 9) return (Module.HEAP32[data >> 2] = getPointer('.'), true);

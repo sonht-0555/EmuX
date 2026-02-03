@@ -1,4 +1,4 @@
-// ===== web2d.js =====
+// ===== w2d.js =====
 let context2d, context2dBottom, imgData, imgDataBottom, pixelBuffer, pixelBufferBottom, lastMain, lastBottom, lastView16as32, srcView32, srcView16;
 function render32(source, sourceOffset, last, buffer, context, img, length) {
   frameCount++;
@@ -74,3 +74,4 @@ window.activeRenderFn = function(pointer, width, height, pitch) {
   else render16(srcView16, srcView32, lastView16as32, pixelBuffer, context2d, imgData, width, height, pitch >> 1);
   logSkip();
 };
+console.log("w2d.js loaded");
