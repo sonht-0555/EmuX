@@ -1,5 +1,4 @@
 @layer common, base, components, utilities;
-
 @layer common {
   * { margin: 0; padding: 0; }
   @font-face { font-family: "04b"; src: url("../font/04b.ttf"); }
@@ -66,7 +65,7 @@
 @layer base {
   page00,
   page01, list, list01, list02, file, cta, 
-  page02, display, gamepad, notification, joypad, invis {
+  page02, display, gamepad, notification, joypad, invis, sec-12, sec-34 {
     display: grid;
     width: 100%;
     box-sizing: border-box;
@@ -208,17 +207,15 @@
     grid-template-columns: 1fr 1px 1fr 1px 1fr 1px 1fr 1px 10px 1px 1fr 1px 1fr 1px 1fr 1px 1fr;
     grid-template-rows: 24px 8px 1fr 1px 1fr 1px 24px;
   }
-  btn-state  {position: relative; grid-area: btn-state;  grid-row: 1 / 1; grid-column: 1 / 1}
-  btn-l      {position: relative; grid-area: btn-l;      grid-row: 1 / 1; grid-column: 3 / 9}
-  btn-r      {position: relative; grid-area: btn-r;      grid-row: 1 / 1; grid-column: 11 / 16}
-  btn-menu   {position: relative; grid-area: btn-menu;   grid-row: 1 / 1; grid-column: 17 / 18}
-  sec-dpad   {position: relative; grid-area: sec-dpad;  grid-row: 3 / 8; grid-column: 1 / 9}
-  btn-1      {position: relative; grid-area: btn-1;         grid-row: 3 / 3; grid-column: 11 / 14}
-  btn-2      {position: relative; grid-area: btn-2;         grid-row: 3 / 3; grid-column: 15 / 18}
-  btn-3      {position: relative; grid-area: btn-3;         grid-row: 5 / 5; grid-column: 11 / 14}
-  btn-4      {position: relative; grid-area: btn-4;         grid-row: 5 / 5; grid-column: 15 / 18}
-  btn-select {position: relative; grid-area: btn-select; grid-row: 7 / 7; grid-column: 11 / 14}
-  btn-start  {position: relative; grid-area: btn-start;  grid-row: 7 / 7; grid-column: 15 / 18}
+  btn-state  { position: relative; grid-area: btn-state;  grid-row: 01 / 01; grid-column: 01 / 01 }
+  btn-l      { position: relative; grid-area: btn-l;      grid-row: 01 / 01; grid-column: 03 / 09 }
+  btn-r      { position: relative; grid-area: btn-r;      grid-row: 01 / 01; grid-column: 11 / 16 }
+  btn-menu   { position: relative; grid-area: btn-menu;   grid-row: 01 / 01; grid-column: 17 / 18 }
+  sec-dpad   { position: relative; grid-area: sec-dpad;   grid-row: 03 / 08; grid-column: 01 / 09 }
+  sec-12     { position: relative; grid-area: sec-12;     grid-row: 03 / 03; grid-column: 11 / 18 }
+  sec-34     { position: relative; grid-area: sec-34;     grid-row: 05 / 05; grid-column: 11 / 18 }
+  btn-select { position: relative; grid-area: btn-select; grid-row: 07 / 07; grid-column: 11 / 14 }
+  btn-start  { position: relative; grid-area: btn-start;  grid-row: 07 / 07; grid-column: 15 / 18 }
 
   btn-state {
     background: url("data:image/svg+xml,%3Csvg width='23' height='6' viewBox='0 0 23 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M9 3H14' stroke='%23C5AF90' stroke-opacity='0.4' stroke-width='2'/%3E%3C/svg%3E%0A");
@@ -234,6 +231,10 @@
   }
   sec-dpad {
     background: url("data:image/svg+xml,%3Csvg width='136' height='136' viewBox='0 0 136 136' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M68 0V6M0 68H6M68 130V136M130 68H136' stroke='%23C5AF90' stroke-width='3'/%3E%3C/svg%3E%0A");
+  }
+  sec-12, sec-34 {
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); 
+    gap:1px
   }
   btn-select {
     background: url("data:image/svg+xml,%3Csvg width='23' height='6' viewBox='0 0 23 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M5 5H8V1H11M19 5H14V1H19M21 5H23' stroke='%23C5AF90' stroke-opacity='0.4' stroke-width='2'/%3E%3C/svg%3E%0A");

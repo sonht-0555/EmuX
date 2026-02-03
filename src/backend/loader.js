@@ -12,15 +12,15 @@ if (command === 15) {
 }
 // ===== Core =====
 const CORE_CONFIG = [
-    { ext: '.gba', script: './src/core/gba.zip' },
-    { ext: '.gb,.gbc', script: './src/core/gba.zip' },
-    { ext: '.smc,.sfc', script: './src/core/snes2010.zip' },
-    { ext: '.nes', script: './src/core/nes.zip' },
-    { ext: '.zip', script: './src/core/arcade.zip', bios: ['./src/core/bios/neogeo.zip'], vars: { 'fbneo-allow-depth-32': 'Disabled', 'fbneo-sample-interpolation': '4-point', 'fbneo-fm-interpolation': 'linear', 'fbneo-lowpass-filter': 'Disabled', 'fbneo-samplerate': '44100', 'fbneo-cpu-speed-adjust': '100', 'fbneo-diagnostic-input': 'Disabled' } },
-    { ext: '.md,.gen', script: './src/core/genesis.zip' },
-    { ext: '.ngp,.ngc', script: './src/core/ngp.zip' },
-    { ext: '.nds', script: './src/core/nds.zip', bios: ['./src/core/bios/bios7.bin', './src/core/bios/bios9.bin', './src/core/bios/firmware.bin'], vars: { melonds_console_mode: 'DS', melonds_boot_directly: 'Enabled', melonds_screen_layout: 'Top/Bottom', melonds_screen_gap: '0', melonds_hybrid_small_screen: 'Disabled', melonds_swapscreen_mode: 'Disabled', melonds_randomize_mac_address: 'Disabled', melonds_touch_mode: 'Touch', melonds_dsi_sdcard: 'Disabled', melonds_mic_input: 'None', melonds_audio_bitrate: 'Low', melonds_audio_interpolation: 'None', melonds_use_fw_settings: 'Disabled', melonds_language: 'English' } },
-    { ext: '.bin,.iso,.img,.cue,.pbp', script: './src/core/ps1.zip', bios: ['./src/core/bios/scph5501.bin'] },
+    { ext: '.nes', script: './src/core/nes.zip',                     btns: { 'btn-1': ['A', 8], 'btn-3': ['B', 0], 'btn-l': ['', ''], 'btn-r': ['', ''], 'btn-select': ['', 2], 'btn-start': ['', 3] } },
+    { ext: '.ngp,.ngc', script: './src/core/ngp.zip',                btns: { 'btn-1': ['A', 0], 'btn-3': ['B', 8], 'btn-l': ['', ''], 'btn-r': ['', ''], 'btn-select': ['', 2], 'btn-start': ['', 3] } },
+    { ext: '.gb,.gbc', script: './src/core/gba.zip',                 btns: { 'btn-1': ['A', 8], 'btn-3': ['B', 0], 'btn-l': ['', ''], 'btn-r': ['', ''], 'btn-select': ['', 2], 'btn-start': ['', 3] } },
+    { ext: '.gba', script: './src/core/gba.zip',                     btns: { 'btn-1': ['A', 8], 'btn-3': ['B', 0], 'btn-l': ['', 10], 'btn-r': ['', 11], 'btn-select': ['', 2], 'btn-start': ['', 3] } },
+    { ext: '.md,.gen', script: './src/core/genesis.zip',             btns: { 'btn-3': ['A', 1], 'btn-1': ['B', 0], 'btn-2': ['C', 8], 'btn-l': ['', ''], 'btn-r': ['', ''], 'btn-select': ['', 2], 'btn-start': ['', 3] } },
+    { ext: '.smc,.sfc', script: './src/core/snes2010.zip',           btns: { 'btn-1': ['A', 8], 'btn-2': ['X', 9], 'btn-3': ['B', 0], 'btn-4': ['Y', 1], 'btn-l': ['', 10], 'btn-r': ['', 11], 'btn-select': ['', 2], 'btn-start': ['', 3] } },
+    { ext: '.zip', script: './src/core/arcade.zip',                  btns: { 'btn-1': ['A', 0], 'btn-2': ['B', 8], 'btn-3': ['C', 1], 'btn-4': ['D', 9], 'btn-l': ['', ''], 'btn-r': ['', ''], 'btn-select': ['', 2], 'btn-start': ['', 3] }, bios: ['./src/core/bios/neogeo.zip'], vars: { 'fbneo-allow-depth-32': 'Disabled', 'fbneo-sample-interpolation': '4-point', 'fbneo-fm-interpolation': 'linear', 'fbneo-lowpass-filter': 'Disabled', 'fbneo-samplerate': '44100', 'fbneo-cpu-speed-adjust': '100', 'fbneo-diagnostic-input': 'Disabled' } },
+    { ext: '.nds', script: './src/core/nds.zip',                     btns: { 'btn-1': ['A', 8], 'btn-2': ['X', 9], 'btn-3': ['B', 0], 'btn-4': ['Y', 1], 'btn-l': ['', 10], 'btn-r': ['', 11], 'btn-select': ['', 2], 'btn-start': ['', 3] }, bios: ['./src/core/bios/bios7.bin', './src/core/bios/bios9.bin', './src/core/bios/firmware.bin'], vars: { melonds_console_mode: 'DS', melonds_boot_directly: 'Enabled', melonds_screen_layout: 'Top/Bottom', melonds_screen_gap: '0', melonds_hybrid_small_screen: 'Disabled', melonds_swapscreen_mode: 'Disabled', melonds_randomize_mac_address: 'Disabled', melonds_touch_mode: 'Touch', melonds_dsi_sdcard: 'Disabled', melonds_mic_input: 'None', melonds_audio_bitrate: 'Low', melonds_audio_interpolation: 'None', melonds_use_fw_settings: 'Disabled', melonds_language: 'English' } },
+    { ext: '.bin,.iso,.img,.cue,.pbp', script: './src/core/ps1.zip', btns: { 'btn-1': ['A', 8], 'btn-2': ['X', 9], 'btn-3': ['B', 0], 'btn-4': ['Y', 1], 'btn-l': ['', 10], 'btn-r': ['', 11], 'btn-select': ['', 2], 'btn-start': ['', 3] }, bios: ['./src/core/bios/scph5501.bin'] },
 ];
 var isRunning = false;
 // ===== Unzip ====
@@ -65,6 +65,7 @@ async function initCore(romFile) {
     ); 
     if (!coreConfig) return notifi("Error","Unknown","Core","");
     activeVars = coreConfig.vars || {};
+    updateButtons(coreConfig.btns);
     let scriptSource = coreConfig.script;
     const isArcade = scriptSource.includes('arcade');
     const isNDS = scriptSource.includes('nds');
