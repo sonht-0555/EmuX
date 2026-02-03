@@ -1,22 +1,28 @@
-const COMMON_VARS = { audio_sync: 'true', audio_latency: '256', audio_resampler: 'nearest', audio_mute_focus_loss: 'true', video_vsync: 'true', video_hard_sync: 'false', video_frame_delay: '0', video_threaded: 'false', video_shader_enable: 'false', video_smooth: 'false', video_max_swapchain_images: '2', video_waitable_swapchains: 'true', video_font_enable: 'false', video_max_frame_latency: '1', run_ahead_enabled: 'false', rewind_enable: 'false', frameskip: 'Auto', fastforward_ratio: '0' };
-const CORE_CONFIG = [
-    { ext: '.gba', script: './src/core/gba.zip', vars: { mgba_game_boy_optimization: 'Enabled', mgba_skip_bios: 'Enabled' } }, { ext: '.gb,.gbc', script: './src/core/gba.zip', vars: { mgba_game_boy_optimization: 'Enabled', mgba_skip_bios: 'Enabled' } },
-    { ext: '.smc,.sfc', script: './src/core/snes2010.zip' }, { ext: '.nes', script: './src/core/nes.zip' },
-    { ext: '.zip', script: './src/core/arcade.zip', bios: ['./src/core/bios/neogeo.zip'], vars: { 'fbneo-frameskip': '1', 'fbneo-allow-depth-32': 'Disabled', 'fbneo-cpu-speed-adjust': '100', 'fbneo-diagnostic-input': 'Disabled', 'fbneo-sample-interpolation': '4-point' } },
-    { ext: '.md,.gen', script: './src/core/genesis.zip' }, { ext: '.ngp,.ngc', script: './src/core/ngp.zip' },
-    { ext: '.nds', script: './src/core/nds.zip', bios: ['./src/core/bios/bios7.bin', './src/core/bios/bios9.bin', './src/core/bios/firmware.bin'], vars: { melonds_renderer: 'Software', melonds_resolution: '1x', melonds_threaded_renderer: 'Disabled', melonds_improved_polygon_splitting: 'Disabled', melonds_audio_interpolation: 'None', melonds_filtering: 'nearest', melonds_jit_enable: 'Enabled', melonds_jit_block_size: '12', melonds_jit_branch_optimisations: 'Enabled', melonds_jit_literal_optimisations: 'Enabled', melonds_jit_fast_memory: 'Enabled', melonds_touch_mode: 'Touch', melonds_screen_layout: 'Top/Bottom', melonds_screen_gap: '0', melonds_hybrid_small_screen: 'Disabled', melonds_swapscreen_mode: 'Disabled', melonds_console_mode: 'DS', melonds_boot_directly: 'Enabled', melonds_language: 'English', melonds_mic_input: 'None', melonds_audio_bitrate: 'Low', melonds_randomize_mac_address: 'Disabled', melonds_dsi_sdcard: 'Disabled', melonds_use_fw_settings: 'Disabled' } },
-    { ext: '.bin,.iso,.img,.cue,.pbp', script: './src/core/ps1.zip', bios: ['./src/core/bios/scph5501.bin'] },
-];
-var isRunning = false, activeVars = {}, POINTER_CACHE = {};
+// ===== LibEnvironment =====
+var activeVars = {}, POINTER_CACHE = {};
 const getPointer = (string, pointer) => POINTER_CACHE[string] || (POINTER_CACHE[string] = (pointer = Module._malloc(string.length + 1), Module.stringToUTF8(string, pointer, string.length + 1), pointer));
 function env_cb(command, data) {
-    if (command === 15) {
-        const key = Module.UTF8ToString(Module.HEAP32[data >> 2]);
-        if (activeVars[key]) return (Module.HEAP32[(data >> 2) + 1] = getPointer(activeVars[key]), true);
-    }
+if (command === 15) {
+    const key = Module.UTF8ToString(Module.HEAP32[data >> 2]);
+    console.log(`[Core] ${key}`);
+    if (activeVars[key]) return (Module.HEAP32[(data >> 2) + 1] = getPointer(activeVars[key]), true);
+}
     if (command === 9) return (Module.HEAP32[data >> 2] = getPointer('.'), true);
     return command === 10;
 }
+// ===== Core =====
+const CORE_CONFIG = [
+    { ext: '.gba', script: './src/core/gba.zip' },
+    { ext: '.gb,.gbc', script: './src/core/gba.zip' },
+    { ext: '.smc,.sfc', script: './src/core/snes2010.zip' },
+    { ext: '.nes', script: './src/core/nes.zip' },
+    { ext: '.zip', script: './src/core/arcade.zip', bios: ['./src/core/bios/neogeo.zip'], vars: { 'fbneo-allow-depth-32': 'Disabled', 'fbneo-sample-interpolation': '4-point', 'fbneo-fm-interpolation': 'linear', 'fbneo-lowpass-filter': 'Disabled', 'fbneo-samplerate': '44100', 'fbneo-cpu-speed-adjust': '100', 'fbneo-diagnostic-input': 'Disabled' } },
+    { ext: '.md,.gen', script: './src/core/genesis.zip' },
+    { ext: '.ngp,.ngc', script: './src/core/ngp.zip' },
+    { ext: '.nds', script: './src/core/nds.zip', bios: ['./src/core/bios/bios7.bin', './src/core/bios/bios9.bin', './src/core/bios/firmware.bin'], vars: { melonds_console_mode: 'DS', melonds_boot_directly: 'Enabled', melonds_screen_layout: 'Top/Bottom', melonds_screen_gap: '0', melonds_hybrid_small_screen: 'Disabled', melonds_swapscreen_mode: 'Disabled', melonds_randomize_mac_address: 'Disabled', melonds_touch_mode: 'Touch', melonds_dsi_sdcard: 'Disabled', melonds_mic_input: 'None', melonds_audio_bitrate: 'Low', melonds_audio_interpolation: 'None', melonds_use_fw_settings: 'Disabled', melonds_language: 'English' } },
+    { ext: '.bin,.iso,.img,.cue,.pbp', script: './src/core/ps1.zip', bios: ['./src/core/bios/scph5501.bin'] },
+];
+var isRunning = false;
 // ===== Unzip ====
 async function unzip(binaryData, nameFilter) {
     return new Promise((resolve, reject) => {
@@ -58,7 +64,7 @@ async function initCore(romFile) {
         )
     ); 
     if (!coreConfig) return notifi("Error","Unknown","Core","");
-    activeVars = { ...COMMON_VARS, ...(coreConfig.vars || {}) };
+    activeVars = coreConfig.vars || {};
     let scriptSource = coreConfig.script;
     const isArcade = scriptSource.includes('arcade');
     const isNDS = scriptSource.includes('nds');
@@ -81,9 +87,9 @@ async function initCore(romFile) {
         const canvas = document.getElementById("canvas");
         window.Module = {
             isArcade, isNDS, canvas,
+            print: () => {}, printErr: () => {},
             locateFile: (path) => path.endsWith('.wasm') ? (window.wasmUrl || path) : path,
             async onRuntimeInitialized() {
-                Module.ENV = { "RETRO_LOG_LEVEL": "0" };
                 const romPointer = Module._malloc(finalRomData.length), infoPointer = Module._malloc(16);
                 [[Module._retro_set_environment, env_cb, "iii"], 
                  [Module._retro_set_video_refresh, video_cb, "viiii"], 
