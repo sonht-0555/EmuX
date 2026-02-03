@@ -74,6 +74,7 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
     ver.textContent = gameVer;
+    switch0.textContent = local('render') || 'WGPU';
     setTimeout(() => {if(!isReload){verSetting(),listGame()}},2000);
     romInput.addEventListener("change", function(e) { inputGame(e) })
     vertical.addEventListener("click",  function(e) { verSetting() })
