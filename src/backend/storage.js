@@ -34,7 +34,9 @@ async function emuxDB(dataOrKey, name) {
   const store = tx.objectStore(storeName);
   return new Promise((res, rej) => {
     if (name) {
-      store.put(dataOrKey, name);
+      let dataToSave = dataOrKey;
+      if (dataToSave instanceof ArrayBuffer) dataToSave = new Uint8Array(dataToSave);
+      store.put(dataToSave, name);
       tx.oncomplete = () => res(true);
       tx.onerror = e => rej(e);
     } else {

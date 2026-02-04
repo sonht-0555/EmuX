@@ -1,7 +1,8 @@
 async function inputGame(e) {
   const file = e.target.files[0];
+  const storeName = storeForFilename(file.name);
   await emuxDB(await file.arrayBuffer(), file.name);
-  await initCore(file);
+  if (storeName === 'games') await initCore(file);
 }
 async function loadGame(name) {
   await initCore(new File([await emuxDB(name)], name));

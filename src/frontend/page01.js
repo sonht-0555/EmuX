@@ -61,7 +61,11 @@ function optionClick(text) {
 document.addEventListener("DOMContentLoaded", function() {
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js')
+            navigator.serviceWorker.register('./sw.js').then(reg => {
+                if (reg.active && !navigator.serviceWorker.controller) {
+                    window.location.reload();
+                }
+            });
         });
         navigator.serviceWorker.addEventListener('message', function (event) {
         if (event.data.msg === "Updating...") {
