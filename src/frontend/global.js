@@ -54,5 +54,5 @@ document.addEventListener("DOMContentLoaded", function(){
     body.removeAttribute('hide');
     canvasB = document.getElementById("canvas-bottom");
     body.style.setProperty("--background", svgGen(1, window.devicePixelRatio, window.devicePixelRatio));
-    console.log(svgGen(3, 3, "0.1.0.1.1.1.0.1.0"));
+    // console.log(svgGen(3, 3, "0.1.0.1.1.1.0.1.0"));
 });
