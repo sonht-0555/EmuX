@@ -42,6 +42,7 @@ async function unzip(binaryData, nameFilter) {
 // ===== initCore ====
 async function initCore(romFile) {
     isRunning = true;
+    switch0.hidden = false;
     const lowName = romFile.name.toLowerCase();
     const isZip = lowName.endsWith('.zip');
     const romBuffer = await romFile.arrayBuffer();

@@ -89,7 +89,7 @@
 @layer page-0 {
   page00 {
     z-index: 3;
-    grid-template-rows: 1fr auto auto 60px auto 10px auto 1fr;
+    grid-template-rows: 1fr auto auto auto 1fr;
     height: calc(100vh - 30px);
     background: var(--profile-black);
     place-items: center;
@@ -97,7 +97,7 @@
   title0, gray0 { font-size: 12px; padding: 1px 0px 10px 0px; white-space: pre }
   green0 { color: var(--profile-green); text-shadow: -3px 0px 0px var(--profile-green-dark) }
   message0, gray0, switch0 { color: var(--profile-4) }
-  switch0 {padding: 8px 8px 8px 10px; outline: 1px solid var(--profile-6); width: 100px;}  
+  switch0 { padding: 8px 8px 8px 10px; outline: 1px solid var(--profile-6); width: 100px; margin-top: 60px }  
 }
 @layer page-1 {
   page01 {

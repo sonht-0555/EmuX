@@ -1,4 +1,4 @@
-let revision = 'EmuX_3.6';
+let revision = 'EmuX_3.9';
 var urlsToCache = [
     '/', 
     './index.html',
@@ -58,10 +58,7 @@ self.addEventListener('install', function (event) {
 self.addEventListener('fetch', function (event) {
     event.respondWith(
         caches.match(event.request, { ignoreSearch: true }).then(function (response) {
-            // Nếu có trong cache, biến nó thành Promise.resolve(response)
-            // Nếu không có, gọi fetch(event.request)
             var fetchPromise = response ? Promise.resolve(response) : fetch(event.request);
-            
             return fetchPromise.then(function(res) {
                 return addHeaders(res, event.request.url);
             });
@@ -72,12 +69,10 @@ function addHeaders(response, url) {
     if (!response || response.status === 0 || response.type === 'opaque' || !url.startsWith(self.location.origin)) {
         return response;
     }
-
     const newHeaders = new Headers(response.headers);
     newHeaders.set("Cross-Origin-Embedder-Policy", "require-corp");
     newHeaders.set("Cross-Origin-Opener-Policy", "same-origin");
     newHeaders.set("Cross-Origin-Resource-Policy", "cross-origin");
-
     return new Response(response.body, {
         status: response.status,
         statusText: response.statusText,

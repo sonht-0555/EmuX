@@ -1,5 +1,5 @@
 tag("html"), tag("body"), tag("page00"), tag("page01"), tag("page02"), tag("logo"), tag("page02"), tag("notification"), tag("display"), tag("list"), tag("list01"), tag("list02"), tag("name"), tag("ver"), tag("gamepad"), tag("title1"), tag("vertical"), tag("screen"), tag("invis"), tag("joypad"), tag("green0"), tag("white0"), tag("gray0"), tag("message0"), tag("skip1"), tag("switch0");
-let gameName, gameType, gameWidth, gameHeight, integer, timerId, count = null, canSync = true, recCount = 1, isReload = false, swipe, canvasB, isStart = false;
+let gameName, gameType, gameWidth, gameHeight, integer, timerId, count = null, canSync = true, recCount = 1, swipe, canvasB, isStart = false;
 let [hours, minutes, seconds, count1] = [0, 0, 0, 0, 0], current = parseInt(local('vertical')) || 0;
 const canvas = document.getElementById('canvas');
 function tag(selector) { return window[selector] = document.querySelector(selector) }
@@ -20,7 +20,7 @@ function svgGen(repeat, size, pattern) {
 async function delay(ms) { return new Promise(resolve => setTimeout(resolve, ms)) }
 async function notifi(green, white, gray, message, shouldWait) {
     [page00.hidden, green0.textContent, white0.textContent, gray0.textContent, message0.textContent] = [false, green, white, gray, message];
-    if (shouldWait) { window._loadDelay = 1000; while (window._loadDelay > 0) { await delay(100); window._loadDelay -= 100; } }
+    if (shouldWait) { window._loadDelay = 500; while (window._loadDelay > 0) { await delay(100); window._loadDelay -= 100; } }
 }
 async function message(mess, second = 2000) {
     if (count) count.cancelled = true;
@@ -45,7 +45,7 @@ async function gameView(romName) {
     gamepad.style.gridTemplateColumns = `${adjust}px 1px ${adjust}px 1px ${adjust}px 1px ${adjust}px 1px auto 1px ${adjust}px 1px ${adjust}px 1px ${adjust}px 1px ${adjust}px`;
     page02.style.gridTemplateRows = `auto ${window.innerWidth - (adjust * 8 + 30)}px ${adjust * 4 + 38}px ${window.innerWidth - (adjust * 8 + 20)}px 1fr 20px`;
     joy.style.width = `${adjust * 4 + 3}px`;
-    page00.hidden = page01.hidden = list01.hidden = list02.hidden = true;
+    page00.hidden = page01.hidden = list01.hidden = list02.hidden = switch0.hidden = true;
     page02.hidden = list.hidden = false;
     const ps = (integer <= 4 || integer % 2 !== 0) ? integer : (integer / 2);
     screen.style.setProperty("--shader", svgGen(integer / ps, ps, local(`shader0${local("shader")}`) || ps));
