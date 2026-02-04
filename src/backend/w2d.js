@@ -2,9 +2,10 @@
 let context2d, context2dBottom, imgData, imgDataBottom, pixelBuffer, pixelBufferBottom, lastMain, lastBottom, lastView16as32, srcView32, srcView16;
 function render32(source, sourceOffset, last, buffer, context, img, length) {
   frameCount++;
-  const end = sourceOffset + length;
-  for (let i = end - 1; i >= sourceOffset; i--) {
-    if (source[i] !== last[i - sourceOffset]) {
+  const src64 = new BigUint64Array(source.buffer, source.byteOffset + (sourceOffset << 2), length >> 1);
+  const last64 = new BigUint64Array(last.buffer, 0, length >> 1);
+  for (let i = src64.length - 1; i >= 0; i--) {
+    if (src64[i] !== last64[i]) {
       for (let j = 0, k = sourceOffset; j < length; j++, k++) {
         const color = last[j] = source[k];
         buffer[j] = 0xFF000000 | (color & 0xFF) << 16 | (color & 0xFF00) | (color >> 16) & 0xFF;

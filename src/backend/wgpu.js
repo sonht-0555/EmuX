@@ -41,10 +41,12 @@ function recordDraw(context, bindGroup, encoder) {
   pass.setPipeline(pipeline); pass.setBindGroup(0, bindGroup); pass.draw(6); pass.end();
 }
 function render32(source, sourceOffset, last, context, texture, width, height, length, bindGroup, encoder) {
-  frameCount++; const end = sourceOffset + length;
-  for (let i = end - 1; i >= sourceOffset; i--) {
-    if (source[i] !== last[i - sourceOffset]) {
-      for (let j = 0; j < length; j++) last[j] = source[sourceOffset + j];
+  frameCount++;
+  const src64 = new BigUint64Array(source.buffer, source.byteOffset + (sourceOffset << 2), length >> 1);
+  const last64 = new BigUint64Array(last.buffer, 0, length >> 1);
+  for (let i = src64.length - 1; i >= 0; i--) {
+    if (src64[i] !== last64[i]) {
+      last.set(source.subarray(sourceOffset, sourceOffset + length));
       queue.writeTexture({ texture: texture }, last, { bytesPerRow: width * 4 }, { width, height });
       recordDraw(context, bindGroup, encoder); return;
     }
