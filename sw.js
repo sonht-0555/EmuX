@@ -1,4 +1,4 @@
-let revision = 'EmuX_2.93';
+let revision = 'EmuX_2.96';
 var urlsToCache = [
     '/', 
     './index.html',
@@ -56,22 +56,29 @@ self.addEventListener('install', function (event) {
 });
 
 self.addEventListener('fetch', function (event) {
+    if (event.request.method !== 'GET') return;
+
     event.respondWith(
-        caches.match(event.request, {
-            ignoreSearch: true
-        }).then(function (response) {
-            if (response) {
-                return addHeaders(response);
-            }
-            return fetch(event.request).then(function (response) {
-                return addHeaders(response);
+        caches.match(event.request, { ignoreSearch: true }).then((cachedResponse) => {
+            const fetchPromise = fetch(event.request).then((networkResponse) => {
+                return addHeaders(networkResponse);
+            }).catch(() => {
+                // Return nothing if both fail
             });
+
+            // Nếu có trong cache, trả về luôn (sau khi chèn header)
+            if (cachedResponse) {
+                return addHeaders(cachedResponse);
+            }
+
+            // Nếu không có trong cache, đợi mạng
+            return fetchPromise;
         })
     );
 });
 
 function addHeaders(response) {
-    if (response.status === 0) {
+    if (!response || response.status === 0 || response.type === 'opaque') {
         return response;
     }
 
