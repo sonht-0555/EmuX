@@ -9,19 +9,7 @@
   <link rel="manifest" href="/manifest.json" />
 </head>
 <script>
-let gameVer = 'EmuX_2.96';
-if ('serviceWorker' in navigator) {
-    if (!window.crossOriginIsolated) {
-        navigator.serviceWorker.ready.then(() => {
-            if (!navigator.serviceWorker.controller) {
-                window.location.reload();
-            } else {
-                // Controller exists but not isolated -> SW might need an extra kick
-                setTimeout(() => { if (!window.crossOriginIsolated) window.location.reload(); }, 800);
-            }
-        });
-    }
-}
+let gameVer = 'EmuX_2.90';
 </script>
 <body hide>
   <page00 hidden>
