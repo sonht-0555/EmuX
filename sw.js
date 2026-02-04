@@ -1,4 +1,4 @@
-let revision = 'EmuX_2.92';
+let revision = 'EmuX_2.93';
 var urlsToCache = [
     '/', 
     './index.html',
@@ -61,12 +61,31 @@ self.addEventListener('fetch', function (event) {
             ignoreSearch: true
         }).then(function (response) {
             if (response) {
-                return response;
+                return addHeaders(response);
             }
-            return fetch(event.request);
+            return fetch(event.request).then(function (response) {
+                return addHeaders(response);
+            });
         })
     );
 });
+
+function addHeaders(response) {
+    if (response.status === 0) {
+        return response;
+    }
+
+    const newHeaders = new Headers(response.headers);
+    newHeaders.set("Cross-Origin-Embedder-Policy", "require-corp");
+    newHeaders.set("Cross-Origin-Opener-Policy", "same-origin");
+    newHeaders.set("Cross-Origin-Resource-Policy", "cross-origin");
+
+    return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: newHeaders,
+    });
+}
 
 self.addEventListener('activate', function (event) {
     var cacheAllowlist = [revision];
@@ -80,6 +99,8 @@ self.addEventListener('activate', function (event) {
                     }
                 })
             );
+        }).then(() => {
+            return self.clients.claim();
         })
     );
     postMsg({msg:'Updated'})
