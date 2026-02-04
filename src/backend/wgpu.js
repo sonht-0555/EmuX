@@ -14,17 +14,12 @@ const shaderSource = `
   }
   @fragment fn fs(@location(0) uv: vec2f) -> @location(0) vec4f {
     let coords = vec2i(uv * vec2f(config.width, config.height));
-    var color: vec3f;
     if (config.is32 == 1u) {
-      let c = textureLoad(texture32, coords, 0);
-      color = vec3f(c.b, c.g, c.r);
-    } else {
-      let raw = textureLoad(texture16, coords, 0).r;
-      color = vec3f(f32((raw >> 11u) & 0x1Fu) * 0.032258, f32((raw >> 5u) & 0x3Fu) * 0.015873, f32(raw & 0x1Fu) * 0.032258);
+      let color = textureLoad(texture32, coords, 0);
+      return vec4f(color.b, color.g, color.r, 1.0);
     }
-    // GBA Color Correction Matrix (Simulate original LCD) - Remove to disable
-    color = mat3x3f(0.84, 0.17, 0.00, 0.08, 0.73, 0.19, 0.08, 0.10, 0.81) * color;
-    return vec4f(color, 1.0);
+    let raw = textureLoad(texture16, coords, 0).r;
+    return vec4f(f32((raw >> 11u) & 0x1Fu) * 0.032258, f32((raw >> 5u) & 0x3Fu) * 0.015873, f32(raw & 0x1Fu) * 0.032258, 1.0);
   }`;
 async function initGPU(canvas, canvasNDS) {
   if (!navigator.gpu) return false;
