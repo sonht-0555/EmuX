@@ -71,14 +71,14 @@ document.addEventListener("DOMContentLoaded", function() {
         if (event.data.msg === "Updating...") {
             let i = 0, t = setInterval(() => {
                 notifi(" Up","date.","",` Please wait in...|${++i}|`)
-                if (i == 20) clearInterval(t), location.reload();
+                if (i == 10) clearInterval(t), location.reload();
             }, 1000);
             }
         });
     }
     ver.textContent = gameVer;
     switch0.textContent = local('render') || 'WGPU';
-    setTimeout(() => {listGame()},2000);
+    setTimeout(() => {listGame(),verSetting()},2000);
     romInput.addEventListener("change", function(e) { inputGame(e) })
     vertical.addEventListener("click",  function(e) { verSetting() })
     logo.addEventListener("click", function() {

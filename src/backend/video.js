@@ -13,9 +13,7 @@ function logSkip() {
 function video_cb(pointer, width, height, pitch) {
   if (renderFn) return renderFn(pointer, width, height, pitch);
   if (rendererReady) return; rendererReady = true;
-  const dpr = window.devicePixelRatio, max = Math.floor((window.innerWidth * dpr) / width);
-  const integer = (max > 6) ? max - (max % 2) : max;
-  scriptName = ((integer / dpr) % 1 === 0 ? 'w2d' : local('render') || 'wgpu');
+  scriptName = local('render') || 'wgpu';
   const script = document.createElement('script'); 
   script.src = `./src/backend/${scriptName}.js`;
   script.onload = () => { renderFn = window.activeRenderFn; if (renderFn) renderFn(pointer, width, height, pitch); };

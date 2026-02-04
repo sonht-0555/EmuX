@@ -1,6 +1,6 @@
-let revision = 'EmuX_3.09';
+let revision = 'EmuX_3.13';
 var urlsToCache = [
-    '/', 
+    './', 
     './index.html',
     './manifest.json',
     './src/css/main.css',
@@ -39,34 +39,49 @@ var urlsToCache = [
     './src/frontend/page01.js',
     './src/frontend/page02.js'
 ];
-
 self.addEventListener('install', function (event) {
     postMsg({msg:'Updating...'});
-    var urlsAddVersion = urlsToCache.map(function (url) {
-        return url + '?ver=' + revision
-    });
+    const isCoreUpdate = revision.endsWith('_core');
     event.waitUntil(
-        caches.open(revision)
-            .then(function (cache) {
-                return cache.addAll(urlsAddVersion);
-            }).then(() => {
-                self.skipWaiting()
-            })
+        caches.open(revision).then(async (newCache) => {
+            const cacheKeys = await caches.keys();
+            const oldCacheName = cacheKeys.find(key => key !== revision);
+            const oldCache = (oldCacheName && !isCoreUpdate) ? await caches.open(oldCacheName) : null;
+
+            return Promise.all(
+                urlsToCache.map(async (url) => {
+                    const fullUrl = url + '?ver=' + revision;
+                    if (oldCache) {
+                        const isAppFile = /\.(js|html|css|json)$/i.test(url) || url === './' || url === '/';
+                        if (!isAppFile) {
+                            const cachedRes = await oldCache.match(url, { ignoreSearch: true });
+                            if (cachedRes) return newCache.put(fullUrl, cachedRes);
+                        }
+                    }
+                    try {
+                        return await newCache.add(fullUrl);
+                    } catch (e) {
+                        console.warn('Network fetch failed for:', url);
+                    }
+                })
+            ).then(() => self.skipWaiting());
+        })
     );
 });
-
 self.addEventListener('fetch', function (event) {
     event.respondWith(
         caches.match(event.request, { ignoreSearch: true }).then(function (response) {
-            var fetchPromise = response ? Promise.resolve(response) : fetch(event.request);
-            return fetchPromise.then(function(res) {
+            if (response) return addHeaders(response, event.request.url);
+            return fetch(event.request).then(function(res) {
                 return addHeaders(res, event.request.url);
+            }).catch(function() {
+                return new Response("Offline", { status: 503 });
             });
         })
     );
 });
 function addHeaders(response, url) {
-    if (!response || response.status === 0 || response.type === 'opaque' || !url.startsWith(self.location.origin)) {
+    if (!response || response.status === 0 || response.status === 304 || response.type === 'opaque' || !url.startsWith(self.location.origin)) {
         return response;
     }
     const newHeaders = new Headers(response.headers);
@@ -79,7 +94,6 @@ function addHeaders(response, url) {
         headers: newHeaders,
     });
 }
-
 self.addEventListener('activate', function (event) {
     var cacheAllowlist = [revision];
     event.waitUntil(
@@ -98,7 +112,6 @@ self.addEventListener('activate', function (event) {
     );
     postMsg({msg:'Updated'})
 });
-
 function postMsg(obj) {
     clients.matchAll({ includeUncontrolled: true, type: 'window' }).then((arr) => {
         for (client of arr) {

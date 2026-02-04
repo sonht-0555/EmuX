@@ -20,7 +20,7 @@ function svgGen(repeat, size, pattern) {
 async function delay(ms) { return new Promise(resolve => setTimeout(resolve, ms)) }
 async function notifi(green, white, gray, message, shouldWait) {
     [page00.hidden, green0.textContent, white0.textContent, gray0.textContent, message0.textContent] = [false, green, white, gray, message];
-    if (shouldWait) { window._loadDelay = 500; while (window._loadDelay > 0) { await delay(100); window._loadDelay -= 100; } }
+    if (shouldWait) { window._loadDelay = 400; while (window._loadDelay > 0) { await delay(100); window._loadDelay -= 100; } }
 }
 async function message(mess, second = 2000) {
     if (count) count.cancelled = true;
