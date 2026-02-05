@@ -22,6 +22,7 @@ jobs:
           - { id: ps1, name: pcsx_rearmed, fetch: pcsx_rearmed, make: "-f Makefile.libretro DYNAREC='' GPU_PEOPS=1 WANT_ZLIB=1 GLES=1 WANT_VFS=1", initial_mem: 512mb, stack: 16mb, method: objects }
           - { id: snes2010, name: snes9x2010, fetch: snes9x2010, make: "-f Makefile.libretro STATIC_LINKING=0", initial_mem: 128mb, stack: 4mb, method: objects }
           - { id: nds, name: melonds, fetch: melonds, initial_mem: 512mb, stack: 32mb, method: objects }
+          - { id: nds2021, name: melonds2021, fetch: melonds2021, initial_mem: 512mb, stack: 32mb, method: objects }
 
     steps:
     - uses: actions/checkout@v3
@@ -42,19 +43,23 @@ jobs:
         if [ ! -d "libretro-super" ]; then
           git clone --depth 1 https://github.com/libretro/libretro-super.git
         fi
-        cd libretro-super && ./libretro-fetch.sh ${{ matrix.core.fetch }}
+        if [ "${{ matrix.core.id }}" == "nds2021" ]; then
+          [ ! -d "libretro-super/libretro-melonds2021" ] && git clone --depth 1 --branch before-rebase-20210922 https://github.com/libretro/melonDS.git libretro-super/libretro-melonds2021 || true
+        else
+          cd libretro-super && ./libretro-fetch.sh ${{ matrix.core.fetch }}
+        fi
 
     - name: Build
       run: |
         cd libretro-super/libretro-${{ matrix.core.fetch }}
         if [ -n "${{ matrix.core.subdir }}" ]; then cd ${{ matrix.core.subdir }}; fi
-        emmake make ${{ matrix.core.make }} platform=emscripten -j$(nproc)
+        [ "${{ matrix.core.id }}" == "nds2021" ] && (sed -i 's/-Wl,--no-undefined//g' Makefile; sed -i 's/-Wl,--version-script=[^ ]*//g' Makefile; emmake make platform=emscripten -j$(nproc) || true) || emmake make ${{ matrix.core.make }} platform=emscripten -j$(nproc)
         cd $GITHUB_WORKSPACE/libretro-super/libretro-${{ matrix.core.fetch }}
         
         if [ "${{ matrix.core.method }}" == "arcade" ]; then
           emcc -c $GITHUB_WORKSPACE/emux/.github/workflows/retro_glue.c -o retro_glue.o -Oz -flto -DNDEBUG -s USE_ZLIB=1
           ALL_OBJS=$(find . -name "*.o")
-          emcc $ALL_OBJS retro_glue.o -Oz -flto -DNDEBUG \
+          emcc $ALL_OBJS retro_glue.o -O3 -flto -DNDEBUG \
             -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web \
             -s ALLOW_MEMORY_GROWTH=1 -s WASM_BIGINT=1 --no-heap-copy -s ALLOW_TABLE_GROWTH=1 \
             -s INITIAL_MEMORY=${{ matrix.core.initial_mem }} -s STACK_SIZE=${{ matrix.core.stack }} -s FORCE_FILESYSTEM=1 \
@@ -63,10 +68,9 @@ jobs:
             -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 \
             -o arcade.js
           zip -j arcade.zip arcade.js arcade.wasm
-
         elif [ "${{ matrix.core.method }}" == "objects" ]; then
           ALL_OBJS=$(find . -name "*.o")
-          emcc $ALL_OBJS -Oz -flto -DNDEBUG \
+          emcc $ALL_OBJS -O3 -flto -DNDEBUG \
             -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web \
             -s ALLOW_MEMORY_GROWTH=1 -s WASM_BIGINT=1 --no-heap-copy -s ALLOW_TABLE_GROWTH=1 \
             -s INITIAL_MEMORY=${{ matrix.core.initial_mem }} -s STACK_SIZE=${{ matrix.core.stack }} \
@@ -76,7 +80,6 @@ jobs:
             -o ${{ matrix.core.id }}.js
           zip -j ${{ matrix.core.id }}.zip ${{ matrix.core.id }}.js ${{ matrix.core.id }}.wasm
         fi
-
     - uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.core.id }}-core

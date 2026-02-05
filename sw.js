@@ -1,4 +1,4 @@
-let revision = 'EmuX_3.16';
+let revision = 'EmuX_3.18';
 var urlsToCache = [
     './', 
     './index.html',
@@ -14,6 +14,7 @@ var urlsToCache = [
     './src/core/snes2010.zip',
     './src/core/nes.zip',
     './src/core/nds.zip',
+    './src/core/nds2021.zip',   
     './src/core/arcade.zip',
     './src/core/bios/neogeo.zip',
     './src/core/bios/scph5501.bin',
