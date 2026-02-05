@@ -1,4 +1,4 @@
-let revision = 'EmuX_3.18';
+let revision = 'EmuX_3.27';
 var urlsToCache = [
     './', 
     './index.html',
@@ -42,29 +42,10 @@ var urlsToCache = [
 ];
 self.addEventListener('install', function (event) {
     postMsg({msg:'Updating...'});
-    const isCoreUpdate = revision.endsWith('_core');
     event.waitUntil(
-        caches.open(revision).then(async (newCache) => {
-            const cacheKeys = await caches.keys();
-            const oldCacheName = cacheKeys.find(key => key !== revision);
-            const oldCache = (oldCacheName && !isCoreUpdate) ? await caches.open(oldCacheName) : null;
-
+        caches.open(revision).then((newCache) => {
             return Promise.all(
-                urlsToCache.map(async (url) => {
-                    const fullUrl = url + '?ver=' + revision;
-                    if (oldCache) {
-                        const isAppFile = /\.(js|html|css|json)$/i.test(url) || url === './' || url === '/';
-                        if (!isAppFile) {
-                            const cachedRes = await oldCache.match(url, { ignoreSearch: true });
-                            if (cachedRes) return newCache.put(fullUrl, cachedRes);
-                        }
-                    }
-                    try {
-                        return await newCache.add(fullUrl);
-                    } catch (e) {
-                        console.warn('Network fetch failed for:', url);
-                    }
-                })
+                urlsToCache.map(url => newCache.add(url + '?ver=' + revision))
             ).then(() => self.skipWaiting());
         })
     );

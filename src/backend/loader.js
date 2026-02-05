@@ -2,14 +2,15 @@
 var activeVars = {}, POINTER_CACHE = {};
 const getPointer = (string, pointer) => POINTER_CACHE[string] || (POINTER_CACHE[string] = (pointer = Module._malloc(string.length + 1), Module.stringToUTF8(string, pointer, string.length + 1), pointer));
 function env_cb(command, data) {
-if (command === 15) {
-    const key = Module.UTF8ToString(Module.HEAP32[data >> 2]);
-    // console.log(`[Core] ${key}`);
-    if (activeVars[key]) return (Module.HEAP32[(data >> 2) + 1] = getPointer(activeVars[key]), true);
-}
-    if (command === 9) return (Module.HEAP32[data >> 2] = getPointer('.'), true);
+    const d32 = Number(data) >> 2;
+    if (command === 15) {
+        const key = Module.UTF8ToString(Module.HEAP32[d32]);
+        if (activeVars[key]) return (Module.HEAP32[d32 + 1] = getPointer(activeVars[key]), true);
+    }
+    if (command === 9) return (Module.HEAP32[d32] = getPointer('.'), true);
     return command === 10;
 }
+
 // ===== Core =====
 const CORE_CONFIG = [
     { ext: '.nes', script: './src/core/nes.zip',                     btns: { 'btn-1': ['A', 8], 'btn-3': ['B', 0], 'btn-l': ['', ''], 'btn-r': ['', ''], 'btn-select': ['', 2], 'btn-start': ['', 3] } },
@@ -19,7 +20,7 @@ const CORE_CONFIG = [
     { ext: '.md,.gen', script: './src/core/genesis.zip',             btns: { 'btn-3': ['A', 1], 'btn-1': ['B', 0], 'btn-2': ['C', 8], 'btn-l': ['', ''], 'btn-r': ['', ''], 'btn-select': ['', 2], 'btn-start': ['', 3] } },
     { ext: '.smc,.sfc', script: './src/core/snes2010.zip',           btns: { 'btn-1': ['A', 8], 'btn-2': ['X', 9], 'btn-3': ['B', 0], 'btn-4': ['Y', 1], 'btn-l': ['', 10], 'btn-r': ['', 11], 'btn-select': ['', 2], 'btn-start': ['', 3] } },
     { ext: '.zip', script: './src/core/arcade.zip',                  btns: { 'btn-1': ['A', 0], 'btn-3': ['B', 8], 'btn-2': ['C', 1], 'btn-4': ['D', 9], 'btn-l': ['', ''], 'btn-r': ['', ''], 'btn-select': ['', 2], 'btn-start': ['', 3] }, bios: ['./src/core/bios/neogeo.zip'], vars: { 'fbneo-allow-depth-32': 'Disabled', 'fbneo-sample-interpolation': '4-point', 'fbneo-fm-interpolation': 'linear', 'fbneo-lowpass-filter': 'Disabled', 'fbneo-samplerate': '44100', 'fbneo-cpu-speed-adjust': '100', 'fbneo-diagnostic-input': 'Disabled' } },
-    { ext: '.nds', script: './src/core/nds2021.zip',                 btns: { 'btn-1': ['A', 8], 'btn-2': ['X', 9], 'btn-3': ['B', 0], 'btn-4': ['Y', 1], 'btn-l': ['', 10], 'btn-r': ['', 11], 'btn-select': ['', 2], 'btn-start': ['', 3] }, bios: ['./src/core/bios/bios7.bin', './src/core/bios/bios9.bin', './src/core/bios/firmware.bin'], vars: { melonds_console_mode: 'DS', melonds_boot_directly: 'Enabled', melonds_screen_layout: 'Top/Bottom', melonds_screen_gap: '0', melonds_hybrid_small_screen: 'Disabled', melonds_swapscreen_mode: 'Disabled', melonds_randomize_mac_address: 'Disabled', melonds_touch_mode: 'Touch', melonds_dsi_sdcard: 'Disabled', melonds_mic_input: 'None', melonds_audio_bitrate: 'Low', melonds_audio_interpolation: 'None', melonds_use_fw_settings: 'Disabled', melonds_language: 'English' } },
+    { ext: '.nds', script: './src/core/nds.zip',                     btns: { 'btn-1': ['A', 8], 'btn-2': ['X', 9], 'btn-3': ['B', 0], 'btn-4': ['Y', 1], 'btn-l': ['', 10], 'btn-r': ['', 11], 'btn-select': ['', 2], 'btn-start': ['', 3] }, bios: ['./src/core/bios/bios7.bin', './src/core/bios/bios9.bin', './src/core/bios/firmware.bin'], vars: { melonds_console_mode: 'DS', melonds_boot_directly: 'Enabled', melonds_screen_layout: 'Top/Bottom', melonds_screen_gap: '0', melonds_hybrid_small_screen: 'Disabled', melonds_swapscreen_mode: 'Disabled', melonds_randomize_mac_address: 'Disabled', melonds_touch_mode: 'Touch', melonds_dsi_sdcard: 'Disabled', melonds_mic_input: 'None', melonds_audio_bitrate: 'Low', melonds_audio_interpolation: 'None', melonds_use_fw_settings: 'Disabled', melonds_language: 'English' } },
     { ext: '.bin,.iso,.img,.cue,.pbp', script: './src/core/ps1.zip', btns: { 'btn-1': ['A', 8], 'btn-2': ['X', 9], 'btn-3': ['B', 0], 'btn-4': ['Y', 1], 'btn-l': ['', 10], 'btn-r': ['', 11], 'btn-select': ['', 2], 'btn-start': ['', 3] }, bios: ['./src/core/bios/scph5501.bin'] },
 ];
 var isRunning = false;
@@ -117,11 +118,11 @@ async function initCore(romFile) {
                     loadInfo[1] = romPointer;
                     loadInfo[2] = finalRomData.length;
                 }
-                Module.HEAPU32.set(loadInfo, infoPointer >> 2);
+                Module.HEAPU32.set(loadInfo, Number(infoPointer) >> 2);
                 Module._retro_load_game(infoPointer);
                 const avInfo = Module._malloc(120);
                 Module._retro_get_system_av_info(avInfo);
-                initAudio(Module.HEAPF64[(avInfo + 32) >> 3] / 48000);
+                initAudio(Module.HEAPF64[(Number(avInfo) + 32) >> 3] / 48000);
                 audioCtx.resume();
                 Module._free(avInfo);
                 (function mainLoop() { if (isRunning) Module._retro_run(); requestAnimationFrame(mainLoop) })();
