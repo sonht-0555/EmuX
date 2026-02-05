@@ -1,105 +1,230 @@
 // ===== wgl.js =====
-let gl, glBottom, program, programBottom, texture, textureBottom, lastMain, lastBottom, pixelBuffer, pixelBufferBottom, pixelView, pixelViewBottom;
-let lastView16as32, srcView32, srcView16, textureInitializedMain = 0, textureInitializedBottom = 0;
+let glContext;
+let glContextBottom;
+let shaderProgram;
+let shaderProgramBottom;
+let glTexture;
+let glTextureBottom;
+let lastMainFrame;
+let lastBottomFrame;
+let pixelBuffer;
+let pixelBufferBottom;
+let pixelView;
+let pixelViewBottom;
+let lastView16as32;
+let sourceView32;
+let sourceView16;
+let textureInitializedMain = 0;
+let textureInitializedBottom = 0;
 const vertexShaderSource = `attribute vec2 p;attribute vec2 t;varying vec2 v;void main(){gl_Position=vec4(p,0,1);v=t;}`;
 const fragmentShaderSource = `precision mediump float;varying vec2 v;uniform sampler2D s;void main(){gl_FragColor=texture2D(s,v);}`;
+// ===== initGL =====
 function initGL(canvas) {
-  const context = canvas.getContext('webgl', { alpha: false, antialias: false, desynchronized: true, preserveDrawingBuffer: false, powerPreference: 'high-performance' });
-  if (!context) return null;
-  const vs = context.createShader(context.VERTEX_SHADER); context.shaderSource(vs, vertexShaderSource); context.compileShader(vs);
-  const fs = context.createShader(context.FRAGMENT_SHADER); context.shaderSource(fs, fragmentShaderSource); context.compileShader(fs);
-  const prog = context.createProgram(); context.attachShader(prog, vs); context.attachShader(prog, fs); context.linkProgram(prog); context.useProgram(prog);
-  const posBuffer = context.createBuffer(); context.bindBuffer(context.ARRAY_BUFFER, posBuffer); context.bufferData(context.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), context.STATIC_DRAW);
-  const posLoc = context.getAttribLocation(prog, 'p'); context.enableVertexAttribArray(posLoc); context.vertexAttribPointer(posLoc, 2, context.FLOAT, false, 0, 0);
-  const texBuffer = context.createBuffer(); context.bindBuffer(context.ARRAY_BUFFER, texBuffer); context.bufferData(context.ARRAY_BUFFER, new Float32Array([0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0]), context.STATIC_DRAW);
-  const texLoc = context.getAttribLocation(prog, 't'); context.enableVertexAttribArray(texLoc); context.vertexAttribPointer(texLoc, 2, context.FLOAT, false, 0, 0);
-  const tex = context.createTexture(); context.bindTexture(context.TEXTURE_2D, tex);
-  context.texParameteri(context.TEXTURE_2D, context.TEXTURE_WRAP_S, context.CLAMP_TO_EDGE); context.texParameteri(context.TEXTURE_2D, context.TEXTURE_WRAP_T, context.CLAMP_TO_EDGE);
-  context.texParameteri(context.TEXTURE_2D, context.TEXTURE_MIN_FILTER, context.NEAREST); context.texParameteri(context.TEXTURE_2D, context.TEXTURE_MAG_FILTER, context.NEAREST);
-  return { context, prog, tex };
-}
-function render32(source, sourceOffset, last, buffer, view, context, tex, width, height, length, type) {
-  frameCount++;
-  const src64 = new BigUint64Array(source.buffer, source.byteOffset + (sourceOffset << 2), length >> 1);
-  const last64 = new BigUint64Array(last.buffer, 0, length >> 1);
-  for (let i = src64.length - 1; i >= 0; i--) {
-    if (src64[i] !== last64[i]) {
-      for (let j = 0, k = sourceOffset; j < length; j++, k++) {
-        const color = last[j] = source[k];
-        buffer[j] = 0xFF000000 | (color & 0xFF) << 16 | (color & 0xFF00) | (color >> 16) & 0xFF;
-      }
-      context.bindTexture(context.TEXTURE_2D, tex);
-      if (type ? textureInitializedBottom : textureInitializedMain) context.texSubImage2D(context.TEXTURE_2D, 0, 0, 0, width, height, context.RGBA, context.UNSIGNED_BYTE, view);
-      else { context.texImage2D(context.TEXTURE_2D, 0, context.RGBA, width, height, 0, context.RGBA, context.UNSIGNED_BYTE, view); if (type) textureInitializedBottom = 1; else textureInitializedMain = 1; }
-      context.drawArrays(context.TRIANGLES, 0, 6); return;
+    const context = canvas.getContext('webgl', {
+        alpha: false,
+        antialias: false,
+        desynchronized: true,
+        preserveDrawingBuffer: false,
+        powerPreference: 'high-performance'
+    });
+    if (!context) {
+        return null;
     }
-  }
-  skippedFrames++;
+    const vertexShader = context.createShader(context.VERTEX_SHADER);
+    context.shaderSource(vertexShader, vertexShaderSource);
+    context.compileShader(vertexShader);
+    const fragmentShader = context.createShader(context.FRAGMENT_SHADER);
+    context.shaderSource(fragmentShader, fragmentShaderSource);
+    context.compileShader(fragmentShader);
+    const program = context.createProgram();
+    context.attachShader(program, vertexShader);
+    context.attachShader(program, fragmentShader);
+    context.linkProgram(program);
+    context.useProgram(program);
+    const positionBuffer = context.createBuffer();
+    context.bindBuffer(context.ARRAY_BUFFER, positionBuffer);
+    context.bufferData(context.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), context.STATIC_DRAW);
+    const positionLocation = context.getAttribLocation(program, 'p');
+    context.enableVertexAttribArray(positionLocation);
+    context.vertexAttribPointer(positionLocation, 2, context.FLOAT, false, 0, 0);
+    const textureCoordBuffer = context.createBuffer();
+    context.bindBuffer(context.ARRAY_BUFFER, textureCoordBuffer);
+    context.bufferData(context.ARRAY_BUFFER, new Float32Array([0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0]), context.STATIC_DRAW);
+    const textureCoordLocation = context.getAttribLocation(program, 't');
+    context.enableVertexAttribArray(textureCoordLocation);
+    context.vertexAttribPointer(textureCoordLocation, 2, context.FLOAT, false, 0, 0);
+    const texture = context.createTexture();
+    context.bindTexture(context.TEXTURE_2D, texture);
+    context.texParameteri(context.TEXTURE_2D, context.TEXTURE_WRAP_S, context.CLAMP_TO_EDGE);
+    context.texParameteri(context.TEXTURE_2D, context.TEXTURE_WRAP_T, context.CLAMP_TO_EDGE);
+    context.texParameteri(context.TEXTURE_2D, context.TEXTURE_MIN_FILTER, context.NEAREST);
+    context.texParameteri(context.TEXTURE_2D, context.TEXTURE_MAG_FILTER, context.NEAREST);
+    return {
+        context: context,
+        prog: program,
+        tex: texture
+    };
 }
-function render16(source16, source32, last32, buffer, view, context, tex, width, height, stride, type) {
-  frameCount++;
-  const widthWords = width >> 1, strideWords = stride >> 1;
-  for (let y = height - 1; y >= 0; y--) {
-    const si = y * strideWords, li = y * widthWords;
-    for (let x = widthWords - 1; x >= 0; x--) {
-      if (source32[si + x] !== last32[li + x]) {
-        for (let y2 = 0; y2 < height; y2++) {
-          const si2 = y2 * stride, li2 = y2 * width, si32 = y2 * strideWords, li32 = y2 * widthWords;
-          for (let x2 = 0; x2 < widthWords; x2++) {
-            const i = x2 << 1;
-            buffer[li2 + i] = lut565[source16[si2 + i]];
-            buffer[li2 + i + 1] = lut565[source16[si2 + i + 1]];
-            last32[li32 + x2] = source32[si32 + x2];
-          }
+// ===== render32 =====
+function render32(source, sourceOffset, lastFrame, buffer, view, context, texture, width, height, length, textureType) {
+    frameCount++;
+    const source64 = new BigUint64Array(source.buffer, source.byteOffset + (sourceOffset << 2), length >> 1);
+    const last64 = new BigUint64Array(lastFrame.buffer, 0, length >> 1);
+    for (let index = source64.length - 1; index >= 0; index--) {
+        if (source64[index] !== last64[index]) {
+            for (let pixelIndex = 0, sourceIndex = sourceOffset; pixelIndex < length; pixelIndex++, sourceIndex++) {
+                const color = lastFrame[pixelIndex] = source[sourceIndex];
+                buffer[pixelIndex] = 0xFF000000 | (color & 0xFF) << 16 | (color & 0xFF00) | (color >> 16) & 0xFF;
+            }
+            context.bindTexture(context.TEXTURE_2D, texture);
+            if (textureType ? textureInitializedBottom : textureInitializedMain) {
+                context.texSubImage2D(context.TEXTURE_2D, 0, 0, 0, width, height, context.RGBA, context.UNSIGNED_BYTE, view);
+            } else {
+                context.texImage2D(context.TEXTURE_2D, 0, context.RGBA, width, height, 0, context.RGBA, context.UNSIGNED_BYTE, view);
+                if (textureType) {
+                    textureInitializedBottom = 1;
+                } else {
+                    textureInitializedMain = 1;
+                }
+            }
+            context.drawArrays(context.TRIANGLES, 0, 6);
+            return;
         }
-        context.bindTexture(context.TEXTURE_2D, tex);
-        if (type ? textureInitializedBottom : textureInitializedMain) context.texSubImage2D(context.TEXTURE_2D, 0, 0, 0, width, height, context.RGBA, context.UNSIGNED_BYTE, view);
-        else { context.texImage2D(context.TEXTURE_2D, 0, context.RGBA, width, height, 0, context.RGBA, context.UNSIGNED_BYTE, view); if (type) textureInitializedBottom = 1; else textureInitializedMain = 1; }
-        context.drawArrays(context.TRIANGLES, 0, 6); return;
-      }
     }
-  }
-  skippedFrames++;
+    skippedFrames++;
 }
+// ===== render16 =====
+function render16(source16, source32, last32, buffer, view, context, texture, width, height, stride, textureType) {
+    frameCount++;
+    const widthWords = width >> 1;
+    const strideWords = stride >> 1;
+    for (let rowIndex = height - 1; rowIndex >= 0; rowIndex--) {
+        const sourceRowIndex = rowIndex * strideWords;
+        const lastRowIndex = rowIndex * widthWords;
+        for (let columnIndex = widthWords - 1; columnIndex >= 0; columnIndex--) {
+            if (source32[sourceRowIndex + columnIndex] !== last32[lastRowIndex + columnIndex]) {
+                for (let copyRowIndex = 0; copyRowIndex < height; copyRowIndex++) {
+                    const sourceIndex = copyRowIndex * stride;
+                    const lastIndex = copyRowIndex * width;
+                    const source32Index = copyRowIndex * strideWords;
+                    const last32Index = copyRowIndex * widthWords;
+                    for (let copyColumnIndex = 0; copyColumnIndex < widthWords; copyColumnIndex++) {
+                        const pixelOffset = copyColumnIndex << 1;
+                        buffer[lastIndex + pixelOffset] = lookupTable565[source16[sourceIndex + pixelOffset]];
+                        buffer[lastIndex + pixelOffset + 1] = lookupTable565[source16[sourceIndex + pixelOffset + 1]];
+                        last32[last32Index + copyColumnIndex] = source32[source32Index + copyColumnIndex];
+                    }
+                }
+                context.bindTexture(context.TEXTURE_2D, texture);
+                if (textureType ? textureInitializedBottom : textureInitializedMain) {
+                    context.texSubImage2D(context.TEXTURE_2D, 0, 0, 0, width, height, context.RGBA, context.UNSIGNED_BYTE, view);
+                } else {
+                    context.texImage2D(context.TEXTURE_2D, 0, context.RGBA, width, height, 0, context.RGBA, context.UNSIGNED_BYTE, view);
+                    if (textureType) {
+                        textureInitializedBottom = 1;
+                    } else {
+                        textureInitializedMain = 1;
+                    }
+                }
+                context.drawArrays(context.TRIANGLES, 0, 6);
+                return;
+            }
+        }
+    }
+    skippedFrames++;
+}
+// ===== renderNDS =====
 function renderNDS(pointer, width, height) {
-  const halfHeight = height >> 1, length = width * halfHeight, buffer = Module.HEAPU8.buffer;
-  if (cachedWidth !== width || cachedHeight !== halfHeight) {
-    cachedWidth = width; cachedHeight = halfHeight; Module.canvas.width = canvasB.width = width; Module.canvas.height = canvasB.height = halfHeight;
-    gl.viewport(0, 0, width, halfHeight); glBottom.viewport(0, 0, width, halfHeight);
-    pixelBuffer = new Uint32Array(length); pixelBufferBottom = new Uint32Array(length);
-    pixelView = new Uint8Array(pixelBuffer.buffer); pixelViewBottom = new Uint8Array(pixelBufferBottom.buffer);
-    lastMain = new Uint32Array(length); lastBottom = new Uint32Array(length);
-    srcView32 = null; textureInitializedMain = textureInitializedBottom = 0; if (window.gameView) gameView(gameName);
-  }
-  if (!srcView32 || srcView32.buffer !== buffer || ndsPointer !== pointer) { ndsPointer = pointer; srcView32 = new Uint32Array(buffer, pointer, width * height); }
-  render32(srcView32, 0, lastMain, pixelBuffer, pixelView, gl, texture, width, halfHeight, length, 0);
-  render32(srcView32, length, lastBottom, pixelBufferBottom, pixelViewBottom, glBottom, textureBottom, width, halfHeight, length, 1);
-  logSkip();
-}
-window.activeRenderFn = function(pointer, width, height, pitch) {
-  if (!gl) {
-    const m = initGL(Module.canvas); if (!m) return;
-    gl = m.context; program = m.prog; texture = m.tex;
-    if (Module.isNDS) {
-      page02.style.paddingTop = "5px"; canvasB.style.display = "block"; joypad.style.justifyContent = "center"; joy.style.display = "none";
-      const b = initGL(canvasB); glBottom = b.context; programBottom = b.prog; textureBottom = b.tex;
+    const halfHeight = height >> 1;
+    const pixelCount = width * halfHeight;
+    const buffer = Module.HEAPU8.buffer;
+    if (cachedWidth !== width || cachedHeight !== halfHeight) {
+        cachedWidth = width;
+        cachedHeight = halfHeight;
+        Module.canvas.width = canvasB.width = width;
+        Module.canvas.height = canvasB.height = halfHeight;
+        glContext.viewport(0, 0, width, halfHeight);
+        glContextBottom.viewport(0, 0, width, halfHeight);
+        pixelBuffer = new Uint32Array(pixelCount);
+        pixelBufferBottom = new Uint32Array(pixelCount);
+        pixelView = new Uint8Array(pixelBuffer.buffer);
+        pixelViewBottom = new Uint8Array(pixelBufferBottom.buffer);
+        lastMainFrame = new Uint32Array(pixelCount);
+        lastBottomFrame = new Uint32Array(pixelCount);
+        sourceView32 = null;
+        textureInitializedMain = textureInitializedBottom = 0;
+        if (window.gameView) {
+            gameView(gameName);
+        }
     }
-  }
-  if (Module.isNDS) return renderNDS(pointer, width, height);
-  const length = width * height, is32 = pitch === (width << 2), buffer = Module.HEAPU8.buffer;
-  if (width !== cachedWidth || height !== cachedHeight || pitch !== cachedPitch) {
-    cachedWidth = width; cachedHeight = height; cachedPitch = pitch; cachedBuffer = null;
-    Module.canvas.width = width; Module.canvas.height = height; gl.viewport(0, 0, width, height);
-    pixelBuffer = new Uint32Array(length); pixelView = new Uint8Array(pixelBuffer.buffer);
-    if (is32) lastMain = new Uint32Array(length); else lastView16as32 = new Uint32Array(length >> 1);
-    textureInitializedMain = 0; if (window.gameView) gameView(gameName);
-  }
-  if (buffer !== cachedBuffer || pointer !== cachedPointer) {
-    cachedBuffer = buffer; cachedPointer = pointer; srcView32 = new Uint32Array(buffer, pointer, is32 ? length : ((pitch >> 1) * height) >> 1);
-    if (!is32) srcView16 = new Uint16Array(buffer, pointer, (pitch >> 1) * height);
-  }
-  if (is32) render32(srcView32, 0, lastMain, pixelBuffer, pixelView, gl, texture, width, height, length, 0);
-  else render16(srcView16, srcView32, lastView16as32, pixelBuffer, pixelView, gl, texture, width, height, pitch >> 1, 0);
-  logSkip();
+    if (!sourceView32 || sourceView32.buffer !== buffer || ndsPointer !== pointer) {
+        ndsPointer = pointer;
+        sourceView32 = new Uint32Array(buffer, pointer, width * height);
+    }
+    render32(sourceView32, 0, lastMainFrame, pixelBuffer, pixelView, glContext, glTexture, width, halfHeight, pixelCount, 0);
+    render32(sourceView32, pixelCount, lastBottomFrame, pixelBufferBottom, pixelViewBottom, glContextBottom, glTextureBottom, width, halfHeight, pixelCount, 1);
+    logSkip();
+}
+// ===== activeRenderFn =====
+window.activeRenderFn = function(pointer, width, height, pitch) {
+    if (!glContext) {
+        const mainContext = initGL(Module.canvas);
+        if (!mainContext) {
+            return;
+        }
+        glContext = mainContext.context;
+        shaderProgram = mainContext.prog;
+        glTexture = mainContext.tex;
+        if (Module.isNDS) {
+            page02.style.paddingTop = "5px";
+            canvasB.style.display = "block";
+            joypad.style.justifyContent = "center";
+            joy.style.display = "none";
+            const bottomContext = initGL(canvasB);
+            glContextBottom = bottomContext.context;
+            shaderProgramBottom = bottomContext.prog;
+            glTextureBottom = bottomContext.tex;
+        }
+    }
+    if (Module.isNDS) {
+        return renderNDS(pointer, width, height);
+    }
+    const pixelCount = width * height;
+    const is32BitFormat = pitch === (width << 2);
+    const buffer = Module.HEAPU8.buffer;
+    if (width !== cachedWidth || height !== cachedHeight || pitch !== cachedPitch) {
+        cachedWidth = width;
+        cachedHeight = height;
+        cachedPitch = pitch;
+        cachedBuffer = null;
+        Module.canvas.width = width;
+        Module.canvas.height = height;
+        glContext.viewport(0, 0, width, height);
+        pixelBuffer = new Uint32Array(pixelCount);
+        pixelView = new Uint8Array(pixelBuffer.buffer);
+        if (is32BitFormat) {
+            lastMainFrame = new Uint32Array(pixelCount);
+        } else {
+            lastView16as32 = new Uint32Array(pixelCount >> 1);
+        }
+        textureInitializedMain = 0;
+        if (window.gameView) {
+            gameView(gameName);
+        }
+    }
+    if (buffer !== cachedBuffer || pointer !== cachedPointer) {
+        cachedBuffer = buffer;
+        cachedPointer = pointer;
+        sourceView32 = new Uint32Array(buffer, pointer, is32BitFormat ? pixelCount : ((pitch >> 1) * height) >> 1);
+        if (!is32BitFormat) {
+            sourceView16 = new Uint16Array(buffer, pointer, (pitch >> 1) * height);
+        }
+    }
+    if (is32BitFormat) {
+        render32(sourceView32, 0, lastMainFrame, pixelBuffer, pixelView, glContext, glTexture, width, height, pixelCount, 0);
+    } else {
+        render16(sourceView16, sourceView32, lastView16as32, pixelBuffer, pixelView, glContext, glTexture, width, height, pitch >> 1, 0);
+    }
+    logSkip();
 };
 console.log("wgl.js loaded");

@@ -1,65 +1,102 @@
-async function inputGame(e) {
-  const file = e.target.files[0];
-  const storeName = storeForFilename(file.name);
-  await emuxDB(await file.arrayBuffer(), file.name);
-  if (storeName === 'games') await initCore(file);
+// ===== inputGame =====
+async function inputGame(event) {
+    const file = event.target.files[0];
+    const storeName = storeForFilename(file.name);
+    await emuxDB(await file.arrayBuffer(), file.name);
+    if (storeName === 'games') {
+        await initCore(file);
+    }
 }
+// ===== loadGame =====
 async function loadGame(name) {
-  await initCore(new File([await emuxDB(name)], name));
+    const gameData = await emuxDB(name);
+    const gameFile = new File([gameData], name);
+    await initCore(gameFile);
 }
+// ===== saveState =====
 async function saveState(slot = 1) {
-  if (!isRunning) return;
-  const size = Module._retro_serialize_size();
-  const ptr = Module._malloc(size);
-  if (Module._retro_serialize(ptr, size)) {
-    await emuxDB(new Uint8Array(Module.HEAPU8.buffer, ptr, size).slice(), `${gameName}.ss${slot}`);
-    await message(`[ss${slot}]_Recorded!`, 1000);
-  }
-  Module._free(ptr);
+    if (!isRunning) {
+        return;
+    }
+    const stateSize = Module._retro_serialize_size();
+    const statePointer = Module._malloc(stateSize);
+    if (Module._retro_serialize(statePointer, stateSize)) {
+        const stateData = new Uint8Array(Module.HEAPU8.buffer, statePointer, stateSize).slice();
+        await emuxDB(stateData, `${gameName}.ss${slot}`);
+        await message(`[ss${slot}]_Recorded!`, 1000);
+    }
+    Module._free(statePointer);
 }
+// ===== loadState =====
 async function loadState(slot = 1) {
-  if (!isRunning) return;
-  const data = await emuxDB(`${gameName}.ss${slot}`);
-  if (data) {
-    const ptr = Module._malloc(data.length);
-    Module.HEAPU8.set(data, ptr);
-    Module._retro_unserialize(ptr, data.length);
-    Module._free(ptr);
-    await message(`[ss${slot}]_Loaded!`, 1000);
-  }
+    if (!isRunning) {
+        return;
+    }
+    const stateData = await emuxDB(`${gameName}.ss${slot}`);
+    if (stateData) {
+        const statePointer = Module._malloc(stateData.length);
+        Module.HEAPU8.set(stateData, statePointer);
+        Module._retro_unserialize(statePointer, stateData.length);
+        Module._free(statePointer);
+        await message(`[ss${slot}]_Loaded!`, 1000);
+    }
 }
+// ===== timer =====
 async function timer(isStart) {
     if (isStart) {
-        if (timerId) return;
+        if (timerId) {
+            return;
+        }
         timerId = setInterval(() => {
-            if (++seconds === 60) [seconds, minutes] = [0, ++minutes];
-            if (minutes === 60) [minutes, hours] = [0, ++hours];
-            document.querySelector("time1").textContent = `${hours}h${minutes.toString().padStart(2, '0')}.${(seconds % 60).toString().padStart(2, '0')}`;
-            if (++count1 === 60) { autoSave(); count1 = 0; }
+            seconds++;
+            if (seconds === 60) {
+                seconds = 0;
+                minutes++;
+            }
+            if (minutes === 60) {
+                minutes = 0;
+                hours++;
+            }
+            const formattedMinutes = minutes.toString().padStart(2, '0');
+            const formattedSeconds = (seconds % 60).toString().padStart(2, '0');
+            document.querySelector("time1").textContent = `${hours}h${formattedMinutes}.${formattedSeconds}`;
+            count1++;
+            if (count1 === 60) {
+                autoSave();
+                count1 = 0;
+            }
         }, 1000);
     } else if (timerId) {
         clearInterval(timerId);
         timerId = null;
     }
 }
+// ===== autoSave =====
 async function autoSave() {
     await saveState();
     await message(`[${recCount}]_Recorded!`);
     recCount++;
 }
+// ===== resumeGame =====
 async function resumeGame() {
-  timer(true);
-  isRunning = true;
-  if (audioCtx && (audioCtx.state === 'suspended' || audioCtx.state === 'interrupted')) { audioCtx.resume() }
-  fadeAudioIn();
-  message("[_] Resumed!");
+    timer(true);
+    isRunning = true;
+    if (audioContext && (audioContext.state === 'suspended' || audioContext.state === 'interrupted')) {
+        audioContext.resume();
+    }
+    fadeAudioIn();
+    message("[_] Resumed!");
 }
+// ===== pauseGame =====
 async function pauseGame() {
-  timer(false);
-  isRunning = false;
-  if (gainNode) gainNode.gain.value = 0;
-  message("[_] Paused!");
+    timer(false);
+    isRunning = false;
+    if (audioGainNode) {
+        audioGainNode.gain.value = 0;
+    }
+    message("[_] Paused!");
 }
+// ===== rebootGame =====
 async function rebootGame() {
-  location.reload()
+    location.reload();
 }

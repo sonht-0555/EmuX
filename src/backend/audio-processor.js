@@ -1,43 +1,96 @@
 class AudioProcessor extends AudioWorkletProcessor {
-  constructor() {
-    super();
-    this.s = 16384; this.L = new Float32Array(this.s); this.R = new Float32Array(this.s);
-    this.w = 0; this.r = 0.0; this.ratio = 1.0;
-    this.vol = 1.0; this.t = 0;
-    this.port.onmessage = e => {
-      this.t = 0; // Reset timer mỗi khi có dữ liệu mới
-      if (e.data.ratio) return this.ratio = e.data.ratio;
-      const { l, r } = e.data;
-      for (let i = 0; i < l.length; i++, this.w = (this.w + 1) % this.s) {
-        this.L[this.w] = l[i]; this.R[this.w] = r[i];
-      }
-    };
-  }
-  interp(b, p) {
-    const i = p | 0, f = p - i, m = this.s - 1;
-    const p0 = b[(i - 1) & m], p1 = b[i & m], p2 = b[(i + 1) & m], p3 = b[(i + 2) & m];
-    return (p1 + 0.5 * f * (p2 - p0 + f * (2 * p0 - 5 * p1 + 4 * p2 - p3 + f * (3 * (p1 - p2) + p3 - p0)))) * this.vol;
-  }
-  process(_, [out]) {
-    const [oL, oR] = out, len = oL.length, L = this.L, R = this.R, s = this.s;
-    let r = this.r, avail = (this.w - (r | 0) + s) & (s - 1);
-    const d = this.ratio * (avail > s * 0.7 ? 1.005 : avail < 4800 ? 0.995 : 1);
-    this.t++;
-    if (this.t > 6) this.vol = Math.max(0, this.vol - 0.1); 
-    else if (avail > 1024) this.vol = Math.min(1, this.vol + 0.05);
-
-    if (oR) for (let i = 0; i < len; i++) {
-        if (avail > 8) {
-        oL[i] = this.interp(L, r); oR[i] = this.interp(R, r);
-        if ((r += d) >= s) r -= s; avail -= d;
-      } else oL[i] = oR[i] = 0;
-    } else for (let i = 0; i < len; i++) {
-        if (avail > 8) {
-        oL[i] = this.interp(L, r);
-        if ((r += d) >= s) r -= s; avail -= d;
-      } else oL[i] = 0;
+    constructor() {
+        super();
+        this.bufferSize = 16384;
+        this.leftBuffer = new Float32Array(this.bufferSize);
+        this.rightBuffer = new Float32Array(this.bufferSize);
+        this.writePosition = 0;
+        this.readPosition = 0.0;
+        this.ratio = 1.0;
+        this.volume = 1.0;
+        this.silenceTimer = 0;
+        this.port.onmessage = (event) => {
+            // Reset timer when new data arrives
+            this.silenceTimer = 0;
+            if (event.data.ratio) {
+                this.ratio = event.data.ratio;
+                return;
+            }
+            const { l, r } = event.data;
+            for (let index = 0; index < l.length; index++) {
+                this.leftBuffer[this.writePosition] = l[index];
+                this.rightBuffer[this.writePosition] = r[index];
+                this.writePosition = (this.writePosition + 1) % this.bufferSize;
+            }
+        };
     }
-    this.r = r; return true;
-  }
+    // ===== interpolate =====
+    interpolate(buffer, position) {
+        const integerPart = position | 0;
+        const fractionalPart = position - integerPart;
+        const mask = this.bufferSize - 1;
+        const point0 = buffer[(integerPart - 1) & mask];
+        const point1 = buffer[integerPart & mask];
+        const point2 = buffer[(integerPart + 1) & mask];
+        const point3 = buffer[(integerPart + 2) & mask];
+        const interpolatedValue = point1 + 0.5 * fractionalPart * (
+            point2 - point0 + fractionalPart * (
+                2 * point0 - 5 * point1 + 4 * point2 - point3 + fractionalPart * (
+                    3 * (point1 - point2) + point3 - point0
+                )
+            )
+        );
+        return interpolatedValue * this.volume;
+    }
+    // ===== process =====
+    process(inputs, outputs) {
+        const outputChannels = outputs[0];
+        const outputLeft = outputChannels[0];
+        const outputRight = outputChannels[1];
+        const outputLength = outputLeft.length;
+        let readPosition = this.readPosition;
+        let availableSamples = (this.writePosition - (readPosition | 0) + this.bufferSize) & (this.bufferSize - 1);
+        const dynamicRatio = this.ratio * (
+            availableSamples > this.bufferSize * 0.7 ? 1.005 :
+            availableSamples < 4800 ? 0.995 : 1
+        );
+        this.silenceTimer++;
+        if (this.silenceTimer > 6) {
+            this.volume = Math.max(0, this.volume - 0.1);
+        } else if (availableSamples > 1024) {
+            this.volume = Math.min(1, this.volume + 0.05);
+        }
+        if (outputRight) {
+            for (let index = 0; index < outputLength; index++) {
+                if (availableSamples > 8) {
+                    outputLeft[index] = this.interpolate(this.leftBuffer, readPosition);
+                    outputRight[index] = this.interpolate(this.rightBuffer, readPosition);
+                    readPosition += dynamicRatio;
+                    if (readPosition >= this.bufferSize) {
+                        readPosition -= this.bufferSize;
+                    }
+                    availableSamples -= dynamicRatio;
+                } else {
+                    outputLeft[index] = 0;
+                    outputRight[index] = 0;
+                }
+            }
+        } else {
+            for (let index = 0; index < outputLength; index++) {
+                if (availableSamples > 8) {
+                    outputLeft[index] = this.interpolate(this.leftBuffer, readPosition);
+                    readPosition += dynamicRatio;
+                    if (readPosition >= this.bufferSize) {
+                        readPosition -= this.bufferSize;
+                    }
+                    availableSamples -= dynamicRatio;
+                } else {
+                    outputLeft[index] = 0;
+                }
+            }
+        }
+        this.readPosition = readPosition;
+        return true;
+    }
 }
 registerProcessor('audio-processor', AudioProcessor);

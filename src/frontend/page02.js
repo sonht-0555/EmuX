@@ -1,15 +1,30 @@
-let value = 5, startY = 0, swiping = false, number = 1, active = null;
+// ===== Page02 State Variables =====
+let brightnessValue = 5;
+let swipeStartY = 0;
+let isSwiping = false;
+let shaderNumber = 1;
+let activeElement = null;
 const activePointers = new Map();
-function handleButton(press, element) {
-    const parts = element?.getAttribute('data')?.split('-').slice(1) || [];
-    parts.forEach(part => press ? buttonPress(part) : buttonUnpress(part));
+// ===== handleButton =====
+function handleButton(isPressed, element) {
+    const dataParts = element?.getAttribute('data')?.split('-').slice(1) || [];
+    dataParts.forEach(part => {
+        if (isPressed) {
+            buttonPress(part);
+        } else {
+            buttonUnpress(part);
+        }
+    });
 }
-function setState(pointerId, element) {
-    const current = activePointers.get(pointerId);
-    if (element === current) return;
-    
-    current && handleButton(false, current);
-    
+// ===== setPointerState =====
+function setPointerState(pointerId, element) {
+    const currentElement = activePointers.get(pointerId);
+    if (element === currentElement) {
+        return;
+    }
+    if (currentElement) {
+        handleButton(false, currentElement);
+    }
     if (element) {
         activePointers.set(pointerId, element);
         handleButton(true, element);
@@ -17,71 +32,129 @@ function setState(pointerId, element) {
         activePointers.delete(pointerId);
     }
 }
+// ===== DOMContentLoaded =====
 document.addEventListener("DOMContentLoaded", function() {
-    document.onpointerdown = e => {
-        setState(e.pointerId, e.target.closest('[data]'));
+    // Document Pointer Down
+    document.onpointerdown = (event) => {
+        setPointerState(event.pointerId, event.target.closest('[data]'));
     };
-    document.onpointermove = e => {
-        const active = activePointers.get(e.pointerId);
-        if (!active) return;
-        const element = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data]');
-        if (element && element !== active &&
-            active.getAttribute('data').split('-')[0] === element.getAttribute('data').split('-')[0]) {
-            setState(e.pointerId, element);
+    // Document Pointer Move
+    document.onpointermove = (event) => {
+        const activeElement = activePointers.get(event.pointerId);
+        if (!activeElement) {
+            return;
+        }
+        const targetElement = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data]');
+        if (targetElement && targetElement !== activeElement) {
+            const activeDataType = activeElement.getAttribute('data').split('-')[0];
+            const targetDataType = targetElement.getAttribute('data').split('-')[0];
+            if (activeDataType === targetDataType) {
+                setPointerState(event.pointerId, targetElement);
+            }
         }
     };
-    canvas.onpointerdown = e => {
-        const r = canvas.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
-        if (doubleTap(e, canvas, 1)) {
-            x < r.width / 2 ? (y < r.height / 2 ? loadState(3) : loadState(2)) : (y < r.height / 2 ? saveState(3) : saveState(2));
+    // Canvas Pointer Down
+    canvas.onpointerdown = (event) => {
+        const canvasRect = canvas.getBoundingClientRect();
+        const touchX = event.clientX - canvasRect.left;
+        const touchY = event.clientY - canvasRect.top;
+        if (doubleTap(event, canvas, 1)) {
+            if (touchX < canvasRect.width / 2) {
+                if (touchY < canvasRect.height / 2) {
+                    loadState(3);
+                } else {
+                    loadState(2);
+                }
+            } else {
+                if (touchY < canvasRect.height / 2) {
+                    saveState(3);
+                } else {
+                    saveState(2);
+                }
+            }
         }
-        startY = e.clientY, swiping = e.clientX > (r.right - 40);
+        swipeStartY = event.clientY;
+        isSwiping = event.clientX > (canvasRect.right - 40);
     };
-    canvas.onpointermove = e => {
-        if (!swiping) return;
-        if (Math.abs(startY - e.clientY) >= 20) {
-            value = startY - e.clientY > 0 ? Math.min(10, value + 1) : Math.max(0, value - 1);
-            gamepad.style.opacity = value / 10;
-            message(`Brightness_${value}0.nit`);
-            startY = e.clientY;
+    // Canvas Pointer Move
+    canvas.onpointermove = (event) => {
+        if (!isSwiping) {
+            return;
+        }
+        const swipeDistance = Math.abs(swipeStartY - event.clientY);
+        if (swipeDistance >= 20) {
+            if (swipeStartY - event.clientY > 0) {
+                brightnessValue = Math.min(10, brightnessValue + 1);
+            } else {
+                brightnessValue = Math.max(0, brightnessValue - 1);
+            }
+            gamepad.style.opacity = brightnessValue / 10;
+            message(`Brightness_${brightnessValue}0.nit`);
+            swipeStartY = event.clientY;
         }
     };
-    canvasB.onpointerdown = canvasB.onpointermove = e => {
-        if (!Module.isNDS) return;
-        const r = canvasB.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
-        window._pD = (e.type !== 'pointerup' && e.type !== 'pointercancel') ? 1 : 0;
-        window._pX = Math.floor(x / r.width * 65535 - 32768);
-        window._pY = Math.floor(y / r.height * 32767);
-        e.preventDefault();
+    // Bottom Canvas (NDS Touch Screen)
+    canvasB.onpointerdown = canvasB.onpointermove = (event) => {
+        if (!Module.isNDS) {
+            return;
+        }
+        const canvasRect = canvasB.getBoundingClientRect();
+        const touchX = event.clientX - canvasRect.left;
+        const touchY = event.clientY - canvasRect.top;
+        const isPointerDown = event.type !== 'pointerup' && event.type !== 'pointercancel';
+        window._pD = isPointerDown ? 1 : 0;
+        window._pX = Math.floor(touchX / canvasRect.width * 65535 - 32768);
+        window._pY = Math.floor(touchY / canvasRect.height * 32767);
+        event.preventDefault();
     };
-    canvasB.onpointerup = canvasB.onpointercancel = () => { window._pD = 0; swiping = false; };
-    state.onpointerdown = e => {
-        if (doubleTap(e, state)) {
+    canvasB.onpointerup = canvasB.onpointercancel = () => {
+        window._pD = 0;
+        isSwiping = false;
+    };
+    // Shader State Button
+    state.onpointerdown = (event) => {
+        if (doubleTap(event, state)) {
             isRunning = false;
-            setTimeout(() => { 
-                const input = prompt("Format [shaderxx-data]");
-                input && local(...(input.split('-')));
+            setTimeout(() => {
+                const userInput = prompt("Format [shaderxx-data]");
+                if (userInput) {
+                    local(...(userInput.split('-')));
+                }
                 isRunning = true;
             }, 150);
         } else {
-            number = number % 5 + 1;
-            local("shader", number);
-            const shader = local(`shader0${number}`) || "0.0.0.1.0.0.1.0.0.1.0.0.1.0.0.0";
-            screen.style.setProperty("--shader", pngGen(window.devicePixelRatio, integer, shader)); 
-            message(`[0${number}] Matrix!`);
+            shaderNumber = shaderNumber % 5 + 1;
+            local("shader", shaderNumber);
+            const shaderData = local(`shader0${shaderNumber}`) || "0.0.0.1.0.0.1.0.0.1.0.0.1.0.0.0";
+            screen.style.setProperty("--shader", svgGen(window.devicePixelRatio, integer, shaderData));
+            message(`[0${shaderNumber}] Matrix!`);
         }
     };
-    switch0.onpointerdown = () => { switchRenderer() };
-    ['pointerup', 'pointercancel'].forEach(type => addEventListener(type, e => { setState(e.pointerId, null); swiping = false; joy.style.opacity = "0"}));
-    joy.onpointerdown = () => {joy.style.opacity = "1"};
-    // visibility
-    invis.onpointermove  = () => {
-        page00.hidden = false;
-        notifi(" pa","use.",""," double tap to resume."), pauseGame();
+    // Renderer Switch Button
+    switch0.onpointerdown = () => {
+        switchRenderer();
     };
-    page00.onpointerdown = e => {
-        if (doubleTap(e, page00)) {
-            page00.hidden = true; 
+    // Pointer Up/Cancel Handler
+    ['pointerup', 'pointercancel'].forEach(eventType => {
+        addEventListener(eventType, (event) => {
+            setPointerState(event.pointerId, null);
+            isSwiping = false;
+            joy.style.opacity = "0";
+        });
+    });
+    // Joy Button
+    joy.onpointerdown = () => {
+        joy.style.opacity = "1";
+    };
+    // Visibility Handler
+    invis.onpointermove = () => {
+        page00.hidden = false;
+        notifi(" pa", "use.", "", " double tap to resume.");
+        pauseGame();
+    };
+    page00.onpointerdown = (event) => {
+        if (doubleTap(event, page00)) {
+            page00.hidden = true;
             resumeGame();
         }
     };

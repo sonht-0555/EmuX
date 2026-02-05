@@ -1,4 +1,4 @@
-let revision = 'EmuX_3.27';
+let revision = 'EmuX_3.28';
 var urlsToCache = [
     './', 
     './index.html',
@@ -36,7 +36,6 @@ var urlsToCache = [
     './src/backend/storage.js',
     './src/backend/main.js',
     './src/frontend/global.js',
-    './src/frontend/main.js',
     './src/frontend/page01.js',
     './src/frontend/page02.js'
 ];

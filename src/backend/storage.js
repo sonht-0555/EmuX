@@ -1,85 +1,131 @@
-let dbCache = null
-const DB_NAME = 'EmuxDB', allStoreNames = () => Object.keys(STORES), STORES = {
-  games: ['nes','sfc','smc','gba','gb','gbc','bin','rom','md','gen','ngp','ngc','nds','iso','img','cue','pbp','zip','pce'],
-  saves: ['sav','srm','sram'],
-  states: ['ss1','ss2','ss3','ss4','ss5','ss6','ss7','ss8','ss9','ss0']
+let databaseCache = null;
+const DATABASE_NAME = 'EmuxDB';
+const STORES = {
+    games: ['nes', 'sfc', 'smc', 'gba', 'gb', 'gbc', 'bin', 'rom', 'md', 'gen', 'ngp', 'ngc', 'nds', 'iso', 'img', 'cue', 'pbp', 'zip', 'pce'],
+    saves: ['sav', 'srm', 'sram'],
+    states: ['ss1', 'ss2', 'ss3', 'ss4', 'ss5', 'ss6', 'ss7', 'ss8', 'ss9', 'ss0']
+};
+// ===== getAllStoreNames =====
+function getAllStoreNames() {
+    return Object.keys(STORES);
 }
-
-const storeForFilename = fn => {
-  if (!fn || typeof fn !== 'string') return 'games';
-  const ext = fn.split('.').pop()?.toLowerCase();
-  return ext ? (allStoreNames().find(s => STORES[s].includes(ext)) || 'games') : 'games';
-}
-
-async function getDB() {
-  if (dbCache) return dbCache;
-  const open = v => new Promise((r, j) => {
-    const rq = indexedDB.open(DB_NAME, v);
-    if (v) rq.onupgradeneeded = e => allStoreNames().forEach(s => { if (!e.target.result.objectStoreNames.contains(s)) e.target.result.createObjectStore(s); });
-    rq.onsuccess = e => r(e.target.result);
-    rq.onerror = j;
-  });
-  const db = await open();
-  const miss = allStoreNames().filter(s => !db.objectStoreNames.contains(s));
-  if (miss.length) { db.close(); dbCache = await open(db.version + 1); }
-  else dbCache = db;
-  return dbCache;
-}
-
-async function emuxDB(dataOrKey, name) {
-  const db = await getDB();
-  const key = name || dataOrKey;
-  const storeName = storeForFilename(String(key));
-  const tx = db.transaction(storeName, name ? 'readwrite' : 'readonly');
-  const store = tx.objectStore(storeName);
-  return new Promise((res, rej) => {
-    if (name) {
-      let dataToSave = dataOrKey;
-      if (dataToSave instanceof ArrayBuffer) dataToSave = new Uint8Array(dataToSave);
-      store.put(dataToSave, name);
-      tx.oncomplete = () => res(true);
-      tx.onerror = e => rej(e);
-    } else {
-      const rq = store.get(dataOrKey);
-      rq.onsuccess = () => res(rq.result);
-      rq.onerror = e => rej(e);
+// ===== storeForFilename =====
+function storeForFilename(filename) {
+    if (!filename || typeof filename !== 'string') {
+        return 'games';
     }
-  });
+    const extension = filename.split('.').pop()?.toLowerCase();
+    if (!extension) {
+        return 'games';
+    }
+    const matchedStore = getAllStoreNames().find(storeName => STORES[storeName].includes(extension));
+    return matchedStore || 'games';
 }
-
+// ===== getDB =====
+async function getDB() {
+    if (databaseCache) {
+        return databaseCache;
+    }
+    const openDatabase = (version) => {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(DATABASE_NAME, version);
+            if (version) {
+                request.onupgradeneeded = (event) => {
+                    const database = event.target.result;
+                    getAllStoreNames().forEach(storeName => {
+                        if (!database.objectStoreNames.contains(storeName)) {
+                            database.createObjectStore(storeName);
+                        }
+                    });
+                };
+            }
+            request.onsuccess = (event) => resolve(event.target.result);
+            request.onerror = reject;
+        });
+    };
+    const database = await openDatabase();
+    const missingStores = getAllStoreNames().filter(storeName => !database.objectStoreNames.contains(storeName));
+    if (missingStores.length) {
+        database.close();
+        databaseCache = await openDatabase(database.version + 1);
+    } else {
+        databaseCache = database;
+    }
+    return databaseCache;
+}
+// ===== emuxDB =====
+async function emuxDB(dataOrKey, name) {
+    const database = await getDB();
+    const key = name || dataOrKey;
+    const storeName = storeForFilename(String(key));
+    const transaction = database.transaction(storeName, name ? 'readwrite' : 'readonly');
+    const objectStore = transaction.objectStore(storeName);
+    return new Promise((resolve, reject) => {
+        if (name) {
+            let dataToSave = dataOrKey;
+            if (dataToSave instanceof ArrayBuffer) {
+                dataToSave = new Uint8Array(dataToSave);
+            }
+            objectStore.put(dataToSave, name);
+            transaction.oncomplete = () => resolve(true);
+            transaction.onerror = (event) => reject(event);
+        } else {
+            const request = objectStore.get(dataOrKey);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = (event) => reject(event);
+        }
+    });
+}
+// ===== listStore =====
 async function listStore(storeName) {
-  const db = await getDB();
-  const getKeys = s => new Promise((r, j) => {
-    if (!db.objectStoreNames.contains(s)) return r([]);
-    const rq = db.transaction(s, 'readonly').objectStore(s).getAllKeys();
-    rq.onsuccess = () => r(rq.result.map(k => String(k)));
-    rq.onerror = j;
-  });
-  if (!storeName) {
-    const out = {};
-    for (const s of allStoreNames()) out[s] = await getKeys(s);
-    return out;
-  }
-  return getKeys(storeName);
+    const database = await getDB();
+    const getKeysFromStore = (store) => {
+        return new Promise((resolve, reject) => {
+            if (!database.objectStoreNames.contains(store)) {
+                return resolve([]);
+            }
+            const transaction = database.transaction(store, 'readonly');
+            const objectStore = transaction.objectStore(store);
+            const request = objectStore.getAllKeys();
+            request.onsuccess = () => {
+                const keys = request.result.map(key => String(key));
+                resolve(keys);
+            };
+            request.onerror = reject;
+        });
+    };
+    if (!storeName) {
+        const result = {};
+        for (const store of getAllStoreNames()) {
+            result[store] = await getKeysFromStore(store);
+        }
+        return result;
+    }
+    return getKeysFromStore(storeName);
 }
-
+// ===== deleteFromStore =====
 async function deleteFromStore(key) {
-  const db = await getDB();
-  const storeName = storeForFilename(String(key));
-  return new Promise((res, rej) => {
-    const tx = db.transaction(storeName, 'readwrite');
-    tx.objectStore(storeName).delete(key);
-    tx.oncomplete = () => res(true);
-    tx.onerror = e => rej(e);
-  });
+    const database = await getDB();
+    const storeName = storeForFilename(String(key));
+    return new Promise((resolve, reject) => {
+        const transaction = database.transaction(storeName, 'readwrite');
+        const objectStore = transaction.objectStore(storeName);
+        objectStore.delete(key);
+        transaction.oncomplete = () => resolve(true);
+        transaction.onerror = (event) => reject(event);
+    });
 }
-
+// ===== downloadFromStore =====
 async function downloadFromStore(name) {
-  const data = await emuxDB(name);
-  if (!data) return message("File not found!");
-  const url = URL.createObjectURL(new Blob([data]));
-  const a = document.createElement('a');
-  a.href = url; a.download = name; a.click();
-  URL.revokeObjectURL(url);
-  message(`[#]_Exported!`);
+    const data = await emuxDB(name);
+    if (!data) {
+        return message("File not found!");
+    }
+    const blobUrl = URL.createObjectURL(new Blob([data]));
+    const downloadLink = document.createElement('a');
+    downloadLink.href = blobUrl;
+    downloadLink.download = name;
+    downloadLink.click();
+    URL.revokeObjectURL(blobUrl);
+    message(`[#]_Exported!`);
 }
