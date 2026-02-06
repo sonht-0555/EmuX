@@ -104,9 +104,11 @@ function render16(source16, source32, last32, last32Ptr, buffer, context, imageD
 }
 // ===== renderNDS =====
 function renderNDS(pointer, width, height) {
+    const heap = Module.HEAPU8;
+    if (!heap) return;
+    const buffer = heap.buffer;
     const halfHeight = height >> 1;
     const pixelCount = width * halfHeight;
-    const buffer = Module.HEAPU8.buffer;
     if (cachedWidth !== width || cachedHeight !== halfHeight || !pixelBuffer) {
         cachedWidth = width;
         cachedHeight = halfHeight;
@@ -131,6 +133,7 @@ function renderNDS(pointer, width, height) {
         ndsPointer = pointer;
         sourceView32 = new Uint32Array(buffer, pointer, width * height);
     }
+    if (!pixelBuffer) return;
     render32(sourceView32, 0, lastMainFrame, lastMainFramePtr, pixelBuffer, context2d, imageData, pixelCount, 0);
     render32(sourceView32, pixelCount, lastBottomFrame, lastBottomFramePtr, pixelBufferBottom, context2dBottom, imageDataBottom, pixelCount, 1);
     logSkip();
