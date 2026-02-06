@@ -54,8 +54,9 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     };
     // Canvas Pointer Down
+    let canvasRect;
     canvas.onpointerdown = (event) => {
-        const canvasRect = canvas.getBoundingClientRect();
+        canvasRect = canvas.getBoundingClientRect();
         const touchX = event.clientX - canvasRect.left;
         const touchY = event.clientY - canvasRect.top;
         if (doubleTap(event, canvas, 1)) {
@@ -78,7 +79,7 @@ document.addEventListener("DOMContentLoaded", function() {
     };
     // Canvas Pointer Move
     canvas.onpointermove = (event) => {
-        if (!isSwiping) {
+        if (!isSwiping || !canvasRect) {
             return;
         }
         const swipeDistance = Math.abs(swipeStartY - event.clientY);
@@ -94,17 +95,19 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     };
     // Bottom Canvas (NDS Touch Screen)
+    let canvasBRect;
     canvasB.onpointerdown = canvasB.onpointermove = (event) => {
         if (!Module.isNDS) {
             return;
         }
-        const canvasRect = canvasB.getBoundingClientRect();
-        const touchX = event.clientX - canvasRect.left;
-        const touchY = event.clientY - canvasRect.top;
-        const isPointerDown = event.type !== 'pointerup' && event.type !== 'pointercancel';
-        window._pD = isPointerDown ? 1 : 0;
-        window._pX = Math.floor(touchX / canvasRect.width * 65535 - 32768);
-        window._pY = Math.floor(touchY / canvasRect.height * 32767);
+        if (event.type === "pointerdown" || !canvasBRect) {
+            canvasBRect = canvasB.getBoundingClientRect();
+        }
+        const touchX = event.clientX - canvasBRect.left;
+        const touchY = event.clientY - canvasBRect.top;
+        window._pD = 1;
+        window._pX = Math.floor(touchX / canvasBRect.width * 65535 - 32768);
+        window._pY = Math.floor(touchY / canvasBRect.height * 32767);
         event.preventDefault();
     };
     canvasB.onpointerup = canvasB.onpointercancel = () => {

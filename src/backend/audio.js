@@ -40,20 +40,24 @@ function fadeAudioIn(duration = 2) {
     audioGainNode.gain.linearRampToValueAtTime(1, currentTime + duration);
 }
 // ===== writeAudio =====
+let audioBufferL, audioBufferR, maxFrames = 0;
 function writeAudio(pointer, frames) {
     if (!audioWorkletNode || !isRunning) {
         return frames;
     }
+    if (frames > maxFrames) {
+        maxFrames = frames;
+        audioBufferL = new Float32Array(maxFrames);
+        audioBufferR = new Float32Array(maxFrames);
+    }
     const audioData = new Int16Array(Module.HEAPU8.buffer, pointer, frames * 2);
-    const leftChannel = new Float32Array(frames);
-    const rightChannel = new Float32Array(frames);
     for (let index = 0; index < frames; index++) {
-        leftChannel[index] = audioData[index * 2] / 32768;
-        rightChannel[index] = audioData[index * 2 + 1] / 32768;
+        audioBufferL[index] = audioData[index * 2] / 32768;
+        audioBufferR[index] = audioData[index * 2 + 1] / 32768;
     }
     audioWorkletNode.port.postMessage({
-        l: leftChannel,
-        r: rightChannel
+        l: audioBufferL.subarray(0, frames),
+        r: audioBufferR.subarray(0, frames)
     });
     return frames;
 }
