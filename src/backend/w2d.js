@@ -13,7 +13,8 @@ let lastView16as32;
 let sourceView32;
 let sourceView16;
 // ===== render32 =====
-function render32(source, sourceOffset, lastFrame, lastFramePtr, buffer, context, imageDataObject, length) {
+let source64_w2d_top, last64_w2d_top, source64_w2d_bottom, last64_w2d_bottom;
+function render32(source, sourceOffset, lastFrame, lastFramePtr, buffer, context, imageDataObject, length, screenType) {
     frameCount++;
     const isDirtyFn = Module._retro_is_dirty || (Module.asm && Module.asm._retro_is_dirty) || (Module.instance && Module.instance.exports && Module.instance.exports._retro_is_dirty) || (Module.instance && Module.instance.exports && Module.instance.exports.retro_is_dirty);
     if (isDirtyFn && lastFramePtr) {
@@ -26,8 +27,19 @@ function render32(source, sourceOffset, lastFrame, lastFramePtr, buffer, context
             return;
         }
     } else {
-        const source64 = new BigUint64Array(source.buffer, source.byteOffset + (sourceOffset << 2), length >> 1);
-        const last64 = new BigUint64Array(lastFrame.buffer, 0, length >> 1);
+        let source64 = screenType ? source64_w2d_bottom : source64_w2d_top;
+        let last64 = screenType ? last64_w2d_bottom : last64_w2d_top;
+        if (!source64 || source64.buffer !== source.buffer || source64.byteOffset !== source.byteOffset + (sourceOffset << 2) || source64.length !== length >> 1) {
+            source64 = new BigUint64Array(source.buffer, source.byteOffset + (sourceOffset << 2), length >> 1);
+            last64 = new BigUint64Array(lastFrame.buffer, 0, length >> 1);
+            if (screenType) {
+                source64_w2d_bottom = source64;
+                last64_w2d_bottom = last64;
+            } else {
+                source64_w2d_top = source64;
+                last64_w2d_top = last64;
+            }
+        }
         for (let index = source64.length - 1; index >= 0; index--) {
             if (source64[index] !== last64[index]) {
                 for (let pixelIndex = 0, sourceIndex = sourceOffset; pixelIndex < length; pixelIndex++, sourceIndex++) {
@@ -117,8 +129,8 @@ function renderNDS(pointer, width, height) {
         ndsPointer = pointer;
         sourceView32 = new Uint32Array(buffer, pointer, width * height);
     }
-    render32(sourceView32, 0, lastMainFrame, lastMainFramePtr, pixelBuffer, context2d, imageData, pixelCount);
-    render32(sourceView32, pixelCount, lastBottomFrame, lastBottomFramePtr, pixelBufferBottom, context2dBottom, imageDataBottom, pixelCount);
+    render32(sourceView32, 0, lastMainFrame, lastMainFramePtr, pixelBuffer, context2d, imageData, pixelCount, 0);
+    render32(sourceView32, pixelCount, lastBottomFrame, lastBottomFramePtr, pixelBufferBottom, context2dBottom, imageDataBottom, pixelCount, 1);
     logSkip();
 }
 // ===== activeRenderFn =====
@@ -178,7 +190,7 @@ window.activeRenderFn = function(pointer, width, height, pitch) {
         }
     }
     if (is32BitFormat) {
-        render32(sourceView32, 0, lastMainFrame, lastMainFramePtr, pixelBuffer, context2d, imageData, pixelCount);
+        render32(sourceView32, 0, lastMainFrame, lastMainFramePtr, pixelBuffer, context2d, imageData, pixelCount, 0);
     } else {
         render16(sourceView16, sourceView32, lastView16as32, lastMainFramePtr, pixelBuffer, context2d, imageData, width, height, pitch >> 1);
     }

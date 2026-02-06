@@ -193,13 +193,25 @@ async function initCore(romFile) {
                 audioContext.resume();
                 Module._free(avInfoPointer);
                 // Start main loop
+                let rafId;
                 function mainLoop() {
                     if (isRunning) {
                         Module._retro_run();
+                        rafId = requestAnimationFrame(mainLoop);
                     }
-                    requestAnimationFrame(mainLoop);
                 }
-                mainLoop();
+                window.startLoop = () => {
+                    if (!rafId) {
+                        rafId = requestAnimationFrame(mainLoop);
+                    }
+                };
+                window.stopLoop = () => {
+                    if (rafId) {
+                        cancelAnimationFrame(rafId);
+                        rafId = 0;
+                    }
+                };
+                startLoop();
                 // Finalize
                 await loadState();
                 await timer(true);

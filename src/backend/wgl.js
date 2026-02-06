@@ -68,6 +68,7 @@ function initGL(canvas) {
     };
 }
 // ===== render32 =====
+let source64_wgl_top, last64_wgl_top, source64_wgl_bottom, last64_wgl_bottom;
 function render32(source, sourceOffset, lastFrame, lastFramePtr, buffer, view, context, texture, width, height, length, textureType) {
     frameCount++;
     const isDirtyFn = Module._retro_is_dirty || (Module.asm && Module.asm._retro_is_dirty) || (Module.instance && Module.instance.exports && Module.instance.exports._retro_is_dirty) || (Module.instance && Module.instance.exports && Module.instance.exports.retro_is_dirty);
@@ -88,8 +89,19 @@ function render32(source, sourceOffset, lastFrame, lastFramePtr, buffer, view, c
             return;
         }
     } else {
-        const source64 = new BigUint64Array(source.buffer, source.byteOffset + (sourceOffset << 2), length >> 1);
-        const last64 = new BigUint64Array(lastFrame.buffer, 0, length >> 1);
+        let source64 = textureType ? source64_wgl_bottom : source64_wgl_top;
+        let last64 = textureType ? last64_wgl_bottom : last64_wgl_top;
+        if (!source64 || source64.buffer !== source.buffer || source64.byteOffset !== source.byteOffset + (sourceOffset << 2) || source64.length !== length >> 1) {
+            source64 = new BigUint64Array(source.buffer, source.byteOffset + (sourceOffset << 2), length >> 1);
+            last64 = new BigUint64Array(lastFrame.buffer, 0, length >> 1);
+            if (textureType) {
+                source64_wgl_bottom = source64;
+                last64_wgl_bottom = last64;
+            } else {
+                source64_wgl_top = source64;
+                last64_wgl_top = last64;
+            }
+        }
         for (let index = source64.length - 1; index >= 0; index--) {
             if (source64[index] !== last64[index]) {
                 for (let pixelIndex = 0, sourceIndex = sourceOffset; pixelIndex < length; pixelIndex++, sourceIndex++) {

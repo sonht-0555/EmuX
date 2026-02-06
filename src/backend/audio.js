@@ -41,6 +41,7 @@ function fadeAudioIn(duration = 2) {
 }
 // ===== writeAudio =====
 let audioBufferL, audioBufferR, maxFrames = 0;
+let audioDataView, audioDataBuffer, audioDataPointer;
 function writeAudio(pointer, frames) {
     if (!audioWorkletNode || !isRunning) {
         return frames;
@@ -50,10 +51,15 @@ function writeAudio(pointer, frames) {
         audioBufferL = new Float32Array(maxFrames);
         audioBufferR = new Float32Array(maxFrames);
     }
-    const audioData = new Int16Array(Module.HEAPU8.buffer, pointer, frames * 2);
+    const buffer = Module.HEAPU8.buffer;
+    if (!audioDataView || audioDataBuffer !== buffer || audioDataPointer !== pointer || audioDataView.length < frames * 2) {
+        audioDataBuffer = buffer;
+        audioDataPointer = pointer;
+        audioDataView = new Int16Array(buffer, pointer, Math.max(frames * 2, maxFrames * 2));
+    }
     for (let index = 0; index < frames; index++) {
-        audioBufferL[index] = audioData[index * 2] / 32768;
-        audioBufferR[index] = audioData[index * 2 + 1] / 32768;
+        audioBufferL[index] = audioDataView[index * 2] / 32768;
+        audioBufferR[index] = audioDataView[index * 2 + 1] / 32768;
     }
     audioWorkletNode.port.postMessage({
         l: audioBufferL.subarray(0, frames),

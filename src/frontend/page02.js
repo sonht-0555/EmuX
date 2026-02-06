@@ -38,8 +38,12 @@ document.addEventListener("DOMContentLoaded", function() {
     document.onpointerdown = (event) => {
         setPointerState(event.pointerId, event.target.closest('[data]'));
     };
-    // Document Pointer Move
+    // Document Pointer Move (throttled to 60fps)
+    let lastMoveTime = 0;
     document.onpointermove = (event) => {
+        const now = performance.now();
+        if (now - lastMoveTime < 16) return;
+        lastMoveTime = now;
         const activeElement = activePointers.get(event.pointerId);
         if (!activeElement) {
             return;

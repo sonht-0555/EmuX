@@ -42,10 +42,14 @@ async function loadState(slot = 1) {
     }
 }
 // ===== timer =====
+let time1Element;
 async function timer(isStart) {
     if (isStart) {
         if (timerId) {
             return;
+        }
+        if (!time1Element) {
+            time1Element = document.querySelector("time1");
         }
         timerId = setInterval(() => {
             seconds++;
@@ -59,7 +63,7 @@ async function timer(isStart) {
             }
             const formattedMinutes = minutes.toString().padStart(2, '0');
             const formattedSeconds = (seconds % 60).toString().padStart(2, '0');
-            document.querySelector("time1").textContent = `${hours}h${formattedMinutes}.${formattedSeconds}`;
+            time1Element.textContent = `${hours}h${formattedMinutes}.${formattedSeconds}`;
             count1++;
             if (count1 === 60) {
                 autoSave();
@@ -81,6 +85,7 @@ async function autoSave() {
 async function resumeGame() {
     timer(true);
     isRunning = true;
+    if (window.startLoop) startLoop();
     if (audioContext && (audioContext.state === 'suspended' || audioContext.state === 'interrupted')) {
         audioContext.resume();
     }
@@ -91,6 +96,7 @@ async function resumeGame() {
 async function pauseGame() {
     timer(false);
     isRunning = false;
+    if (window.stopLoop) stopLoop();
     if (audioGainNode) {
         audioGainNode.gain.value = 0;
     }

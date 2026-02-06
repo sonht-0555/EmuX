@@ -40,13 +40,7 @@ function buttonUnpress(button) {
     const buttonId = buttonMap[button];
     if (buttonId !== undefined && buttonId !== '') {
         gamepadState[buttonId] = 0;
-        // Recalculate mask from scratch
-        gamepadMask = 0;
-        for (let index = 0; index < 16; index++) {
-            if (gamepadState[index]) {
-                gamepadMask |= (1 << index);
-            }
-        }
+        gamepadMask &= ~(1 << buttonId);
     }
 }
 // ===== input_state_cb =====
