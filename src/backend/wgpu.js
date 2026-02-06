@@ -8,6 +8,8 @@ let bindGroupMain;
 let bindGroupBottom;
 let textureMain;
 let textureBottom;
+let lastMainFramePtr = 0;
+let lastBottomFramePtr = 0;
 let lastMainFrame;
 let lastBottomFrame;
 let lastView16as32;
@@ -110,10 +112,11 @@ function recordDraw(context, bindGroup, encoder) {
     pass.end();
 }
 // ===== render32 =====
-function render32(source, sourceOffset, lastFrame, context, texture, width, height, length, bindGroup, encoder) {
+function render32(source, sourceOffset, lastFrame, lastFramePtr, context, texture, width, height, length, bindGroup, encoder) {
     frameCount++;
-    if (Module._retro_is_dirty) {
-        if (Module._retro_is_dirty(source.byteOffset + (sourceOffset << 2), lastFrame.byteOffset, length << 2)) {
+    const isDirtyFn = Module._retro_is_dirty || (Module.asm && Module.asm._retro_is_dirty) || (Module.instance && Module.instance.exports && Module.instance.exports._retro_is_dirty) || (Module.instance && Module.instance.exports && Module.instance.exports.retro_is_dirty);
+    if (isDirtyFn && lastFramePtr) {
+        if (isDirtyFn(source.byteOffset + (sourceOffset << 2), lastFramePtr, length << 2)) {
             lastFrame.set(source.subarray(sourceOffset, sourceOffset + length));
             gpuQueue.writeTexture({ texture: texture }, lastFrame, { bytesPerRow: width * 4 }, { width, height });
             recordDraw(context, bindGroup, encoder);
@@ -134,10 +137,13 @@ function render32(source, sourceOffset, lastFrame, context, texture, width, heig
     skippedFrames++;
 }
 // ===== render16 =====
-function render16(source32, last32, last16, context, texture, width, height, stride, bindGroup, encoder) {
+function render16(source32, last32, last16, last32Ptr, context, texture, width, height, stride, bindGroup, encoder) {
     frameCount++;
-    if (Module._retro_is_dirty) {
-        if (Module._retro_is_dirty(source32.byteOffset, last32.byteOffset, (width * height) << 1)) {
+    const widthWords = width >> 1;
+    const strideWords = stride >> 1;
+    const isDirtyFn = Module._retro_is_dirty || (Module.asm && Module.asm._retro_is_dirty) || (Module.instance && Module.instance.exports && Module.instance.exports._retro_is_dirty) || (Module.instance && Module.instance.exports && Module.instance.exports.retro_is_dirty);
+    if (isDirtyFn && last32Ptr) {
+        if (isDirtyFn(source32.byteOffset, last32Ptr, (width * height) << 1)) {
             if (width === stride) {
                 last32.set(source32);
             } else {
@@ -203,8 +209,12 @@ function renderNDS(pointer, width, height, encoder) {
         };
         bindGroupMain = createBindGroup(textureMain);
         bindGroupBottom = createBindGroup(textureBottom);
-        lastMainFrame = new Uint32Array(pixelCount);
-        lastBottomFrame = new Uint32Array(pixelCount);
+        if (lastMainFramePtr) Module._free(lastMainFramePtr);
+        if (lastBottomFramePtr) Module._free(lastBottomFramePtr);
+        lastMainFramePtr = Module._malloc(pixelCount << 2);
+        lastBottomFramePtr = Module._malloc(pixelCount << 2);
+        lastMainFrame = new Uint32Array(Module.HEAPU8.buffer, lastMainFramePtr, pixelCount);
+        lastBottomFrame = new Uint32Array(Module.HEAPU8.buffer, lastBottomFramePtr, pixelCount);
         sourceView32 = null;
         if (window.gameView) {
             gameView(gameName);
@@ -214,8 +224,8 @@ function renderNDS(pointer, width, height, encoder) {
         ndsPointer = pointer;
         sourceView32 = new Uint32Array(buffer, pointer, width * height);
     }
-    render32(sourceView32, 0, lastMainFrame, contextMain, textureMain, width, halfHeight, pixelCount, bindGroupMain, encoder);
-    render32(sourceView32, pixelCount, lastBottomFrame, contextBottom, textureBottom, width, halfHeight, pixelCount, bindGroupBottom, encoder);
+    render32(sourceView32, 0, lastMainFrame, lastMainFramePtr, contextMain, textureMain, width, halfHeight, pixelCount, bindGroupMain, encoder);
+    render32(sourceView32, pixelCount, lastBottomFrame, lastBottomFramePtr, contextBottom, textureBottom, width, halfHeight, pixelCount, bindGroupBottom, encoder);
 }
 // ===== activeRenderFn =====
 window.activeRenderFn = async function(pointer, width, height, pitch) {
@@ -263,11 +273,15 @@ window.activeRenderFn = async function(pointer, width, height, pitch) {
                     { binding: 2, resource: (is32BitFormat ? dummyTexture : textureMain).createView() }
                 ]
             });
+            const pixelCount = width * height;
+            if (lastMainFramePtr) Module._free(lastMainFramePtr);
             if (is32BitFormat) {
-                lastMainFrame = new Uint32Array(width * height);
+                lastMainFramePtr = Module._malloc(pixelCount << 2);
+                lastMainFrame = new Uint32Array(Module.HEAPU8.buffer, lastMainFramePtr, pixelCount);
             } else {
-                lastView16as32 = new Uint32Array((width * height) >> 1);
-                lastMain16 = new Uint16Array(lastView16as32.buffer);
+                lastMainFramePtr = Module._malloc(pixelCount << 1);
+                lastView16as32 = new Uint32Array(Module.HEAPU8.buffer, lastMainFramePtr, pixelCount >> 1);
+                lastMain16 = new Uint16Array(Module.HEAPU8.buffer, lastMainFramePtr, pixelCount);
             }
             if (window.gameView) {
                 gameView(gameName);
@@ -279,9 +293,9 @@ window.activeRenderFn = async function(pointer, width, height, pitch) {
             sourceView32 = new Uint32Array(buffer, pointer, (pitch * height) >> 2);
         }
         if (is32BitFormat) {
-            render32(sourceView32, 0, lastMainFrame, contextMain, textureMain, width, height, width * height, bindGroupMain, encoder);
+            render32(sourceView32, 0, lastMainFrame, lastMainFramePtr, contextMain, textureMain, width, height, width * height, bindGroupMain, encoder);
         } else {
-            render16(sourceView32, lastView16as32, lastMain16, contextMain, textureMain, width, height, pitch >> 1, bindGroupMain, encoder);
+            render16(sourceView32, lastView16as32, lastMain16, lastMainFramePtr, contextMain, textureMain, width, height, pitch >> 1, bindGroupMain, encoder);
         }
     }
     gpuQueue.submit([encoder.finish()]);
