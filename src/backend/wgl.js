@@ -68,10 +68,8 @@ function initGL(canvas) {
 // ===== render32 =====
 function render32(source, sourceOffset, lastFrame, buffer, view, context, texture, width, height, length, textureType) {
     frameCount++;
-    const source64 = new BigUint64Array(source.buffer, source.byteOffset + (sourceOffset << 2), length >> 1);
-    const last64 = new BigUint64Array(lastFrame.buffer, 0, length >> 1);
-    for (let index = source64.length - 1; index >= 0; index--) {
-        if (source64[index] !== last64[index]) {
+    if (Module._retro_is_dirty) {
+        if (Module._retro_is_dirty(source.byteOffset + (sourceOffset << 2), lastFrame.byteOffset, length << 2)) {
             for (let pixelIndex = 0, sourceIndex = sourceOffset; pixelIndex < length; pixelIndex++, sourceIndex++) {
                 const color = lastFrame[pixelIndex] = source[sourceIndex];
                 buffer[pixelIndex] = 0xFF000000 | (color & 0xFF) << 16 | (color & 0xFF00) | (color >> 16) & 0xFF;
@@ -81,14 +79,30 @@ function render32(source, sourceOffset, lastFrame, buffer, view, context, textur
                 context.texSubImage2D(context.TEXTURE_2D, 0, 0, 0, width, height, context.RGBA, context.UNSIGNED_BYTE, view);
             } else {
                 context.texImage2D(context.TEXTURE_2D, 0, context.RGBA, width, height, 0, context.RGBA, context.UNSIGNED_BYTE, view);
-                if (textureType) {
-                    textureInitializedBottom = 1;
-                } else {
-                    textureInitializedMain = 1;
-                }
+                if (textureType) textureInitializedBottom = 1; else textureInitializedMain = 1;
             }
             context.drawArrays(context.TRIANGLES, 0, 6);
             return;
+        }
+    } else {
+        const source64 = new BigUint64Array(source.buffer, source.byteOffset + (sourceOffset << 2), length >> 1);
+        const last64 = new BigUint64Array(lastFrame.buffer, 0, length >> 1);
+        for (let index = source64.length - 1; index >= 0; index--) {
+            if (source64[index] !== last64[index]) {
+                for (let pixelIndex = 0, sourceIndex = sourceOffset; pixelIndex < length; pixelIndex++, sourceIndex++) {
+                    const color = lastFrame[pixelIndex] = source[sourceIndex];
+                    buffer[pixelIndex] = 0xFF000000 | (color & 0xFF) << 16 | (color & 0xFF00) | (color >> 16) & 0xFF;
+                }
+                context.bindTexture(context.TEXTURE_2D, texture);
+                if (textureType ? textureInitializedBottom : textureInitializedMain) {
+                    context.texSubImage2D(context.TEXTURE_2D, 0, 0, 0, width, height, context.RGBA, context.UNSIGNED_BYTE, view);
+                } else {
+                    context.texImage2D(context.TEXTURE_2D, 0, context.RGBA, width, height, 0, context.RGBA, context.UNSIGNED_BYTE, view);
+                    if (textureType) textureInitializedBottom = 1; else textureInitializedMain = 1;
+                }
+                context.drawArrays(context.TRIANGLES, 0, 6);
+                return;
+            }
         }
     }
     skippedFrames++;
@@ -96,38 +110,58 @@ function render32(source, sourceOffset, lastFrame, buffer, view, context, textur
 // ===== render16 =====
 function render16(source16, source32, last32, buffer, view, context, texture, width, height, stride, textureType) {
     frameCount++;
-    const widthWords = width >> 1;
-    const strideWords = stride >> 1;
-    for (let rowIndex = height - 1; rowIndex >= 0; rowIndex--) {
-        const sourceRowIndex = rowIndex * strideWords;
-        const lastRowIndex = rowIndex * widthWords;
-        for (let columnIndex = widthWords - 1; columnIndex >= 0; columnIndex--) {
-            if (source32[sourceRowIndex + columnIndex] !== last32[lastRowIndex + columnIndex]) {
-                for (let copyRowIndex = 0; copyRowIndex < height; copyRowIndex++) {
-                    const sourceIndex = copyRowIndex * stride;
-                    const lastIndex = copyRowIndex * width;
-                    const source32Index = copyRowIndex * strideWords;
-                    const last32Index = copyRowIndex * widthWords;
-                    for (let copyColumnIndex = 0; copyColumnIndex < widthWords; copyColumnIndex++) {
-                        const pixelOffset = copyColumnIndex << 1;
-                        buffer[lastIndex + pixelOffset] = lookupTable565[source16[sourceIndex + pixelOffset]];
-                        buffer[lastIndex + pixelOffset + 1] = lookupTable565[source16[sourceIndex + pixelOffset + 1]];
-                        last32[last32Index + copyColumnIndex] = source32[source32Index + copyColumnIndex];
-                    }
+    if (Module._retro_is_dirty) {
+        if (Module._retro_is_dirty(source32.byteOffset, last32.byteOffset, (width * height) << 1)) {
+            for (let copyRowIndex = 0; copyRowIndex < height; copyRowIndex++) {
+                const sourceIndex = copyRowIndex * stride;
+                const lastIndex = copyRowIndex * width;
+                const source32Index = copyRowIndex * strideWords;
+                const last32Index = copyRowIndex * widthWords;
+                for (let copyColumnIndex = 0; copyColumnIndex < widthWords; copyColumnIndex++) {
+                    const pixelOffset = copyColumnIndex << 1;
+                    buffer[lastIndex + pixelOffset] = lookupTable565[source16[sourceIndex + pixelOffset]];
+                    buffer[lastIndex + pixelOffset + 1] = lookupTable565[source16[sourceIndex + pixelOffset + 1]];
+                    last32[last32Index + copyColumnIndex] = source32[source32Index + copyColumnIndex];
                 }
-                context.bindTexture(context.TEXTURE_2D, texture);
-                if (textureType ? textureInitializedBottom : textureInitializedMain) {
-                    context.texSubImage2D(context.TEXTURE_2D, 0, 0, 0, width, height, context.RGBA, context.UNSIGNED_BYTE, view);
-                } else {
-                    context.texImage2D(context.TEXTURE_2D, 0, context.RGBA, width, height, 0, context.RGBA, context.UNSIGNED_BYTE, view);
-                    if (textureType) {
-                        textureInitializedBottom = 1;
+            }
+            context.bindTexture(context.TEXTURE_2D, texture);
+            if (textureType ? textureInitializedBottom : textureInitializedMain) {
+                context.texSubImage2D(context.TEXTURE_2D, 0, 0, 0, width, height, context.RGBA, context.UNSIGNED_BYTE, view);
+            } else {
+                context.texImage2D(context.TEXTURE_2D, 0, context.RGBA, width, height, 0, context.RGBA, context.UNSIGNED_BYTE, view);
+                if (textureType) textureInitializedBottom = 1; else textureInitializedMain = 1;
+            }
+            context.drawArrays(context.TRIANGLES, 0, 6);
+            return;
+        }
+    } else {
+        for (let rowIndex = height - 1; rowIndex >= 0; rowIndex--) {
+            const sourceRowIndex = rowIndex * strideWords;
+            const lastRowIndex = rowIndex * widthWords;
+            for (let columnIndex = widthWords - 1; columnIndex >= 0; columnIndex--) {
+                if (source32[sourceRowIndex + columnIndex] !== last32[lastRowIndex + columnIndex]) {
+                    for (let copyRowIndex = 0; copyRowIndex < height; copyRowIndex++) {
+                        const sourceIndex = copyRowIndex * stride;
+                        const lastIndex = copyRowIndex * width;
+                        const source32Index = copyRowIndex * strideWords;
+                        const last32Index = copyRowIndex * widthWords;
+                        for (let copyColumnIndex = 0; copyColumnIndex < widthWords; copyColumnIndex++) {
+                            const pixelOffset = copyColumnIndex << 1;
+                            buffer[lastIndex + pixelOffset] = lookupTable565[source16[sourceIndex + pixelOffset]];
+                            buffer[lastIndex + pixelOffset + 1] = lookupTable565[source16[sourceIndex + pixelOffset + 1]];
+                            last32[last32Index + copyColumnIndex] = source32[source32Index + copyColumnIndex];
+                        }
+                    }
+                    context.bindTexture(context.TEXTURE_2D, texture);
+                    if (textureType ? textureInitializedBottom : textureInitializedMain) {
+                        context.texSubImage2D(context.TEXTURE_2D, 0, 0, 0, width, height, context.RGBA, context.UNSIGNED_BYTE, view);
                     } else {
-                        textureInitializedMain = 1;
+                        context.texImage2D(context.TEXTURE_2D, 0, context.RGBA, width, height, 0, context.RGBA, context.UNSIGNED_BYTE, view);
+                        if (textureType) textureInitializedBottom = 1; else textureInitializedMain = 1;
                     }
+                    context.drawArrays(context.TRIANGLES, 0, 6);
+                    return;
                 }
-                context.drawArrays(context.TRIANGLES, 0, 6);
-                return;
             }
         }
     }

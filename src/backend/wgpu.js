@@ -112,19 +112,23 @@ function recordDraw(context, bindGroup, encoder) {
 // ===== render32 =====
 function render32(source, sourceOffset, lastFrame, context, texture, width, height, length, bindGroup, encoder) {
     frameCount++;
-    const source64 = new BigUint64Array(source.buffer, source.byteOffset + (sourceOffset << 2), length >> 1);
-    const last64 = new BigUint64Array(lastFrame.buffer, 0, length >> 1);
-    for (let index = source64.length - 1; index >= 0; index--) {
-        if (source64[index] !== last64[index]) {
+    if (Module._retro_is_dirty) {
+        if (Module._retro_is_dirty(source.byteOffset + (sourceOffset << 2), lastFrame.byteOffset, length << 2)) {
             lastFrame.set(source.subarray(sourceOffset, sourceOffset + length));
-            gpuQueue.writeTexture(
-                { texture: texture },
-                lastFrame,
-                { bytesPerRow: width * 4 },
-                { width, height }
-            );
+            gpuQueue.writeTexture({ texture: texture }, lastFrame, { bytesPerRow: width * 4 }, { width, height });
             recordDraw(context, bindGroup, encoder);
             return;
+        }
+    } else {
+        const source64 = new BigUint64Array(source.buffer, source.byteOffset + (sourceOffset << 2), length >> 1);
+        const last64 = new BigUint64Array(lastFrame.buffer, 0, length >> 1);
+        for (let index = source64.length - 1; index >= 0; index--) {
+            if (source64[index] !== last64[index]) {
+                lastFrame.set(source.subarray(sourceOffset, sourceOffset + length));
+                gpuQueue.writeTexture({ texture: texture }, lastFrame, { bytesPerRow: width * 4 }, { width, height });
+                recordDraw(context, bindGroup, encoder);
+                return;
+            }
         }
     }
     skippedFrames++;
@@ -132,31 +136,36 @@ function render32(source, sourceOffset, lastFrame, context, texture, width, heig
 // ===== render16 =====
 function render16(source32, last32, last16, context, texture, width, height, stride, bindGroup, encoder) {
     frameCount++;
-    const widthWords = width >> 1;
-    const strideWords = stride >> 1;
-    for (let rowIndex = height - 1; rowIndex >= 0; rowIndex--) {
-        const sourceRowIndex = rowIndex * strideWords;
-        const lastRowIndex = rowIndex * widthWords;
-        for (let columnIndex = widthWords - 1; columnIndex >= 0; columnIndex--) {
-            if (source32[sourceRowIndex + columnIndex] !== last32[lastRowIndex + columnIndex]) {
-                if (width === stride) {
-                    last32.set(source32);
-                } else {
-                    for (let copyRowIndex = 0; copyRowIndex < height; copyRowIndex++) {
-                        last32.set(
-                            source32.subarray(copyRowIndex * strideWords, copyRowIndex * strideWords + widthWords),
-                            copyRowIndex * widthWords
-                        );
-                    }
+    if (Module._retro_is_dirty) {
+        if (Module._retro_is_dirty(source32.byteOffset, last32.byteOffset, (width * height) << 1)) {
+            if (width === stride) {
+                last32.set(source32);
+            } else {
+                for (let copyRowIndex = 0; copyRowIndex < height; copyRowIndex++) {
+                    last32.set(source32.subarray(copyRowIndex * strideWords, copyRowIndex * strideWords + widthWords), copyRowIndex * widthWords);
                 }
-                gpuQueue.writeTexture(
-                    { texture: texture },
-                    last16,
-                    { bytesPerRow: width * 2 },
-                    { width, height }
-                );
-                recordDraw(context, bindGroup, encoder);
-                return;
+            }
+            gpuQueue.writeTexture({ texture: texture }, last16, { bytesPerRow: width * 2 }, { width, height });
+            recordDraw(context, bindGroup, encoder);
+            return;
+        }
+    } else {
+        for (let rowIndex = height - 1; rowIndex >= 0; rowIndex--) {
+            const sourceRowIndex = rowIndex * strideWords;
+            const lastRowIndex = rowIndex * widthWords;
+            for (let columnIndex = widthWords - 1; columnIndex >= 0; columnIndex--) {
+                if (source32[sourceRowIndex + columnIndex] !== last32[lastRowIndex + columnIndex]) {
+                    if (width === stride) {
+                        last32.set(source32);
+                    } else {
+                        for (let copyRowIndex = 0; copyRowIndex < height; copyRowIndex++) {
+                            last32.set(source32.subarray(copyRowIndex * strideWords, copyRowIndex * strideWords + widthWords), copyRowIndex * widthWords);
+                        }
+                    }
+                    gpuQueue.writeTexture({ texture: texture }, last16, { bytesPerRow: width * 2 }, { width, height });
+                    recordDraw(context, bindGroup, encoder);
+                    return;
+                }
             }
         }
     }
