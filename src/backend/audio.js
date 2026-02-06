@@ -22,22 +22,10 @@ async function initAudio(ratio) {
     await audioContext.audioWorklet.addModule('./src/backend/audio-processor.js');
     audioWorkletNode = new AudioWorkletNode(audioContext, 'audio-processor');
     audioGainNode = audioContext.createGain();
-    audioGainNode.gain.value = 0;
+    audioGainNode.gain.value = 1;
     audioWorkletNode.port.postMessage({ ratio });
     audioWorkletNode.connect(audioGainNode).connect(audioContext.destination);
-    const result = audioContext.resume();
-    fadeAudioIn(1);
-    return result;
-}
-// ===== fadeAudioIn =====
-function fadeAudioIn(duration = 2) {
-    if (!audioGainNode || !audioContext) {
-        return;
-    }
-    const currentTime = audioContext.currentTime;
-    audioGainNode.gain.cancelScheduledValues(currentTime);
-    audioGainNode.gain.setValueAtTime(audioGainNode.gain.value, currentTime);
-    audioGainNode.gain.linearRampToValueAtTime(1, currentTime + duration);
+    return audioContext.resume();
 }
 // ===== writeAudio =====
 let audioBufferL, audioBufferR, maxFrames = 0;

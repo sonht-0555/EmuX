@@ -55,10 +55,10 @@ class AudioProcessor extends AudioWorkletProcessor {
             availableSamples < 4800 ? 0.995 : 1
         );
         this.silenceTimer++;
-        if (this.silenceTimer > 10 || availableSamples < 512) {
-            this.volume = Math.max(0, this.volume - 0.02);
-        } else if (availableSamples > 2048) {
-            this.volume = Math.min(1, this.volume + 0.02);
+        if (this.silenceTimer > 15 || availableSamples < 256) {
+            this.volume = Math.max(0, this.volume - 0.1);
+        } else if (availableSamples > 512) {
+            this.volume = Math.min(1, this.volume + 0.1);
         }
         if (outputRight) {
             for (let index = 0; index < outputLength; index++) {
