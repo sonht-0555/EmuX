@@ -1,14 +1,12 @@
 ---
-description: Tự động gom code, viết commit message chuẩn chuyên nghiệp và đẩy lên GitHub
+description: Increment version, stage changes, generate a professional commit message, and push to GitHub.
 ---
 
 // turbo-all
-Để thực hiện việc này, tôi sẽ:
-1. Chạy `git add .` để gom tất cả thay đổi.
-2. Tự động soi `git diff --cached` để hiểu nội dung sửa đổi.
-3. Thiết kế Commit Message chuẩn **Conventional Commits**:
-   - Title: `<type>(<scope>): <description>`
-   - Body: Các gạch đầu dòng chi tiết (`- ...`).
-4. Thực hiện lệnh:
-   - `git commit -m "Tiêu đề" -m "Nội dung chi tiết"`
-   - `git push`
+To complete this efficiently (one-click approval), I will:
+1. Increment the version number (e.g., EmuX_3.30 -> EmuX_3.31) in both `index.html` (`gameVer`) and `sw.js` (`revision`).
+2. Run `git add .` to stage all changes, including the version bump.
+3. Analyze `git diff --cached` to understand the modifications.
+4. Craft a **Conventional Commits** message (type(scope): description).
+5. Execute the entire process with a single chained command:
+   `git commit -m "..." -m "..." && git push`
