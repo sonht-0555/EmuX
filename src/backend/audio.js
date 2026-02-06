@@ -26,7 +26,7 @@ async function initAudio(ratio) {
     audioWorkletNode.port.postMessage({ ratio });
     audioWorkletNode.connect(audioGainNode).connect(audioContext.destination);
     const result = audioContext.resume();
-    fadeAudioIn();
+    fadeAudioIn(1);
     return result;
 }
 // ===== fadeAudioIn =====
