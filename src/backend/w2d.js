@@ -107,11 +107,13 @@ function renderNDS(pointer, width, height) {
     const halfHeight = height >> 1;
     const pixelCount = width * halfHeight;
     const buffer = Module.HEAPU8.buffer;
-    if (cachedWidth !== width || cachedHeight !== halfHeight) {
+    if (cachedWidth !== width || cachedHeight !== halfHeight || !pixelBuffer) {
         cachedWidth = width;
         cachedHeight = halfHeight;
         Module.canvas.width = canvasB.width = width;
         Module.canvas.height = canvasB.height = halfHeight;
+        imageData = context2d.createImageData(width, halfHeight);
+        imageDataBottom = context2dBottom.createImageData(width, halfHeight);
         pixelBuffer = new Uint32Array(imageData.data.buffer);
         pixelBufferBottom = new Uint32Array(imageDataBottom.data.buffer);
         if (lastMainFramePtr) Module._free(lastMainFramePtr);
@@ -159,7 +161,7 @@ window.activeRenderFn = function(pointer, width, height, pitch) {
     const pixelCount = width * height;
     const is32BitFormat = pitch === (width << 2);
     const buffer = Module.HEAPU8.buffer;
-    if (width !== cachedWidth || height !== cachedHeight || pitch !== cachedPitch) {
+    if (width !== cachedWidth || height !== cachedHeight || pitch !== cachedPitch || !pixelBuffer) {
         cachedWidth = width;
         cachedHeight = height;
         cachedPitch = pitch;

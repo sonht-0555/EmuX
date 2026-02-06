@@ -193,8 +193,9 @@ function render16(source32, last32, last16, last32Ptr, context, texture, width, 
 function renderNDS(pointer, width, height, encoder) {
     const halfHeight = height >> 1;
     const pixelCount = width * halfHeight;
-    const buffer = Module.HEAPU8.buffer;
-    if (cachedWidth !== width || cachedHeight !== halfHeight) {
+    const buffer = Module.HEAPU8?.buffer;
+    if (!buffer) return;
+    if (cachedWidth !== width || cachedHeight !== halfHeight || !textureMain) {
         cachedWidth = width;
         cachedHeight = halfHeight;
         Module.canvas.width = canvasB.width = width;
@@ -236,6 +237,7 @@ function renderNDS(pointer, width, height, encoder) {
         ndsPointer = pointer;
         sourceView32 = new Uint32Array(buffer, pointer, width * height);
     }
+    if (!sourceView32) return;
     render32(sourceView32, 0, lastMainFrame, lastMainFramePtr, contextMain, textureMain, width, halfHeight, pixelCount, bindGroupMain, encoder, 0);
     render32(sourceView32, pixelCount, lastBottomFrame, lastBottomFramePtr, contextBottom, textureBottom, width, halfHeight, pixelCount, bindGroupBottom, encoder, 1);
 }
@@ -261,7 +263,7 @@ window.activeRenderFn = async function(pointer, width, height, pitch) {
     if (Module.isNDS) {
         renderNDS(pointer, width, height, encoder);
     } else {
-        if (width !== cachedWidth || height !== cachedHeight || is32BitFormat !== formatIs32) {
+        if (width !== cachedWidth || height !== cachedHeight || is32BitFormat !== formatIs32 || !textureMain) {
             cachedWidth = width;
             cachedHeight = height;
             cachedPitch = pitch;
