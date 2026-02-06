@@ -1,0 +1,45 @@
+name: Deploy EmuX (Optimized)
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout 🛎️
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ⚙️
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Minifiers 📦
+        run: npm install -g terser html-minifier-terser cleancss-cli
+
+      - name: Create Production Build 🏗️
+        run: |
+          mkdir dist
+          cp -r src dist/
+          cp index.html manifest.json sw.js CNAME _headers dist/ 2>/dev/null || true
+          
+          # Minify JS files in place
+          find dist -name "*.js" -exec terser {} -o {} --compress --mangle \;
+          
+          # Minify CSS files
+          find dist -name "*.css" -exec cleancss -o {} {} \;
+          
+          # Minify HTML
+          html-minifier-terser --collapse-whitespace --remove-comments --minify-js true --minify-css true index.html -o dist/index.html
+
+      - name: Deploy to GitHub Pages 🚀
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: dist
+          branch: gh-pages
