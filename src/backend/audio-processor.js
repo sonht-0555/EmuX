@@ -20,27 +20,18 @@ class AudioProcessor extends AudioWorkletProcessor {
             for (let index = 0; index < l.length; index++) {
                 this.leftBuffer[this.writePosition] = l[index];
                 this.rightBuffer[this.writePosition] = r[index];
-                this.writePosition = (this.writePosition + 1) % this.bufferSize;
+                this.writePosition = (this.writePosition + 1) & (this.bufferSize - 1);
             }
         };
     }
-    // ===== interpolate =====
-    interpolate(buffer, position) {
-        const integerPart = position | 0;
-        const fractionalPart = position - integerPart;
-        const mask = this.bufferSize - 1;
-        const point0 = buffer[(integerPart - 1) & mask];
-        const point1 = buffer[integerPart & mask];
-        const point2 = buffer[(integerPart + 1) & mask];
-        const point3 = buffer[(integerPart + 2) & mask];
-        const interpolatedValue = point1 + 0.5 * fractionalPart * (
-            point2 - point0 + fractionalPart * (
-                2 * point0 - 5 * point1 + 4 * point2 - point3 + fractionalPart * (
-                    3 * (point1 - point2) + point3 - point0
-                )
-            )
-        );
-        return interpolatedValue * this.volume;
+    interpolate(buffer, position, mask) {
+        const integer = position | 0;
+        const f = position - integer;
+        const p0 = buffer[(integer - 1) & mask];
+        const p1 = buffer[integer & mask];
+        const p2 = buffer[(integer + 1) & mask];
+        const p3 = buffer[(integer + 2) & mask];
+        return p1 + 0.5 * f * (p2 - p0 + f * (2 * p0 - 5 * p1 + 4 * p2 - p3 + f * (3 * (p1 - p2) + p3 - p0)));
     }
     // ===== process =====
     process(inputs, outputs) {
@@ -48,10 +39,15 @@ class AudioProcessor extends AudioWorkletProcessor {
         const outputLeft = outputChannels[0];
         const outputRight = outputChannels[1];
         const outputLength = outputLeft.length;
+        const bufferSize = this.bufferSize;
+        const mask = bufferSize - 1;
+        const ratio = this.ratio;
+        const leftBuffer = this.leftBuffer;
+        const rightBuffer = this.rightBuffer;
         let readPosition = this.readPosition;
-        let availableSamples = (this.writePosition - (readPosition | 0) + this.bufferSize) & (this.bufferSize - 1);
-        const dynamicRatio = this.ratio * (
-            availableSamples > this.bufferSize * 0.7 ? 1.005 :
+        let availableSamples = (this.writePosition - (readPosition | 0) + bufferSize) & mask;
+        const dynamicRatio = ratio * (
+            availableSamples > bufferSize * 0.7 ? 1.005 :
             availableSamples < 4800 ? 0.995 : 1
         );
         this.silenceTimer++;
@@ -60,33 +56,27 @@ class AudioProcessor extends AudioWorkletProcessor {
         } else if (availableSamples > 512) {
             this.volume = Math.min(1, this.volume + 0.1);
         }
+        const volume = this.volume;
+        const processableCount = Math.min(outputLength, Math.max(0, Math.floor((availableSamples - 8) / dynamicRatio)));
         if (outputRight) {
-            for (let index = 0; index < outputLength; index++) {
-                if (availableSamples > 8) {
-                    outputLeft[index] = this.interpolate(this.leftBuffer, readPosition);
-                    outputRight[index] = this.interpolate(this.rightBuffer, readPosition);
-                    readPosition += dynamicRatio;
-                    if (readPosition >= this.bufferSize) {
-                        readPosition -= this.bufferSize;
-                    }
-                    availableSamples -= dynamicRatio;
-                } else {
-                    outputLeft[index] = 0;
-                    outputRight[index] = 0;
-                }
+            for (let i = 0; i < processableCount; i++) {
+                outputLeft[i] = this.interpolate(leftBuffer, readPosition, mask) * volume;
+                outputRight[i] = this.interpolate(rightBuffer, readPosition, mask) * volume;
+                readPosition += dynamicRatio;
+                if (readPosition >= bufferSize) readPosition -= bufferSize;
+            }
+            if (processableCount < outputLength) {
+                outputLeft.fill(0, processableCount);
+                outputRight.fill(0, processableCount);
             }
         } else {
-            for (let index = 0; index < outputLength; index++) {
-                if (availableSamples > 8) {
-                    outputLeft[index] = this.interpolate(this.leftBuffer, readPosition);
-                    readPosition += dynamicRatio;
-                    if (readPosition >= this.bufferSize) {
-                        readPosition -= this.bufferSize;
-                    }
-                    availableSamples -= dynamicRatio;
-                } else {
-                    outputLeft[index] = 0;
-                }
+            for (let i = 0; i < processableCount; i++) {
+                outputLeft[i] = this.interpolate(leftBuffer, readPosition, mask) * volume;
+                readPosition += dynamicRatio;
+                if (readPosition >= bufferSize) readPosition -= bufferSize;
+            }
+            if (processableCount < outputLength) {
+                outputLeft.fill(0, processableCount);
             }
         }
         this.readPosition = readPosition;

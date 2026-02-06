@@ -45,9 +45,10 @@ function writeAudio(pointer, frames) {
         audioDataPointer = pointer;
         audioDataView = new Int16Array(buffer, pointer, Math.max(frames * 2, maxFrames * 2));
     }
-    for (let index = 0; index < frames; index++) {
-        audioBufferL[index] = audioDataView[index * 2] / 32768;
-        audioBufferR[index] = audioDataView[index * 2 + 1] / 32768;
+    const view = audioDataView;
+    for (let i = 0; i < frames; i++) {
+        audioBufferL[i] = view[i * 2] * 0.000030517578125;
+        audioBufferR[i] = view[i * 2 + 1] * 0.000030517578125;
     }
     audioWorkletNode.port.postMessage({
         l: audioBufferL.subarray(0, frames),
