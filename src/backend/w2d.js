@@ -12,11 +12,12 @@ let lastBottomFrame;
 let lastView16as32;
 let sourceView32;
 let sourceView16;
+let cachedIsDirtyFn;
 // ===== render32 =====
 let source64_w2d_top, last64_w2d_top, source64_w2d_bottom, last64_w2d_bottom;
 function render32(source, sourceOffset, lastFrame, lastFramePtr, buffer, context, imageDataObject, length, screenType) {
     frameCount++;
-    const isDirtyFn = Module._retro_is_dirty || (Module.asm && Module.asm._retro_is_dirty) || (Module.instance && Module.instance.exports && Module.instance.exports._retro_is_dirty) || (Module.instance && Module.instance.exports && Module.instance.exports.retro_is_dirty);
+    const isDirtyFn = cachedIsDirtyFn || (cachedIsDirtyFn = Module._retro_is_dirty || Module.asm?._retro_is_dirty || Module.instance?.exports?._retro_is_dirty || Module.instance?.exports?.retro_is_dirty);
     if (isDirtyFn && lastFramePtr) {
         if (isDirtyFn(source.byteOffset + (sourceOffset << 2), lastFramePtr, length << 2)) {
             for (let pixelIndex = 0, sourceIndex = sourceOffset; pixelIndex < length; pixelIndex++, sourceIndex++) {
@@ -58,19 +59,16 @@ function render16(source16, source32, last32, last32Ptr, buffer, context, imageD
     frameCount++;
     const widthWords = width >> 1;
     const strideWords = stride >> 1;
-    const isDirtyFn = Module._retro_is_dirty || (Module.asm && Module.asm._retro_is_dirty) || (Module.instance && Module.instance.exports && Module.instance.exports._retro_is_dirty) || (Module.instance && Module.instance.exports && Module.instance.exports.retro_is_dirty);
+    const lut = lookupTable565;
+    const isDirtyFn = cachedIsDirtyFn || (cachedIsDirtyFn = Module._retro_is_dirty || Module.asm?._retro_is_dirty || Module.instance?.exports?._retro_is_dirty || Module.instance?.exports?.retro_is_dirty);
     if (isDirtyFn && last32Ptr) {
         if (isDirtyFn(source32.byteOffset, last32Ptr, (width * height) << 1)) {
-            for (let copyRowIndex = 0; copyRowIndex < height; copyRowIndex++) {
-                const sourceIndex = copyRowIndex * stride;
-                const lastIndex = copyRowIndex * width;
-                const source32Index = copyRowIndex * strideWords;
-                const last32Index = copyRowIndex * widthWords;
-                for (let copyColumnIndex = 0; copyColumnIndex < widthWords; copyColumnIndex++) {
-                    const pixelOffset = copyColumnIndex << 1;
-                    buffer[lastIndex + pixelOffset] = lookupTable565[source16[sourceIndex + pixelOffset]];
-                    buffer[lastIndex + pixelOffset + 1] = lookupTable565[source16[sourceIndex + pixelOffset + 1]];
-                    last32[last32Index + copyColumnIndex] = source32[source32Index + copyColumnIndex];
+            for (let row = 0, srcIdx = 0, dstIdx = 0, s32Idx = 0, l32Idx = 0; row < height; row++, srcIdx += stride, dstIdx += width, s32Idx += strideWords, l32Idx += widthWords) {
+                for (let col = 0; col < widthWords; col++) {
+                    const px = col << 1;
+                    buffer[dstIdx + px] = lut[source16[srcIdx + px]];
+                    buffer[dstIdx + px + 1] = lut[source16[srcIdx + px + 1]];
+                    last32[l32Idx + col] = source32[s32Idx + col];
                 }
             }
             context.putImageData(imageDataObject, 0, 0);
@@ -82,16 +80,12 @@ function render16(source16, source32, last32, last32Ptr, buffer, context, imageD
             const lastRowIndex = rowIndex * widthWords;
             for (let columnIndex = widthWords - 1; columnIndex >= 0; columnIndex--) {
                 if (source32[sourceRowIndex + columnIndex] !== last32[lastRowIndex + columnIndex]) {
-                    for (let copyRowIndex = 0; copyRowIndex < height; copyRowIndex++) {
-                        const sourceIndex = copyRowIndex * stride;
-                        const lastIndex = copyRowIndex * width;
-                        const source32Index = copyRowIndex * strideWords;
-                        const last32Index = copyRowIndex * widthWords;
-                        for (let copyColumnIndex = 0; copyColumnIndex < widthWords; copyColumnIndex++) {
-                            const pixelOffset = copyColumnIndex << 1;
-                            buffer[lastIndex + pixelOffset] = lookupTable565[source16[sourceIndex + pixelOffset]];
-                            buffer[lastIndex + pixelOffset + 1] = lookupTable565[source16[sourceIndex + pixelOffset + 1]];
-                            last32[last32Index + copyColumnIndex] = source32[source32Index + copyColumnIndex];
+                    for (let row = 0, srcIdx = 0, dstIdx = 0, s32Idx = 0, l32Idx = 0; row < height; row++, srcIdx += stride, dstIdx += width, s32Idx += strideWords, l32Idx += widthWords) {
+                        for (let col = 0; col < widthWords; col++) {
+                            const px = col << 1;
+                            buffer[dstIdx + px] = lut[source16[srcIdx + px]];
+                            buffer[dstIdx + px + 1] = lut[source16[srcIdx + px + 1]];
+                            last32[l32Idx + col] = source32[s32Idx + col];
                         }
                     }
                     context.putImageData(imageDataObject, 0, 0);

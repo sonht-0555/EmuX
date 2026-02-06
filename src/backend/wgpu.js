@@ -17,6 +17,7 @@ let lastMain16;
 let sourceView32;
 let gpuInitializing = null;
 let formatIs32 = true;
+let cachedIsDirtyFn;
 const shaderSource = `
     struct Config { is32: u32, width: f32, height: f32, pad: u32 };
     @group(0) @binding(0) var<uniform> config: Config;
@@ -115,7 +116,7 @@ function recordDraw(context, bindGroup, encoder) {
 let source64_wgpu_top, last64_wgpu_top, source64_wgpu_bottom, last64_wgpu_bottom;
 function render32(source, sourceOffset, lastFrame, lastFramePtr, context, texture, width, height, length, bindGroup, encoder, screenType) {
     frameCount++;
-    const isDirtyFn = Module._retro_is_dirty || (Module.asm && Module.asm._retro_is_dirty) || (Module.instance && Module.instance.exports && Module.instance.exports._retro_is_dirty) || (Module.instance && Module.instance.exports && Module.instance.exports.retro_is_dirty);
+    const isDirtyFn = cachedIsDirtyFn || (cachedIsDirtyFn = Module._retro_is_dirty || Module.asm?._retro_is_dirty || Module.instance?.exports?._retro_is_dirty || Module.instance?.exports?.retro_is_dirty);
     if (isDirtyFn && lastFramePtr) {
         if (isDirtyFn(source.byteOffset + (sourceOffset << 2), lastFramePtr, length << 2)) {
             lastFrame.set(source.subarray(sourceOffset, sourceOffset + length));
@@ -153,7 +154,7 @@ function render16(source32, last32, last16, last32Ptr, context, texture, width, 
     frameCount++;
     const widthWords = width >> 1;
     const strideWords = stride >> 1;
-    const isDirtyFn = Module._retro_is_dirty || (Module.asm && Module.asm._retro_is_dirty) || (Module.instance && Module.instance.exports && Module.instance.exports._retro_is_dirty) || (Module.instance && Module.instance.exports && Module.instance.exports.retro_is_dirty);
+    const isDirtyFn = cachedIsDirtyFn || (cachedIsDirtyFn = Module._retro_is_dirty || Module.asm?._retro_is_dirty || Module.instance?.exports?._retro_is_dirty || Module.instance?.exports?.retro_is_dirty);
     if (isDirtyFn && last32Ptr) {
         if (isDirtyFn(source32.byteOffset, last32Ptr, (width * height) << 1)) {
             if (width === stride) {

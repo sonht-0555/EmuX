@@ -89,7 +89,6 @@ async function resumeGame() {
     if (audioContext && (audioContext.state === 'suspended' || audioContext.state === 'interrupted')) {
         audioContext.resume();
     }
-    fadeAudioIn();
     message("[_] Resumed!");
 }
 // ===== pauseGame =====
@@ -97,9 +96,6 @@ async function pauseGame() {
     timer(false);
     isRunning = false;
     if (window.stopLoop) stopLoop();
-    if (audioGainNode) {
-        audioGainNode.gain.value = 0;
-    }
     message("[_] Paused!");
 }
 // ===== rebootGame =====
