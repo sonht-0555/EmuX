@@ -21,7 +21,7 @@ jobs:
           node-version: 20
 
       - name: Install Minifiers 📦
-        run: npm install -g terser html-minifier-terser cleancss-cli
+        run: npm install -g terser html-minifier-terser clean-css-cli
 
       - name: Create Production Build 🏗️
         run: |
