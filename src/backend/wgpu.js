@@ -1,23 +1,8 @@
 // ===== wgpu.js =====
-let gpuDevice;
-let gpuQueue;
-let contextMain;
-let contextBottom;
-let renderPipeline;
-let bindGroupMain;
-let bindGroupBottom;
-let textureMain;
-let textureBottom;
-let lastMainFramePtr = 0;
-let lastBottomFramePtr = 0;
-let lastMainFrame;
-let lastBottomFrame;
-let lastView16as32;
-let lastMain16;
-let sourceView32;
-let gpuInitializing = null;
-let formatIs32 = true;
-let cachedIsDirtyFn;
+let gpuDevice, gpuQueue, contextMain, contextBottom, renderPipeline, bindGroupMain, bindGroupBottom, textureMain, textureBottom;
+let lastMainFramePtr = 0, lastBottomFramePtr = 0;
+let lastMainFrame, lastBottomFrame, lastMain16;
+let sourceView32, gpuInitializing = null, formatIs32 = true, cachedIsDirtyFn;
 const shaderSource = `
     struct Config { is32: u32, width: f32, height: f32, pad: u32 };
     @group(0) @binding(0) var<uniform> config: Config;
@@ -44,49 +29,24 @@ const shaderSource = `
 `;
 // ===== initGPU =====
 async function initGPU(canvas, canvasNDS) {
-    if (!navigator.gpu) {
-        return false;
-    }
-    const adapter = await navigator.gpu.requestAdapter({
-        powerPreference: 'high-performance'
-    });
-    if (!adapter) {
-        return false;
-    }
+    if (!navigator.gpu) return false;
+    const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
+    if (!adapter) return false;
     gpuDevice = await adapter.requestDevice();
     gpuQueue = gpuDevice.queue;
     const format = navigator.gpu.getPreferredCanvasFormat();
     contextMain = canvas.getContext('webgpu');
-    contextMain.configure({
-        device: gpuDevice,
-        format: format,
-        alphaMode: 'opaque'
-    });
+    contextMain.configure({ device: gpuDevice, format, alphaMode: 'opaque' });
     if (canvasNDS) {
         contextBottom = canvasNDS.getContext('webgpu');
-        contextBottom.configure({
-            device: gpuDevice,
-            format: format,
-            alphaMode: 'opaque'
-        });
+        contextBottom.configure({ device: gpuDevice, format, alphaMode: 'opaque' });
     }
-    const shaderModule = gpuDevice.createShaderModule({
-        code: shaderSource
-    });
+    const shaderModule = gpuDevice.createShaderModule({ code: shaderSource });
     renderPipeline = gpuDevice.createRenderPipeline({
         layout: 'auto',
-        vertex: {
-            module: shaderModule,
-            entryPoint: 'vs'
-        },
-        fragment: {
-            module: shaderModule,
-            entryPoint: 'fs',
-            targets: [{ format }]
-        },
-        primitive: {
-            topology: 'triangle-list'
-        }
+        vertex: { module: shaderModule, entryPoint: 'vs' },
+        fragment: { module: shaderModule, entryPoint: 'fs', targets: [{ format }] },
+        primitive: { topology: 'triangle-list' }
     });
     return true;
 }
@@ -103,8 +63,7 @@ function recordDraw(context, bindGroup, encoder) {
     const pass = encoder.beginRenderPass({
         colorAttachments: [{
             view: context.getCurrentTexture().createView(),
-            loadOp: 'clear',
-            storeOp: 'store'
+            loadOp: 'clear', storeOp: 'store'
         }]
     });
     pass.setPipeline(renderPipeline);
@@ -117,19 +76,18 @@ function render32(source, sourceOffset, lastFrame, lastFramePtr, context, textur
     frameCount++;
     const isDirtyFn = cachedIsDirtyFn || (cachedIsDirtyFn = Module._retro_is_dirty || Module.asm?._retro_is_dirty || Module.instance?.exports?._retro_is_dirty || Module.instance?.exports?.retro_is_dirty);
     if (isDirtyFn && lastFramePtr && isDirtyFn(source.byteOffset + (sourceOffset << 2), lastFramePtr, length << 2)) {
-        gpuQueue.writeTexture({ texture: texture }, lastFrame, { bytesPerRow: width * 4 }, { width, height });
+        gpuQueue.writeTexture({ texture }, lastFrame, { bytesPerRow: width << 2 }, { width, height });
         recordDraw(context, bindGroup, encoder);
     } else {
         skippedFrames++;
     }
 }
 // ===== render16 =====
-function render16(source32, last32, last16, last32Ptr, context, texture, width, height, pitch, bindGroup, encoder) {
+function render16(source32, last16, last32Ptr, context, texture, width, height, pitch, bindGroup, encoder) {
     frameCount++;
     const isDirtyFn = cachedIsDirtyFn || (cachedIsDirtyFn = Module._retro_is_dirty || Module.asm?._retro_is_dirty || Module.instance?.exports?._retro_is_dirty || Module.instance?.exports?.retro_is_dirty);
-    const byteSize = pitch * height;
-    if (isDirtyFn && last32Ptr && isDirtyFn(source32.byteOffset, last32Ptr, byteSize)) {
-        gpuQueue.writeTexture({ texture: texture }, last16, { bytesPerRow: pitch }, { width, height });
+    if (isDirtyFn && last32Ptr && isDirtyFn(source32.byteOffset, last32Ptr, pitch * height)) {
+        gpuQueue.writeTexture({ texture }, last16, { bytesPerRow: pitch }, { width, height });
         recordDraw(context, bindGroup, encoder);
     } else {
         skippedFrames++;
@@ -139,12 +97,10 @@ function render16(source32, last32, last16, last32Ptr, context, texture, width, 
 function renderNDS(pointer, width, height, encoder) {
     const heap = Module.HEAPU8;
     if (!heap) return;
-    const buffer = heap.buffer;
     const halfHeight = height >> 1;
     const pixelCount = width * halfHeight;
     if (cachedWidth !== width || cachedHeight !== halfHeight || !textureMain) {
-        cachedWidth = width;
-        cachedHeight = halfHeight;
+        cachedWidth = width; cachedHeight = halfHeight;
         Module.canvas.width = canvasB.width = width;
         Module.canvas.height = canvasB.height = halfHeight;
         textureMain = createTexture(width, halfHeight, true);
@@ -152,10 +108,7 @@ function renderNDS(pointer, width, height, encoder) {
         const bindGroupLayout = renderPipeline.getBindGroupLayout(0);
         const dummyTexture = createTexture(1, 1, false);
         const createBindGroup = (texture) => {
-            const uniformBuffer = gpuDevice.createBuffer({
-                size: 16,
-                usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
-            });
+            const uniformBuffer = gpuDevice.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
             gpuQueue.writeBuffer(uniformBuffer, 0, new Uint32Array([1]));
             gpuQueue.writeBuffer(uniformBuffer, 4, new Float32Array([width, halfHeight]));
             return gpuDevice.createBindGroup({
@@ -176,13 +129,11 @@ function renderNDS(pointer, width, height, encoder) {
         lastMainFrame = new Uint32Array(Module.HEAPU8.buffer, lastMainFramePtr, pixelCount);
         lastBottomFrame = new Uint32Array(Module.HEAPU8.buffer, lastBottomFramePtr, pixelCount);
         sourceView32 = null;
-        if (window.gameView) {
-            gameView(gameName);
-        }
+        if (window.gameView) gameView(gameName);
     }
-    if (!sourceView32 || sourceView32.buffer !== buffer || ndsPointer !== pointer) {
+    if (!sourceView32 || sourceView32.buffer !== heap.buffer || ndsPointer !== pointer) {
         ndsPointer = pointer;
-        sourceView32 = new Uint32Array(buffer, pointer, width * height);
+        sourceView32 = new Uint32Array(heap.buffer, pointer, width * height);
     }
     render32(sourceView32, 0, lastMainFrame, lastMainFramePtr, contextMain, textureMain, width, halfHeight, pixelCount, bindGroupMain, encoder);
     render32(sourceView32, pixelCount, lastBottomFrame, lastBottomFramePtr, contextBottom, textureBottom, width, halfHeight, pixelCount, bindGroupBottom, encoder);
@@ -190,39 +141,25 @@ function renderNDS(pointer, width, height, encoder) {
 // ===== activeRenderFn =====
 window.activeRenderFn = async function(pointer, width, height, pitch) {
     if (!gpuDevice) {
-        if (!gpuInitializing) {
-            gpuInitializing = initGPU(Module.canvas, Module.isNDS ? canvasB : null);
-        }
-        if (!await gpuInitializing) {
-            return;
-        }
+        if (!gpuInitializing) gpuInitializing = initGPU(Module.canvas, Module.isNDS ? canvasB : null);
+        if (!await gpuInitializing) return;
         if (Module.isNDS) {
-            page02.style.paddingTop = "5px";
-            canvasB.style.display = "block";
-            joypad.style.justifyContent = "center";
-            joy.style.display = "none";
+            page02.style.paddingTop = "5px"; canvasB.style.display = "block";
+            joypad.style.justifyContent = "center"; joy.style.display = "none";
         }
     }
     const encoder = gpuDevice.createCommandEncoder();
     const is32BitFormat = pitch === (width << 2);
-    const buffer = Module.HEAPU8.buffer;
+    const heap = Module.HEAPU8;
     if (Module.isNDS) {
         renderNDS(pointer, width, height, encoder);
     } else {
         if (width !== cachedWidth || height !== cachedHeight || is32BitFormat !== formatIs32 || !textureMain) {
-            cachedWidth = width;
-            cachedHeight = height;
-            cachedPitch = pitch;
-            formatIs32 = is32BitFormat;
-            cachedBuffer = null;
-            Module.canvas.width = width;
-            Module.canvas.height = height;
+            cachedWidth = width; cachedHeight = height; cachedPitch = pitch; formatIs32 = is32BitFormat; cachedBuffer = null;
+            Module.canvas.width = width; Module.canvas.height = height;
             textureMain = createTexture(width, height, is32BitFormat);
             const dummyTexture = createTexture(1, 1, !is32BitFormat);
-            const uniformBuffer = gpuDevice.createBuffer({
-                size: 16,
-                usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
-            });
+            const uniformBuffer = gpuDevice.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
             gpuQueue.writeBuffer(uniformBuffer, 0, new Uint32Array([is32BitFormat ? 1 : 0]));
             gpuQueue.writeBuffer(uniformBuffer, 4, new Float32Array([width, height]));
             bindGroupMain = gpuDevice.createBindGroup({
@@ -233,29 +170,24 @@ window.activeRenderFn = async function(pointer, width, height, pitch) {
                     { binding: 2, resource: (is32BitFormat ? dummyTexture : textureMain).createView() }
                 ]
             });
-            const byteSize = pitch * height;
             if (lastMainFramePtr) Module._free(lastMainFramePtr);
+            const byteSize = pitch * height;
+            lastMainFramePtr = Module._malloc(byteSize);
             if (is32BitFormat) {
-                lastMainFramePtr = Module._malloc(byteSize);
-                lastMainFrame = new Uint32Array(Module.HEAPU8.buffer, lastMainFramePtr, byteSize >> 2);
+                lastMainFrame = new Uint32Array(heap.buffer, lastMainFramePtr, byteSize >> 2);
             } else {
-                lastMainFramePtr = Module._malloc(byteSize);
-                lastView16as32 = new Uint32Array(Module.HEAPU8.buffer, lastMainFramePtr, byteSize >> 2);
-                lastMain16 = new Uint16Array(Module.HEAPU8.buffer, lastMainFramePtr, byteSize >> 1);
+                lastMain16 = new Uint16Array(heap.buffer, lastMainFramePtr, byteSize >> 1);
             }
-            if (window.gameView) {
-                gameView(gameName);
-            }
+            if (window.gameView) gameView(gameName);
         }
-        if (buffer !== cachedBuffer || pointer !== cachedPointer) {
-            cachedBuffer = buffer;
-            cachedPointer = pointer;
-            sourceView32 = new Uint32Array(buffer, pointer, (pitch * height) >> 2);
+        if (heap.buffer !== cachedBuffer || pointer !== cachedPointer) {
+            cachedBuffer = heap.buffer; cachedPointer = pointer;
+            sourceView32 = new Uint32Array(heap.buffer, pointer, (pitch * height) >> 2);
         }
         if (is32BitFormat) {
-            render32(sourceView32, 0, lastMainFrame, lastMainFramePtr, contextMain, textureMain, width, height, width * height, bindGroupMain, encoder, 0);
+            render32(sourceView32, 0, lastMainFrame, lastMainFramePtr, contextMain, textureMain, width, height, width * height, bindGroupMain, encoder);
         } else {
-            render16(sourceView32, lastView16as32, lastMain16, lastMainFramePtr, contextMain, textureMain, width, height, pitch, bindGroupMain, encoder);
+            render16(sourceView32, lastMain16, lastMainFramePtr, contextMain, textureMain, width, height, pitch, bindGroupMain, encoder);
         }
     }
     gpuQueue.submit([encoder.finish()]);
