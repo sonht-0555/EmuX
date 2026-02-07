@@ -113,67 +113,27 @@ function recordDraw(context, bindGroup, encoder) {
     pass.end();
 }
 // ===== render32 =====
-let source64_wgpu_top, last64_wgpu_top, source64_wgpu_bottom, last64_wgpu_bottom;
-function render32(source, sourceOffset, lastFrame, lastFramePtr, context, texture, width, height, length, bindGroup, encoder, screenType) {
+function render32(source, sourceOffset, lastFrame, lastFramePtr, context, texture, width, height, length, bindGroup, encoder) {
     frameCount++;
     const isDirtyFn = cachedIsDirtyFn || (cachedIsDirtyFn = Module._retro_is_dirty || Module.asm?._retro_is_dirty || Module.instance?.exports?._retro_is_dirty || Module.instance?.exports?.retro_is_dirty);
-    if (isDirtyFn && lastFramePtr) {
-        if (isDirtyFn(source.byteOffset + (sourceOffset << 2), lastFramePtr, length << 2)) {
-            gpuQueue.writeTexture({ texture: texture }, lastFrame, { bytesPerRow: width * 4 }, { width, height });
-            recordDraw(context, bindGroup, encoder);
-            return;
-        }
+    if (isDirtyFn && lastFramePtr && isDirtyFn(source.byteOffset + (sourceOffset << 2), lastFramePtr, length << 2)) {
+        gpuQueue.writeTexture({ texture: texture }, lastFrame, { bytesPerRow: width * 4 }, { width, height });
+        recordDraw(context, bindGroup, encoder);
     } else {
-        let source64 = screenType ? source64_wgpu_bottom : source64_wgpu_top;
-        let last64 = screenType ? last64_wgpu_bottom : last64_wgpu_top;
-        if (!source64 || source64.buffer !== source.buffer || source64.byteOffset !== source.byteOffset + (sourceOffset << 2) || source64.length !== length >> 1) {
-            source64 = new BigUint64Array(source.buffer, source.byteOffset + (sourceOffset << 2), length >> 1);
-            last64 = new BigUint64Array(lastFrame.buffer, 0, length >> 1);
-            if (screenType) {
-                source64_wgpu_bottom = source64;
-                last64_wgpu_bottom = last64;
-            } else {
-                source64_wgpu_top = source64;
-                last64_wgpu_top = last64;
-            }
-        }
-        for (let index = source64.length - 1; index >= 0; index--) {
-            if (source64[index] !== last64[index]) {
-                lastFrame.set(source.subarray(sourceOffset, sourceOffset + length));
-                gpuQueue.writeTexture({ texture: texture }, lastFrame, { bytesPerRow: width * 4 }, { width, height });
-                recordDraw(context, bindGroup, encoder);
-                return;
-            }
-        }
+        skippedFrames++;
     }
-    skippedFrames++;
 }
 // ===== render16 =====
-let source64_wgpu_16, last64_wgpu_16;
 function render16(source32, last32, last16, last32Ptr, context, texture, width, height, pitch, bindGroup, encoder) {
     frameCount++;
     const isDirtyFn = cachedIsDirtyFn || (cachedIsDirtyFn = Module._retro_is_dirty || Module.asm?._retro_is_dirty || Module.instance?.exports?._retro_is_dirty || Module.instance?.exports?.retro_is_dirty);
     const byteSize = pitch * height;
-    if (isDirtyFn && last32Ptr) {
-        if (isDirtyFn(source32.byteOffset, last32Ptr, byteSize)) {
-            gpuQueue.writeTexture({ texture: texture }, last16, { bytesPerRow: pitch }, { width, height });
-            recordDraw(context, bindGroup, encoder); return;
-        }
+    if (isDirtyFn && last32Ptr && isDirtyFn(source32.byteOffset, last32Ptr, byteSize)) {
+        gpuQueue.writeTexture({ texture: texture }, last16, { bytesPerRow: pitch }, { width, height });
+        recordDraw(context, bindGroup, encoder);
     } else {
-        const len64 = byteSize >> 3;
-        if (!source64_wgpu_16 || source64_wgpu_16.buffer !== source32.buffer || source64_wgpu_16.length !== len64) {
-            source64_wgpu_16 = new BigUint64Array(source32.buffer, source32.byteOffset, len64);
-            last64_wgpu_16 = new BigUint64Array(last32.buffer, 0, len64);
-        }
-        for (let i = len64 - 1; i >= 0; i--) {
-            if (source64_wgpu_16[i] !== last64_wgpu_16[i]) {
-                last32.set(source32.subarray(0, byteSize >> 2));
-                gpuQueue.writeTexture({ texture: texture }, last16, { bytesPerRow: pitch }, { width, height });
-                recordDraw(context, bindGroup, encoder); return;
-            }
-        }
+        skippedFrames++;
     }
-    skippedFrames++;
 }
 // ===== renderNDS =====
 function renderNDS(pointer, width, height, encoder) {
@@ -224,8 +184,8 @@ function renderNDS(pointer, width, height, encoder) {
         ndsPointer = pointer;
         sourceView32 = new Uint32Array(buffer, pointer, width * height);
     }
-    render32(sourceView32, 0, lastMainFrame, lastMainFramePtr, contextMain, textureMain, width, halfHeight, pixelCount, bindGroupMain, encoder, 0);
-    render32(sourceView32, pixelCount, lastBottomFrame, lastBottomFramePtr, contextBottom, textureBottom, width, halfHeight, pixelCount, bindGroupBottom, encoder, 1);
+    render32(sourceView32, 0, lastMainFrame, lastMainFramePtr, contextMain, textureMain, width, halfHeight, pixelCount, bindGroupMain, encoder);
+    render32(sourceView32, pixelCount, lastBottomFrame, lastBottomFramePtr, contextBottom, textureBottom, width, halfHeight, pixelCount, bindGroupBottom, encoder);
 }
 // ===== activeRenderFn =====
 window.activeRenderFn = async function(pointer, width, height, pitch) {
