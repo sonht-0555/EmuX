@@ -12,39 +12,37 @@ let lastBottomFrame;
 let lastView16as32;
 let sourceView32;
 let sourceView16;
-let cachedIsDirtyFn;
+let cachedIsDirtyFn, cachedRender32Fn, cachedRender16Fn;
+let visualBufferPtr = 0;
+let visualBufferBottomPtr = 0;
+let lutPtr = 0;
+
 // ===== render32 =====
-// ===== render32 =====
-function render32(source, sourceOffset, lastFrame, lastFramePtr, buffer, context, imageDataObject, length, screenType) {
+function render32(source, sourceOffset, lastFrame, lastFramePtr, context, imageDataObject, length, vBufPtr) {
     frameCount++;
-    const isDirtyFn = cachedIsDirtyFn || (cachedIsDirtyFn = Module._retro_is_dirty || Module.asm?._retro_is_dirty || Module.instance?.exports?._retro_is_dirty || Module.instance?.exports?.retro_is_dirty);
-    if (isDirtyFn && lastFramePtr && isDirtyFn(source.byteOffset + (sourceOffset << 2), lastFramePtr, length << 2)) {
-        for (let pixelIndex = 0, sourceIndex = sourceOffset; pixelIndex < length; pixelIndex++, sourceIndex++) {
-            const color = source[sourceIndex];
-            buffer[pixelIndex] = 0xFF000000 | (color & 0xFF) << 16 | (color & 0xFF00) | (color >> 16) & 0xFF;
-        }
+    const renderFn = cachedRender32Fn || (cachedRender32Fn = Module._retro_render32 || Module.asm?._retro_render32 || Module.instance?.exports?._retro_render32 || Module.instance?.exports?.retro_render32);
+    if (renderFn && lastFramePtr && renderFn(source.byteOffset + (sourceOffset << 2), lastFramePtr, vBufPtr, length)) {
         context.putImageData(imageDataObject, 0, 0);
     } else {
         skippedFrames++;
     }
 }
+
 // ===== render16 =====
-function render16(source16, source32, last32, last32Ptr, buffer, context, imageDataObject, width, height, stride) {
+function render16(source16, source32, last32, last32Ptr, context, imageDataObject, width, height, stride) {
     frameCount++;
-    const lut = lookupTable565;
-    const isDirtyFn = cachedIsDirtyFn || (cachedIsDirtyFn = Module._retro_is_dirty || Module.asm?._retro_is_dirty || Module.instance?.exports?._retro_is_dirty || Module.instance?.exports?.retro_is_dirty);
-    const byteSize = (stride << 1) * height;
-    if (isDirtyFn && last32Ptr && isDirtyFn(source32.byteOffset, last32Ptr, byteSize)) {
-        for (let row = 0, srcIdx = 0, dstIdx = 0; row < height; row++, srcIdx += stride, dstIdx += width) {
-            for (let col = 0; col < width; col++) {
-                buffer[dstIdx + col] = lut[source16[srcIdx + col]];
-            }
-        }
+    const renderFn = cachedRender16Fn || (cachedRender16Fn = Module._retro_render16 || Module.asm?._retro_render16 || Module.instance?.exports?._retro_render16 || Module.instance?.exports?.retro_render16);
+    if (!lutPtr && window.lookupTable565) {
+        lutPtr = Module._malloc(lookupTable565.length << 2);
+        new Uint32Array(Module.HEAPU8.buffer, lutPtr, lookupTable565.length).set(lookupTable565);
+    }
+    if (renderFn && last32Ptr && renderFn(source32.byteOffset, last32Ptr, visualBufferPtr, width, height, stride, lutPtr)) {
         context.putImageData(imageDataObject, 0, 0);
     } else {
         skippedFrames++;
     }
 }
+
 // ===== renderNDS =====
 function renderNDS(pointer, width, height) {
     const heap = Module.HEAPU8;
@@ -52,15 +50,20 @@ function renderNDS(pointer, width, height) {
     const buffer = heap.buffer;
     const halfHeight = height >> 1;
     const pixelCount = width * halfHeight;
-    if (cachedWidth !== width || cachedHeight !== halfHeight || !pixelBuffer) {
+    if (cachedWidth !== width || cachedHeight !== halfHeight || !visualBufferPtr) {
         cachedWidth = width;
         cachedHeight = halfHeight;
         Module.canvas.width = canvasB.width = width;
         Module.canvas.height = canvasB.height = halfHeight;
-        imageData = context2d.createImageData(width, halfHeight);
-        imageDataBottom = context2dBottom.createImageData(width, halfHeight);
-        pixelBuffer = new Uint32Array(imageData.data.buffer);
-        pixelBufferBottom = new Uint32Array(imageDataBottom.data.buffer);
+        
+        if (visualBufferPtr) Module._free(visualBufferPtr);
+        if (visualBufferBottomPtr) Module._free(visualBufferBottomPtr);
+        visualBufferPtr = Module._malloc(pixelCount << 2);
+        visualBufferBottomPtr = Module._malloc(pixelCount << 2);
+        
+        imageData = new ImageData(new Uint8ClampedArray(Module.HEAPU8.buffer, visualBufferPtr, pixelCount << 2), width, halfHeight);
+        imageDataBottom = new ImageData(new Uint8ClampedArray(Module.HEAPU8.buffer, visualBufferBottomPtr, pixelCount << 2), width, halfHeight);
+        
         if (lastMainFramePtr) Module._free(lastMainFramePtr);
         if (lastBottomFramePtr) Module._free(lastBottomFramePtr);
         lastMainFramePtr = Module._malloc(pixelCount << 2);
@@ -76,11 +79,11 @@ function renderNDS(pointer, width, height) {
         ndsPointer = pointer;
         sourceView32 = new Uint32Array(buffer, pointer, width * height);
     }
-    if (!pixelBuffer) return;
-    render32(sourceView32, 0, lastMainFrame, lastMainFramePtr, pixelBuffer, context2d, imageData, pixelCount);
-    render32(sourceView32, pixelCount, lastBottomFrame, lastBottomFramePtr, pixelBufferBottom, context2dBottom, imageDataBottom, pixelCount);
+    render32(sourceView32, 0, lastMainFrame, lastMainFramePtr, context2d, imageData, pixelCount, visualBufferPtr);
+    render32(sourceView32, pixelCount, lastBottomFrame, lastBottomFramePtr, context2dBottom, imageDataBottom, pixelCount, visualBufferBottomPtr);
     logSkip();
 }
+
 // ===== activeRenderFn =====
 window.activeRenderFn = function(pointer, width, height, pitch) {
     if (!context2d) {
@@ -107,15 +110,18 @@ window.activeRenderFn = function(pointer, width, height, pitch) {
     const pixelCount = width * height;
     const is32BitFormat = pitch === (width << 2);
     const buffer = Module.HEAPU8.buffer;
-    if (width !== cachedWidth || height !== cachedHeight || pitch !== cachedPitch || !pixelBuffer) {
+    if (width !== cachedWidth || height !== cachedHeight || pitch !== cachedPitch || !visualBufferPtr) {
         cachedWidth = width;
         cachedHeight = height;
         cachedPitch = pitch;
         cachedBuffer = null;
         Module.canvas.width = width;
         Module.canvas.height = height;
-        imageData = context2d.createImageData(width, height);
-        pixelBuffer = new Uint32Array(imageData.data.buffer);
+        
+        if (visualBufferPtr) Module._free(visualBufferPtr);
+        visualBufferPtr = Module._malloc(pixelCount << 2);
+        imageData = new ImageData(new Uint8ClampedArray(Module.HEAPU8.buffer, visualBufferPtr, pixelCount << 2), width, height);
+        
         const byteSize = pitch * height;
         if (is32BitFormat) {
             if (lastMainFramePtr) Module._free(lastMainFramePtr);
@@ -139,9 +145,9 @@ window.activeRenderFn = function(pointer, width, height, pitch) {
         }
     }
     if (is32BitFormat) {
-        render32(sourceView32, 0, lastMainFrame, lastMainFramePtr, pixelBuffer, context2d, imageData, pixelCount, 0);
+        render32(sourceView32, 0, lastMainFrame, lastMainFramePtr, context2d, imageData, pixelCount, visualBufferPtr);
     } else {
-        render16(sourceView16, sourceView32, lastView16as32, lastMainFramePtr, pixelBuffer, context2d, imageData, width, height, pitch >> 1);
+        render16(sourceView16, sourceView32, lastView16as32, lastMainFramePtr, context2d, imageData, width, height, pitch >> 1);
     }
     logSkip();
 };

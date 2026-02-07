@@ -18,9 +18,14 @@ let sourceView32;
 let sourceView16;
 let textureInitializedMain = 0;
 let textureInitializedBottom = 0;
-let cachedIsDirtyFn;
+let cachedIsDirtyFn, cachedRender32Fn, cachedRender16Fn;
+let visualBufferPtr = 0;
+let visualBufferBottomPtr = 0;
+let lutPtr = 0;
+
 const vertexShaderSource = `attribute vec2 p;attribute vec2 t;varying vec2 v;void main(){gl_Position=vec4(p,0,1);v=t;}`;
 const fragmentShaderSource = `precision mediump float;varying vec2 v;uniform sampler2D s;void main(){gl_FragColor=texture2D(s,v);}`;
+
 // ===== initGL =====
 function initGL(canvas) {
     const context = canvas.getContext('webgl', {
@@ -30,9 +35,7 @@ function initGL(canvas) {
         preserveDrawingBuffer: false,
         powerPreference: 'high-performance'
     });
-    if (!context) {
-        return null;
-    }
+    if (!context) return null;
     const vertexShader = context.createShader(context.VERTEX_SHADER);
     context.shaderSource(vertexShader, vertexShaderSource);
     context.compileShader(vertexShader);
@@ -62,21 +65,14 @@ function initGL(canvas) {
     context.texParameteri(context.TEXTURE_2D, context.TEXTURE_WRAP_T, context.CLAMP_TO_EDGE);
     context.texParameteri(context.TEXTURE_2D, context.TEXTURE_MIN_FILTER, context.NEAREST);
     context.texParameteri(context.TEXTURE_2D, context.TEXTURE_MAG_FILTER, context.NEAREST);
-    return {
-        context: context,
-        prog: program,
-        tex: texture
-    };
+    return { context, prog: program, tex: texture };
 }
+
 // ===== render32 =====
-function render32(source, sourceOffset, lastFrame, lastFramePtr, buffer, view, context, texture, width, height, length, textureType) {
+function render32(source, sourceOffset, lastFrame, lastFramePtr, vBufPtr, view, context, texture, width, height, length, textureType) {
     frameCount++;
-    const isDirtyFn = cachedIsDirtyFn || (cachedIsDirtyFn = Module._retro_is_dirty || Module.asm?._retro_is_dirty || Module.instance?.exports?._retro_is_dirty || Module.instance?.exports?.retro_is_dirty);
-    if (isDirtyFn && lastFramePtr && isDirtyFn(source.byteOffset + (sourceOffset << 2), lastFramePtr, length << 2)) {
-        for (let pixelIndex = 0, sourceIndex = sourceOffset; pixelIndex < length; pixelIndex++, sourceIndex++) {
-            const color = source[sourceIndex];
-            buffer[pixelIndex] = 0xFF000000 | (color & 0xFF) << 16 | (color & 0xFF00) | (color >> 16) & 0xFF;
-        }
+    const renderFn = cachedRender32Fn || (cachedRender32Fn = Module._retro_render32 || Module.asm?._retro_render32 || Module.instance?.exports?._retro_render32 || Module.instance?.exports?.retro_render32);
+    if (renderFn && lastFramePtr && renderFn(source.byteOffset + (sourceOffset << 2), lastFramePtr, vBufPtr, length)) {
         context.bindTexture(context.TEXTURE_2D, texture);
         if (textureType ? textureInitializedBottom : textureInitializedMain) context.texSubImage2D(context.TEXTURE_2D, 0, 0, 0, width, height, context.RGBA, context.UNSIGNED_BYTE, view);
         else { context.texImage2D(context.TEXTURE_2D, 0, context.RGBA, width, height, 0, context.RGBA, context.UNSIGNED_BYTE, view); if (textureType) textureInitializedBottom = 1; else textureInitializedMain = 1; }
@@ -85,18 +81,16 @@ function render32(source, sourceOffset, lastFrame, lastFramePtr, buffer, view, c
         skippedFrames++;
     }
 }
+
 // ===== render16 =====
-function render16(source16, source32, last32, last32Ptr, buffer, view, context, texture, width, height, stride, textureType) {
+function render16(source32, last32, last32Ptr, vBufPtr, view, context, texture, width, height, stride, textureType) {
     frameCount++;
-    const lut = lookupTable565;
-    const isDirtyFn = cachedIsDirtyFn || (cachedIsDirtyFn = Module._retro_is_dirty || Module.asm?._retro_is_dirty || Module.instance?.exports?._retro_is_dirty || Module.instance?.exports?.retro_is_dirty);
-    const byteSize = (stride << 1) * height;
-    if (isDirtyFn && last32Ptr && isDirtyFn(source32.byteOffset, last32Ptr, byteSize)) {
-        for (let row = 0, srcIdx = 0, dstIdx = 0; row < height; row++, srcIdx += stride, dstIdx += width) {
-            for (let col = 0; col < width; col++) {
-                buffer[dstIdx + col] = lut[source16[srcIdx + col]];
-            }
-        }
+    const renderFn = cachedRender16Fn || (cachedRender16Fn = Module._retro_render16 || Module.asm?._retro_render16 || Module.instance?.exports?._retro_render16 || Module.instance?.exports?.retro_render16);
+    if (!lutPtr && window.lookupTable565) {
+        lutPtr = Module._malloc(lookupTable565.length << 2);
+        new Uint32Array(Module.HEAPU8.buffer, lutPtr, lookupTable565.length).set(lookupTable565);
+    }
+    if (renderFn && last32Ptr && renderFn(source32.byteOffset, last32Ptr, vBufPtr, width, height, stride, lutPtr)) {
         context.bindTexture(context.TEXTURE_2D, texture);
         if (textureType ? textureInitializedBottom : textureInitializedMain) context.texSubImage2D(context.TEXTURE_2D, 0, 0, 0, width, height, context.RGBA, context.UNSIGNED_BYTE, view);
         else { context.texImage2D(context.TEXTURE_2D, 0, context.RGBA, width, height, 0, context.RGBA, context.UNSIGNED_BYTE, view); if (textureType) textureInitializedBottom = 1; else textureInitializedMain = 1; }
@@ -105,6 +99,7 @@ function render16(source16, source32, last32, last32Ptr, buffer, view, context, 
         skippedFrames++;
     }
 }
+
 // ===== renderNDS =====
 function renderNDS(pointer, width, height) {
     const heap = Module.HEAPU8;
@@ -112,17 +107,22 @@ function renderNDS(pointer, width, height) {
     const buffer = heap.buffer;
     const halfHeight = height >> 1;
     const pixelCount = width * halfHeight;
-    if (cachedWidth !== width || cachedHeight !== halfHeight || !pixelBuffer) {
+    if (cachedWidth !== width || cachedHeight !== halfHeight || !visualBufferPtr) {
         cachedWidth = width;
         cachedHeight = halfHeight;
         Module.canvas.width = canvasB.width = width;
         Module.canvas.height = canvasB.height = halfHeight;
         glContext.viewport(0, 0, width, halfHeight);
         glContextBottom.viewport(0, 0, width, halfHeight);
-        pixelBuffer = new Uint32Array(pixelCount);
-        pixelBufferBottom = new Uint32Array(pixelCount);
-        pixelView = new Uint8Array(pixelBuffer.buffer);
-        pixelViewBottom = new Uint8Array(pixelBufferBottom.buffer);
+        
+        if (visualBufferPtr) Module._free(visualBufferPtr);
+        if (visualBufferBottomPtr) Module._free(visualBufferBottomPtr);
+        visualBufferPtr = Module._malloc(pixelCount << 2);
+        visualBufferBottomPtr = Module._malloc(pixelCount << 2);
+        
+        pixelView = new Uint8Array(Module.HEAPU8.buffer, visualBufferPtr, pixelCount << 2);
+        pixelViewBottom = new Uint8Array(Module.HEAPU8.buffer, visualBufferBottomPtr, pixelCount << 2);
+        
         if (lastMainFramePtr) Module._free(lastMainFramePtr);
         if (lastBottomFramePtr) Module._free(lastBottomFramePtr);
         lastMainFramePtr = Module._malloc(pixelCount << 2);
@@ -131,26 +131,22 @@ function renderNDS(pointer, width, height) {
         lastBottomFrame = new Uint32Array(Module.HEAPU8.buffer, lastBottomFramePtr, pixelCount);
         sourceView32 = null;
         textureInitializedMain = textureInitializedBottom = 0;
-        if (window.gameView) {
-            gameView(gameName);
-        }
+        if (window.gameView) gameView(gameName);
     }
     if (!sourceView32 || sourceView32.buffer !== buffer || ndsPointer !== pointer) {
         ndsPointer = pointer;
         sourceView32 = new Uint32Array(buffer, pointer, width * height);
     }
-    if (!pixelBuffer) return;
-    render32(sourceView32, 0, lastMainFrame, lastMainFramePtr, pixelBuffer, pixelView, glContext, glTexture, width, halfHeight, pixelCount, 0);
-    render32(sourceView32, pixelCount, lastBottomFrame, lastBottomFramePtr, pixelBufferBottom, pixelViewBottom, glContextBottom, glTextureBottom, width, halfHeight, pixelCount, 1);
+    render32(sourceView32, 0, lastMainFrame, lastMainFramePtr, visualBufferPtr, pixelView, glContext, glTexture, width, halfHeight, pixelCount, 0);
+    render32(sourceView32, pixelCount, lastBottomFrame, lastBottomFramePtr, visualBufferBottomPtr, pixelViewBottom, glContextBottom, glTextureBottom, width, halfHeight, pixelCount, 1);
     logSkip();
 }
+
 // ===== activeRenderFn =====
 window.activeRenderFn = function(pointer, width, height, pitch) {
     if (!glContext) {
         const mainContext = initGL(Module.canvas);
-        if (!mainContext) {
-            return;
-        }
+        if (!mainContext) return;
         glContext = mainContext.context;
         shaderProgram = mainContext.prog;
         glTexture = mainContext.tex;
@@ -165,13 +161,11 @@ window.activeRenderFn = function(pointer, width, height, pitch) {
             glTextureBottom = bottomContext.tex;
         }
     }
-    if (Module.isNDS) {
-        return renderNDS(pointer, width, height);
-    }
+    if (Module.isNDS) return renderNDS(pointer, width, height);
     const pixelCount = width * height;
     const is32BitFormat = pitch === (width << 2);
     const buffer = Module.HEAPU8.buffer;
-    if (width !== cachedWidth || height !== cachedHeight || pitch !== cachedPitch || !pixelBuffer) {
+    if (width !== cachedWidth || height !== cachedHeight || pitch !== cachedPitch || !visualBufferPtr) {
         cachedWidth = width;
         cachedHeight = height;
         cachedPitch = pitch;
@@ -179,8 +173,11 @@ window.activeRenderFn = function(pointer, width, height, pitch) {
         Module.canvas.width = width;
         Module.canvas.height = height;
         glContext.viewport(0, 0, width, height);
-        pixelBuffer = new Uint32Array(pixelCount);
-        pixelView = new Uint8Array(pixelBuffer.buffer);
+        
+        if (visualBufferPtr) Module._free(visualBufferPtr);
+        visualBufferPtr = Module._malloc(pixelCount << 2);
+        pixelView = new Uint8Array(Module.HEAPU8.buffer, visualBufferPtr, pixelCount << 2);
+        
         const byteSize = pitch * height;
         if (is32BitFormat) {
             if (lastMainFramePtr) Module._free(lastMainFramePtr);
@@ -192,22 +189,18 @@ window.activeRenderFn = function(pointer, width, height, pitch) {
             lastView16as32 = new Uint32Array(Module.HEAPU8.buffer, lastMainFramePtr, byteSize >> 2);
         }
         textureInitializedMain = 0;
-        if (window.gameView) {
-            gameView(gameName);
-        }
+        if (window.gameView) gameView(gameName);
     }
     if (buffer !== cachedBuffer || pointer !== cachedPointer) {
         cachedBuffer = buffer;
         cachedPointer = pointer;
         sourceView32 = new Uint32Array(buffer, pointer, is32BitFormat ? pixelCount : ((pitch >> 1) * height) >> 1);
-        if (!is32BitFormat) {
-            sourceView16 = new Uint16Array(buffer, pointer, (pitch >> 1) * height);
-        }
+        if (!is32BitFormat) sourceView16 = new Uint16Array(buffer, pointer, (pitch >> 1) * height);
     }
     if (is32BitFormat) {
-        render32(sourceView32, 0, lastMainFrame, lastMainFramePtr, pixelBuffer, pixelView, glContext, glTexture, width, height, pixelCount, 0);
+        render32(sourceView32, 0, lastMainFrame, lastMainFramePtr, visualBufferPtr, pixelView, glContext, glTexture, width, height, pixelCount, 0);
     } else {
-        render16(sourceView16, sourceView32, lastView16as32, lastMainFramePtr, pixelBuffer, pixelView, glContext, glTexture, width, height, pitch >> 1, 0);
+        render16(sourceView32, lastView16as32, lastMainFramePtr, visualBufferPtr, pixelView, glContext, glTexture, width, height, pitch >> 1, 0);
     }
     logSkip();
 };
