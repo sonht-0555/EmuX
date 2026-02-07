@@ -76,7 +76,7 @@ function render32(source, sourceOffset, lastFrame, lastFramePtr, buffer, view, c
     if (isDirtyFn && lastFramePtr) {
         if (isDirtyFn(source.byteOffset + (sourceOffset << 2), lastFramePtr, length << 2)) {
             for (let pixelIndex = 0, sourceIndex = sourceOffset; pixelIndex < length; pixelIndex++, sourceIndex++) {
-                const color = lastFrame[pixelIndex] = source[sourceIndex];
+                const color = source[sourceIndex];
                 buffer[pixelIndex] = 0xFF000000 | (color & 0xFF) << 16 | (color & 0xFF00) | (color >> 16) & 0xFF;
             }
             context.bindTexture(context.TEXTURE_2D, texture);
@@ -132,12 +132,9 @@ function render16(source16, source32, last32, last32Ptr, buffer, view, context, 
     const isDirtyFn = cachedIsDirtyFn || (cachedIsDirtyFn = Module._retro_is_dirty || Module.asm?._retro_is_dirty || Module.instance?.exports?._retro_is_dirty || Module.instance?.exports?.retro_is_dirty);
     if (isDirtyFn && last32Ptr) {
         if (isDirtyFn(source32.byteOffset, last32Ptr, (width * height) << 1)) {
-            for (let row = 0, srcIdx = 0, dstIdx = 0, s32Idx = 0, l32Idx = 0; row < height; row++, srcIdx += stride, dstIdx += width, s32Idx += strideWords, l32Idx += widthWords) {
-                for (let col = 0; col < widthWords; col++) {
-                    const px = col << 1;
-                    buffer[dstIdx + px] = lut[source16[srcIdx + px]];
-                    buffer[dstIdx + px + 1] = lut[source16[srcIdx + px + 1]];
-                    last32[l32Idx + col] = source32[s32Idx + col];
+            for (let row = 0, srcIdx = 0, dstIdx = 0; row < height; row++, srcIdx += stride, dstIdx += width) {
+                for (let col = 0; col < width; col++) {
+                    buffer[dstIdx + col] = lut[source16[srcIdx + col]];
                 }
             }
             context.bindTexture(context.TEXTURE_2D, texture);
@@ -255,14 +252,15 @@ window.activeRenderFn = function(pointer, width, height, pitch) {
         glContext.viewport(0, 0, width, height);
         pixelBuffer = new Uint32Array(pixelCount);
         pixelView = new Uint8Array(pixelBuffer.buffer);
+        const byteSize = pitch * height;
         if (is32BitFormat) {
             if (lastMainFramePtr) Module._free(lastMainFramePtr);
-            lastMainFramePtr = Module._malloc(pixelCount << 2);
-            lastMainFrame = new Uint32Array(Module.HEAPU8.buffer, lastMainFramePtr, pixelCount);
+            lastMainFramePtr = Module._malloc(byteSize);
+            lastMainFrame = new Uint32Array(Module.HEAPU8.buffer, lastMainFramePtr, byteSize >> 2);
         } else {
             if (lastMainFramePtr) Module._free(lastMainFramePtr);
-            lastMainFramePtr = Module._malloc(pixelCount << 1);
-            lastView16as32 = new Uint32Array(Module.HEAPU8.buffer, lastMainFramePtr, pixelCount >> 1);
+            lastMainFramePtr = Module._malloc(byteSize);
+            lastView16as32 = new Uint32Array(Module.HEAPU8.buffer, lastMainFramePtr, byteSize >> 2);
         }
         textureInitializedMain = 0;
         if (window.gameView) {

@@ -119,7 +119,6 @@ function render32(source, sourceOffset, lastFrame, lastFramePtr, context, textur
     const isDirtyFn = cachedIsDirtyFn || (cachedIsDirtyFn = Module._retro_is_dirty || Module.asm?._retro_is_dirty || Module.instance?.exports?._retro_is_dirty || Module.instance?.exports?.retro_is_dirty);
     if (isDirtyFn && lastFramePtr) {
         if (isDirtyFn(source.byteOffset + (sourceOffset << 2), lastFramePtr, length << 2)) {
-            lastFrame.set(source.subarray(sourceOffset, sourceOffset + length));
             gpuQueue.writeTexture({ texture: texture }, lastFrame, { bytesPerRow: width * 4 }, { width, height });
             recordDraw(context, bindGroup, encoder);
             return;
@@ -150,41 +149,27 @@ function render32(source, sourceOffset, lastFrame, lastFramePtr, context, textur
     skippedFrames++;
 }
 // ===== render16 =====
-function render16(source32, last32, last16, last32Ptr, context, texture, width, height, stride, bindGroup, encoder) {
+let source64_wgpu_16, last64_wgpu_16;
+function render16(source32, last32, last16, last32Ptr, context, texture, width, height, pitch, bindGroup, encoder) {
     frameCount++;
-    const widthWords = width >> 1;
-    const strideWords = stride >> 1;
     const isDirtyFn = cachedIsDirtyFn || (cachedIsDirtyFn = Module._retro_is_dirty || Module.asm?._retro_is_dirty || Module.instance?.exports?._retro_is_dirty || Module.instance?.exports?.retro_is_dirty);
+    const byteSize = pitch * height;
     if (isDirtyFn && last32Ptr) {
-        if (isDirtyFn(source32.byteOffset, last32Ptr, (width * height) << 1)) {
-            if (width === stride) {
-                last32.set(source32);
-            } else {
-                for (let copyRowIndex = 0; copyRowIndex < height; copyRowIndex++) {
-                    last32.set(source32.subarray(copyRowIndex * strideWords, copyRowIndex * strideWords + widthWords), copyRowIndex * widthWords);
-                }
-            }
-            gpuQueue.writeTexture({ texture: texture }, last16, { bytesPerRow: width * 2 }, { width, height });
-            recordDraw(context, bindGroup, encoder);
-            return;
+        if (isDirtyFn(source32.byteOffset, last32Ptr, byteSize)) {
+            gpuQueue.writeTexture({ texture: texture }, last16, { bytesPerRow: pitch }, { width, height });
+            recordDraw(context, bindGroup, encoder); return;
         }
     } else {
-        for (let rowIndex = height - 1; rowIndex >= 0; rowIndex--) {
-            const sourceRowIndex = rowIndex * strideWords;
-            const lastRowIndex = rowIndex * widthWords;
-            for (let columnIndex = widthWords - 1; columnIndex >= 0; columnIndex--) {
-                if (source32[sourceRowIndex + columnIndex] !== last32[lastRowIndex + columnIndex]) {
-                    if (width === stride) {
-                        last32.set(source32);
-                    } else {
-                        for (let copyRowIndex = 0; copyRowIndex < height; copyRowIndex++) {
-                            last32.set(source32.subarray(copyRowIndex * strideWords, copyRowIndex * strideWords + widthWords), copyRowIndex * widthWords);
-                        }
-                    }
-                    gpuQueue.writeTexture({ texture: texture }, last16, { bytesPerRow: width * 2 }, { width, height });
-                    recordDraw(context, bindGroup, encoder);
-                    return;
-                }
+        const len64 = byteSize >> 3;
+        if (!source64_wgpu_16 || source64_wgpu_16.buffer !== source32.buffer || source64_wgpu_16.length !== len64) {
+            source64_wgpu_16 = new BigUint64Array(source32.buffer, source32.byteOffset, len64);
+            last64_wgpu_16 = new BigUint64Array(last32.buffer, 0, len64);
+        }
+        for (let i = len64 - 1; i >= 0; i--) {
+            if (source64_wgpu_16[i] !== last64_wgpu_16[i]) {
+                last32.set(source32.subarray(0, byteSize >> 2));
+                gpuQueue.writeTexture({ texture: texture }, last16, { bytesPerRow: pitch }, { width, height });
+                recordDraw(context, bindGroup, encoder); return;
             }
         }
     }
@@ -288,15 +273,15 @@ window.activeRenderFn = async function(pointer, width, height, pitch) {
                     { binding: 2, resource: (is32BitFormat ? dummyTexture : textureMain).createView() }
                 ]
             });
-            const pixelCount = width * height;
+            const byteSize = pitch * height;
             if (lastMainFramePtr) Module._free(lastMainFramePtr);
             if (is32BitFormat) {
-                lastMainFramePtr = Module._malloc(pixelCount << 2);
-                lastMainFrame = new Uint32Array(Module.HEAPU8.buffer, lastMainFramePtr, pixelCount);
+                lastMainFramePtr = Module._malloc(byteSize);
+                lastMainFrame = new Uint32Array(Module.HEAPU8.buffer, lastMainFramePtr, byteSize >> 2);
             } else {
-                lastMainFramePtr = Module._malloc(pixelCount << 1);
-                lastView16as32 = new Uint32Array(Module.HEAPU8.buffer, lastMainFramePtr, pixelCount >> 1);
-                lastMain16 = new Uint16Array(Module.HEAPU8.buffer, lastMainFramePtr, pixelCount);
+                lastMainFramePtr = Module._malloc(byteSize);
+                lastView16as32 = new Uint32Array(Module.HEAPU8.buffer, lastMainFramePtr, byteSize >> 2);
+                lastMain16 = new Uint16Array(Module.HEAPU8.buffer, lastMainFramePtr, byteSize >> 1);
             }
             if (window.gameView) {
                 gameView(gameName);
@@ -310,7 +295,7 @@ window.activeRenderFn = async function(pointer, width, height, pitch) {
         if (is32BitFormat) {
             render32(sourceView32, 0, lastMainFrame, lastMainFramePtr, contextMain, textureMain, width, height, width * height, bindGroupMain, encoder, 0);
         } else {
-            render16(sourceView32, lastView16as32, lastMain16, lastMainFramePtr, contextMain, textureMain, width, height, pitch >> 1, bindGroupMain, encoder);
+            render16(sourceView32, lastView16as32, lastMain16, lastMainFramePtr, contextMain, textureMain, width, height, pitch, bindGroupMain, encoder);
         }
     }
     gpuQueue.submit([encoder.finish()]);
