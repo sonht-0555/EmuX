@@ -1,4 +1,5 @@
 #include <string.h>
+#include <stdint.h>
 #include <emscripten.h>
 
 EMSCRIPTEN_KEEPALIVE int retro_is_dirty(const void *buf1, void *buf2, size_t size) {

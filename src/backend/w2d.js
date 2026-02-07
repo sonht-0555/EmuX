@@ -3,22 +3,17 @@ let context2d;
 let context2dBottom;
 let imageData;
 let imageDataBottom;
-let pixelBuffer;
-let pixelBufferBottom;
 let lastMainFramePtr = 0;
 let lastBottomFramePtr = 0;
-let lastMainFrame;
-let lastBottomFrame;
-let lastView16as32;
 let sourceView32;
 let sourceView16;
-let cachedIsDirtyFn, cachedRender32Fn, cachedRender16Fn;
+let cachedRender32Fn, cachedRender16Fn;
 let visualBufferPtr = 0;
 let visualBufferBottomPtr = 0;
 let lutPtr = 0;
 
 // ===== render32 =====
-function render32(source, sourceOffset, lastFrame, lastFramePtr, context, imageDataObject, length, vBufPtr) {
+function render32(source, sourceOffset, lastFramePtr, context, imageDataObject, length, vBufPtr) {
     frameCount++;
     const renderFn = cachedRender32Fn || (cachedRender32Fn = Module._retro_render32 || Module.asm?._retro_render32 || Module.instance?.exports?._retro_render32 || Module.instance?.exports?.retro_render32);
     if (renderFn && lastFramePtr && renderFn(source.byteOffset + (sourceOffset << 2), lastFramePtr, vBufPtr, length)) {
@@ -29,7 +24,7 @@ function render32(source, sourceOffset, lastFrame, lastFramePtr, context, imageD
 }
 
 // ===== render16 =====
-function render16(source16, source32, last32, last32Ptr, context, imageDataObject, width, height, stride) {
+function render16(source32, last32Ptr, context, imageDataObject, width, height, stride) {
     frameCount++;
     const renderFn = cachedRender16Fn || (cachedRender16Fn = Module._retro_render16 || Module.asm?._retro_render16 || Module.instance?.exports?._retro_render16 || Module.instance?.exports?.retro_render16);
     if (!lutPtr && window.lookupTable565) {
@@ -79,8 +74,8 @@ function renderNDS(pointer, width, height) {
         ndsPointer = pointer;
         sourceView32 = new Uint32Array(buffer, pointer, width * height);
     }
-    render32(sourceView32, 0, lastMainFrame, lastMainFramePtr, context2d, imageData, pixelCount, visualBufferPtr);
-    render32(sourceView32, pixelCount, lastBottomFrame, lastBottomFramePtr, context2dBottom, imageDataBottom, pixelCount, visualBufferBottomPtr);
+    render32(sourceView32, 0, lastMainFramePtr, context2d, imageData, pixelCount, visualBufferPtr);
+    render32(sourceView32, pixelCount, lastBottomFramePtr, context2dBottom, imageDataBottom, pixelCount, visualBufferBottomPtr);
     logSkip();
 }
 
@@ -126,11 +121,9 @@ window.activeRenderFn = function(pointer, width, height, pitch) {
         if (is32BitFormat) {
             if (lastMainFramePtr) Module._free(lastMainFramePtr);
             lastMainFramePtr = Module._malloc(byteSize);
-            lastMainFrame = new Uint32Array(Module.HEAPU8.buffer, lastMainFramePtr, byteSize >> 2);
         } else {
             if (lastMainFramePtr) Module._free(lastMainFramePtr);
             lastMainFramePtr = Module._malloc(byteSize);
-            lastView16as32 = new Uint32Array(Module.HEAPU8.buffer, lastMainFramePtr, byteSize >> 2);
         }
         if (window.gameView) {
             gameView(gameName);
@@ -145,9 +138,9 @@ window.activeRenderFn = function(pointer, width, height, pitch) {
         }
     }
     if (is32BitFormat) {
-        render32(sourceView32, 0, lastMainFrame, lastMainFramePtr, context2d, imageData, pixelCount, visualBufferPtr);
+        render32(sourceView32, 0, lastMainFramePtr, context2d, imageData, pixelCount, visualBufferPtr);
     } else {
-        render16(sourceView16, sourceView32, lastView16as32, lastMainFramePtr, context2d, imageData, width, height, pitch >> 1);
+        render16(sourceView32, lastMainFramePtr, context2d, imageData, width, height, pitch >> 1);
     }
     logSkip();
 };

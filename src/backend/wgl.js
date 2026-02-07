@@ -7,18 +7,13 @@ let glTexture;
 let glTextureBottom;
 let lastMainFramePtr = 0;
 let lastBottomFramePtr = 0;
-let lastMainFrame;
-let lastBottomFrame;
-let pixelBuffer;
-let pixelBufferBottom;
 let pixelView;
 let pixelViewBottom;
-let lastView16as32;
 let sourceView32;
 let sourceView16;
 let textureInitializedMain = 0;
 let textureInitializedBottom = 0;
-let cachedIsDirtyFn, cachedRender32Fn, cachedRender16Fn;
+let cachedRender32Fn, cachedRender16Fn;
 let visualBufferPtr = 0;
 let visualBufferBottomPtr = 0;
 let lutPtr = 0;
@@ -69,7 +64,7 @@ function initGL(canvas) {
 }
 
 // ===== render32 =====
-function render32(source, sourceOffset, lastFrame, lastFramePtr, vBufPtr, view, context, texture, width, height, length, textureType) {
+function render32(source, sourceOffset, lastFramePtr, vBufPtr, view, context, texture, width, height, length, textureType) {
     frameCount++;
     const renderFn = cachedRender32Fn || (cachedRender32Fn = Module._retro_render32 || Module.asm?._retro_render32 || Module.instance?.exports?._retro_render32 || Module.instance?.exports?.retro_render32);
     if (renderFn && lastFramePtr && renderFn(source.byteOffset + (sourceOffset << 2), lastFramePtr, vBufPtr, length)) {
@@ -83,7 +78,7 @@ function render32(source, sourceOffset, lastFrame, lastFramePtr, vBufPtr, view, 
 }
 
 // ===== render16 =====
-function render16(source32, last32, last32Ptr, vBufPtr, view, context, texture, width, height, stride, textureType) {
+function render16(source32, last32Ptr, vBufPtr, view, context, texture, width, height, stride, textureType) {
     frameCount++;
     const renderFn = cachedRender16Fn || (cachedRender16Fn = Module._retro_render16 || Module.asm?._retro_render16 || Module.instance?.exports?._retro_render16 || Module.instance?.exports?.retro_render16);
     if (!lutPtr && window.lookupTable565) {
@@ -137,8 +132,8 @@ function renderNDS(pointer, width, height) {
         ndsPointer = pointer;
         sourceView32 = new Uint32Array(buffer, pointer, width * height);
     }
-    render32(sourceView32, 0, lastMainFrame, lastMainFramePtr, visualBufferPtr, pixelView, glContext, glTexture, width, halfHeight, pixelCount, 0);
-    render32(sourceView32, pixelCount, lastBottomFrame, lastBottomFramePtr, visualBufferBottomPtr, pixelViewBottom, glContextBottom, glTextureBottom, width, halfHeight, pixelCount, 1);
+    render32(sourceView32, 0, lastMainFramePtr, visualBufferPtr, pixelView, glContext, glTexture, width, halfHeight, pixelCount, 0);
+    render32(sourceView32, pixelCount, lastBottomFramePtr, visualBufferBottomPtr, pixelViewBottom, glContextBottom, glTextureBottom, width, halfHeight, pixelCount, 1);
     logSkip();
 }
 
@@ -182,11 +177,9 @@ window.activeRenderFn = function(pointer, width, height, pitch) {
         if (is32BitFormat) {
             if (lastMainFramePtr) Module._free(lastMainFramePtr);
             lastMainFramePtr = Module._malloc(byteSize);
-            lastMainFrame = new Uint32Array(Module.HEAPU8.buffer, lastMainFramePtr, byteSize >> 2);
         } else {
             if (lastMainFramePtr) Module._free(lastMainFramePtr);
             lastMainFramePtr = Module._malloc(byteSize);
-            lastView16as32 = new Uint32Array(Module.HEAPU8.buffer, lastMainFramePtr, byteSize >> 2);
         }
         textureInitializedMain = 0;
         if (window.gameView) gameView(gameName);
@@ -198,9 +191,9 @@ window.activeRenderFn = function(pointer, width, height, pitch) {
         if (!is32BitFormat) sourceView16 = new Uint16Array(buffer, pointer, (pitch >> 1) * height);
     }
     if (is32BitFormat) {
-        render32(sourceView32, 0, lastMainFrame, lastMainFramePtr, visualBufferPtr, pixelView, glContext, glTexture, width, height, pixelCount, 0);
+        render32(sourceView32, 0, lastMainFramePtr, visualBufferPtr, pixelView, glContext, glTexture, width, height, pixelCount, 0);
     } else {
-        render16(sourceView32, lastView16as32, lastMainFramePtr, visualBufferPtr, pixelView, glContext, glTexture, width, height, pitch >> 1, 0);
+        render16(sourceView32, lastMainFramePtr, visualBufferPtr, pixelView, glContext, glTexture, width, height, pitch >> 1, 0);
     }
     logSkip();
 };
