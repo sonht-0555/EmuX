@@ -118,25 +118,6 @@ document.addEventListener("DOMContentLoaded", function() {
         window._pD = 0;
         isSwiping = false;
     };
-    // Shader State Button
-    state.onpointerdown = (event) => {
-        if (doubleTap(event, state)) {
-            isRunning = false;
-            setTimeout(() => {
-                const userInput = prompt("Format [shaderxx-data]");
-                if (userInput) {
-                    local(...(userInput.split('-')));
-                }
-                isRunning = true;
-            }, 150);
-        } else {
-            shaderNumber = shaderNumber % 5 + 1;
-            local("shader", shaderNumber);
-            const shaderData = local(`shader0${shaderNumber}`) || "0.0.0.1.0.0.1.0.0.1.0.0.1.0.0.0";
-            screen.style.setProperty("--shader", svgGen(window.devicePixelRatio, integer, shaderData));
-            message(`[0${shaderNumber}] Matrix!`);
-        }
-    };
     // Renderer Switch Button
     switch0.onpointerdown = () => {
         switchRenderer();

@@ -9,12 +9,12 @@
   <link rel="manifest" href="/manifest.json" />
 </head>
 <script>
-    let gameVer = 'EmuX_3.50';
+    let gameVer = 'EmuX_3.52';
 </script>
 <body hide>
   <page00 hidden>
     <divide></divide>
-    <title0><green0></green0><white0></white0><gray0></gray0></title0>
+    <title0 green="" gray="" white=""></title0>
     <message0></message0>
     <switch0 hidden>EmuX</switch0>
   </page00>
@@ -28,7 +28,7 @@
     <list01 hidden></list01>
     <list><rom><ver op4></ver></rom></list>
     <cta>
-      <logo></logo>
+      <logo green="em">ux</logo>
       <setting></setting>
       <vertical>
         <svg width="50" height="50" viewBox="0 0 50 50" fill="none">
@@ -51,10 +51,9 @@
     </display>
     <divide></divide>
     <gamepad>
-      <btn-state id="state"></btn-state>
-      <btn-l data="func-l"></btn-l>
-      <btn-r data="func-r"></btn-r>
-      <btn-menu id="menu"></btn-menu>
+      <btn-l data="func-l"> bl.</btn-l>
+      <btn-r data="func-r"> br.</btn-r>
+      <btn-menu id="menu">-</btn-menu>
       <sec-dpad id="dpad">
         <svg width="100%" height="100%" viewBox="0 0 100 100" fill-opacity="0">
           <polygon points="50 50, 100 100, 100 0"   fill="transparent" data="btn-right"/>
@@ -75,8 +74,8 @@
         <btn-3 data="func-3"></btn-3>
         <btn-4 data="func-4"></btn-4>
       </sec-34>
-      <btn-select data="func-select"></btn-select>
-      <btn-start data="func-start"></btn-start>
+      <btn-select data="func-select"> sc.</btn-select>
+      <btn-start data="func-start"> st.</btn-start>
     </gamepad>
     <divide></divide>
     <joypad>

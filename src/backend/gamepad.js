@@ -84,7 +84,6 @@ function updateButtons(configuration) {
         }
         const buttonConfiguration = configuration[tag];
         if (buttonConfiguration) {
-            element.style.display = 'grid';
             element.innerText = buttonConfiguration[0];
             if (buttonConfiguration[1] !== undefined) {
                 const buttonKey = tag.replace('btn-', '');
@@ -103,10 +102,6 @@ function updateButtons(configuration) {
         }
         const children = Array.from(element.children);
         const hasVisibleButtons = children.some(child => child.style.display !== 'none');
-        if (hasVisibleButtons) {
-            element.style.display = 'grid';
-        } else {
-            element.style.display = 'none';
-        }
+        if (!hasVisibleButtons) element.style.display = 'none';
     });
 }

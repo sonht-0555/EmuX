@@ -19,12 +19,10 @@ tag("vertical");
 tag("screen");
 tag("invis");
 tag("joypad");
-tag("green0");
-tag("white0");
-tag("gray0");
 tag("message0");
 tag("skip1");
 tag("switch0");
+tag("title0");
 // ===== Global Variables =====
 let gameName;
 let gameType;
@@ -107,9 +105,9 @@ async function delay(milliseconds) {
 // ===== notifi =====
 async function notifi(green, white, gray, messageText, shouldWait) {
     page00.hidden = false;
-    green0.textContent = green;
-    white0.textContent = white;
-    gray0.textContent = gray;
+    title0.setAttribute('green', green);
+    title0.setAttribute('gray', gray);
+    title0.textContent = white;
     message0.textContent = messageText;
     if (shouldWait) {
         window._loadDelay = 400;
@@ -153,7 +151,7 @@ async function gameView(romName) {
     const baseButtonSize = Math.round((window.innerWidth - 36) / 8);
     const adjustedButtonSize = baseButtonSize % 2 === 0 ? baseButtonSize - 1 : baseButtonSize;
     gamepad.style.gridTemplateColumns = `${adjustedButtonSize}px 1px ${adjustedButtonSize}px 1px ${adjustedButtonSize}px 1px ${adjustedButtonSize}px 1px auto 1px ${adjustedButtonSize}px 1px ${adjustedButtonSize}px 1px ${adjustedButtonSize}px 1px ${adjustedButtonSize}px`;
-    page02.style.gridTemplateRows = `auto ${window.innerWidth - (adjustedButtonSize * 8 + 30)}px ${adjustedButtonSize * 4 + 38}px ${window.innerWidth - (adjustedButtonSize * 8 + 20)}px 1fr 20px`;
+    page02.style.gridTemplateRows = `auto ${window.innerWidth - (adjustedButtonSize * 8 + 30)}px ${adjustedButtonSize * 4 + 36}px ${window.innerWidth - (adjustedButtonSize * 8 + 20)}px 1fr 20px`;
     joy.style.width = `${adjustedButtonSize * 4 + 3}px`;
     page00.hidden = true;
     page01.hidden = true;
