@@ -8,12 +8,11 @@ for (let i = 0; i < 65536; i++) {
 }
 // ===== logSkip =====
 function logSkip() {
-    if (frameCount > 0 && (frameCount & 63) === 0 && window.skip1) {
-        const avg = (window._samplesCount || 0) / 64;
-        const skipPct = ((frameCount - skippedFrames) * 100 / frameCount) | 0;
-        skip1.textContent = `${scriptName.toUpperCase()}.[${skipPct}%] A:${avg | 0} `;
-        console.log(`[EmuX] Render:${skipPct}% | AvgSamples:${avg | 0} [${window._samplesMin}-${window._samplesMax}]`);
-        window._samplesCount = 0; window._samplesMin = 9999; window._samplesMax = 0;
+    if (window._runCount >= 60 && window.skip1) {
+        const skipPct = (frameCount > 0) ? ((frameCount - skippedFrames) * 100 / frameCount) | 0 : 0;
+        skip1.textContent = `${scriptName.toUpperCase()}.[${skipPct}%]`;
+        window._runCount = 0;
+        frameCount = skippedFrames = 0;
     }
     if (frameCount > 1000) frameCount = skippedFrames = 0;
 }

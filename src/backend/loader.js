@@ -104,10 +104,21 @@ async function initCore(romFile) {
                 initAudio(Module.HEAPF64[(Number(avPtr) + 32) >> 3] / 48000);
                 audioContext.resume();
                 Module._free(avPtr);
-                let rafId;
-                function mainLoop() { if (!isRunning) return rafId = 0; Module._retro_run(); rafId = requestAnimationFrame(mainLoop); }
-                window.startLoop = () => { if (!rafId) rafId = requestAnimationFrame(mainLoop); };
-                window.stopLoop = () => { if (rafId) { cancelAnimationFrame(rafId); rafId = 0; } };
+                if (window.resetAudioSync) window.resetAudioSync();
+                const session = Math.random();
+                window.currentSessionId = session;
+                function mainLoop() { 
+                    if (!isRunning || window.currentSessionId !== session) return window.mainRafId = 0; 
+                    window.mainRafId = requestAnimationFrame(mainLoop);
+                    let runs = 0;
+                    while (window.getAudioBacklog && window.getAudioBacklog() < 2100 && runs < 2) {
+                        Module._retro_run();
+                        window._runCount = (window._runCount || 0) + 1;
+                        runs++;
+                    }
+                }
+                window.startLoop = () => { if (window.mainRafId) cancelAnimationFrame(window.mainRafId); mainLoop(); };
+                window.stopLoop = () => { isRunning = false; window.currentSessionId = null; };
                 startLoop();
                 await loadState();
                 await timer(true);

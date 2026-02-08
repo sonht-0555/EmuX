@@ -5,6 +5,7 @@ const audio_cb = () => {};
 // ===== Audio State =====
 var audioContext, audioWorkletNode, audioGainNode;
 var audioBufferL, audioBufferR, maxFrames = 0, audioDataView, audioDataBuffer, audioDataPointer;
+var totalSamplesSent = 0, audioStartTime = 0, audioCoreRatio = 1.0;
 // ===== initAudio =====
 async function initAudio(ratio) {
     if (audioContext) return audioContext.resume();
@@ -13,8 +14,12 @@ async function initAudio(ratio) {
     audioWorkletNode = new AudioWorkletNode(audioContext, 'audio-processor');
     audioGainNode = audioContext.createGain();
     audioGainNode.gain.value = 1;
+    audioCoreRatio = ratio;
     audioWorkletNode.port.postMessage({ ratio });
     audioWorkletNode.connect(audioGainNode).connect(audioContext.destination);
+    
+    audioStartTime = audioContext.currentTime;
+    totalSamplesSent = 0;
     return audioContext.resume();
 }
 // ===== writeAudio =====
@@ -36,10 +41,16 @@ function writeAudio(ptr, f) {
         audioBufferR[i] = v[i * 2 + 1] * mul;
     }
     audioWorkletNode.port.postMessage({ l: audioBufferL.subarray(0, f), r: audioBufferR.subarray(0, f) });
-    
-    // Log tracking
-    window._samplesCount = (window._samplesCount || 0) + f;
-    window._samplesMin = Math.min(window._samplesMin || 9999, f);
-    window._samplesMax = Math.max(window._samplesMax || 0, f);
+    totalSamplesSent += f;
     return f;
 }
+window.getAudioBacklog = () => {
+    if (!audioContext || audioContext.state !== 'running') return 0;
+    const coreHz = 48000 * audioCoreRatio;
+    const playedSamples = (audioContext.currentTime - audioStartTime) * coreHz;
+    return totalSamplesSent - playedSamples;
+};
+window.resetAudioSync = () => {
+    totalSamplesSent = 0;
+    if (audioContext) audioStartTime = audioContext.currentTime;
+};
