@@ -9,7 +9,7 @@ for (let i = 0; i < 65536; i++) {
 // ===== logSkip =====
 function logSkip() {
     if (frameCount > 0 && (frameCount & 63) === 0 && window.skip1) {
-        skip1.textContent = `${scriptName.toUpperCase()}.[${(100 - (skippedFrames * 100 / frameCount)) | 0}] `;
+        skip1.textContent = `${scriptName.toUpperCase()}.[${((frameCount - skippedFrames) * 100 / frameCount) | 0}] `;
     }
     if (frameCount > 1000) frameCount = skippedFrames = 0;
 }
