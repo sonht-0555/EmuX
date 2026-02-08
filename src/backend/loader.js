@@ -110,11 +110,13 @@ async function initCore(romFile) {
                 function mainLoop() { 
                     if (!isRunning || window.currentSessionId !== session) return window.mainRafId = 0; 
                     window.mainRafId = requestAnimationFrame(mainLoop);
-                    let runs = 0;
-                    while (window.getAudioBacklog && window.getAudioBacklog() < 2100 && runs < 2) {
+                    let backlog = window.getAudioBacklog();
+                    let targetRuns = 1; 
+                    if (backlog > 4000) targetRuns = 0; 
+                    if (backlog < 1000) targetRuns = 2; 
+                    for (let i = 0; i < targetRuns; i++) {
                         Module._retro_run();
                         window._runCount = (window._runCount || 0) + 1;
-                        runs++;
                     }
                 }
                 window.startLoop = () => { if (window.mainRafId) cancelAnimationFrame(window.mainRafId); mainLoop(); };

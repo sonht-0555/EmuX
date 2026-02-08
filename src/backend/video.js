@@ -10,7 +10,7 @@ for (let i = 0; i < 65536; i++) {
 function logSkip() {
     if (window._runCount >= 60 && window.skip1) {
         const skipPct = (frameCount > 0) ? ((frameCount - skippedFrames) * 100 / frameCount) | 0 : 0;
-        skip1.textContent = `${scriptName.toUpperCase()}.[${skipPct}%]`;
+        skip1.textContent = `${scriptName.toUpperCase()}.[${skipPct}]`;
         window._runCount = 0;
         frameCount = skippedFrames = 0;
     }
