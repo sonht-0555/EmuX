@@ -36,5 +36,10 @@ function writeAudio(ptr, f) {
         audioBufferR[i] = v[i * 2 + 1] * mul;
     }
     audioWorkletNode.port.postMessage({ l: audioBufferL.subarray(0, f), r: audioBufferR.subarray(0, f) });
+    
+    // Log tracking
+    window._samplesCount = (window._samplesCount || 0) + f;
+    window._samplesMin = Math.min(window._samplesMin || 9999, f);
+    window._samplesMax = Math.max(window._samplesMax || 0, f);
     return f;
 }

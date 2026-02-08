@@ -9,12 +9,17 @@ for (let i = 0; i < 65536; i++) {
 // ===== logSkip =====
 function logSkip() {
     if (frameCount > 0 && (frameCount & 63) === 0 && window.skip1) {
-        skip1.textContent = `${scriptName.toUpperCase()}.[${((frameCount - skippedFrames) * 100 / frameCount) | 0}] `;
+        const avg = (window._samplesCount || 0) / 64;
+        const skipPct = ((frameCount - skippedFrames) * 100 / frameCount) | 0;
+        skip1.textContent = `${scriptName.toUpperCase()}.[${skipPct}%] A:${avg | 0} `;
+        console.log(`[EmuX] Render:${skipPct}% | AvgSamples:${avg | 0} [${window._samplesMin}-${window._samplesMax}]`);
+        window._samplesCount = 0; window._samplesMin = 9999; window._samplesMax = 0;
     }
     if (frameCount > 1000) frameCount = skippedFrames = 0;
 }
 // ===== video_cb =====
 function video_cb(pointer, width, height, pitch) {
+    // Không đếm frame ở đây nữa, để renderer (wgpu/wgl...) gọi logSkip khi vẽ xong 1 frame game
     if (renderFunction) return renderFunction(pointer, width, height, pitch);
     if (rendererReady) return;
     rendererReady = true;
