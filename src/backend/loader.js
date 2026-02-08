@@ -42,67 +42,52 @@ const CORE_CONFIG = [
 var isRunning = false;
 // ===== initCore ====
 async function initCore(romFile) {
-    // Step 1: Identify core and prepare data
-    const rawData = new Uint8Array(await romFile.arrayBuffer());
+    // Step 1: Identify core and start parallel loading
+    isRunning = true, switch0.hidden = false;
+    await notifi("", "", "---", "", true);
+    let rawData = new Uint8Array(await romFile.arrayBuffer());
     const { config, data: finalRomData, name: finalRomName } = findCore(romFile.name, rawData);
     if (!config) return;
-    // Step 2: Setup UI and state
-    await notifi("", "", "---", "", true);
-    isRunning = true;
-    switch0.hidden = false;
+    rawData = null;
+    const coreFetch = fetch(config.script).then(r => r.ok ? r.arrayBuffer() : null);
+    const biosFetches = config.bios ? config.bios.map(url => fetch(url).then(r => r.ok ? r.arrayBuffer() : null).catch(() => null)) : [];
+    // Step 2: Setup State
     activeVars = config.vars || {};
     updateButtons(config.btns);
-    const isArcade = config.script.includes('arcade');
-    const isNDS = config.script.includes('nds');
+    const isArcade = config.script.includes('arcade'), isNDS = config.script.includes('nds');
     let scriptSource = config.script;
-    // Step 3: Load core assets (handle ZIP)
+    // Step 3: Prepare Core Engine
     await notifi("", "#", "--", "", true);
     if (scriptSource.endsWith('.zip')) {
-        const response = await fetch(scriptSource);
-        if (!response.ok) return;
-        const coreFiles = await unzip(new Uint8Array(await response.arrayBuffer()), /\.(js|wasm)$/i);
-        const jsFile = Object.keys(coreFiles).find(n => n.endsWith('.js'));
-        const wasmFile = Object.keys(coreFiles).find(n => n.endsWith('.wasm'));
+        const coreBuf = await coreFetch;
+        if (!coreBuf) return;
+        const coreFiles = fflate.unzipSync(new Uint8Array(coreBuf));
+        const jsFile = Object.keys(coreFiles).find(n => n.endsWith('.js')), wasmFile = Object.keys(coreFiles).find(n => n.endsWith('.wasm'));
         if (!jsFile || !wasmFile) return;
         scriptSource = URL.createObjectURL(new Blob([coreFiles[jsFile]], { type: 'application/javascript' }));
         window.wasmUrl = URL.createObjectURL(new Blob([coreFiles[wasmFile]], { type: 'application/wasm' }));
     }
     // Step 4: Initialize emulator module
-    await notifi("", "##", "-", "", true);
     return new Promise(async (resolve) => {
+        await notifi("", "##", "-", "", true);
         window.Module = {
-            isArcade, isNDS,
-            canvas: document.getElementById("canvas"),
+            isArcade, isNDS, canvas: document.getElementById("canvas"),
             print: () => {}, printErr: () => {},
             locateFile: p => p.endsWith('.wasm') ? (window.wasmUrl || p) : p,
             async onRuntimeInitialized() {
                 // Step 5: Core engine setup
-                const romPointer = Module._malloc(finalRomData.length);
-                const infoPointer = Module._malloc(16);
-                const callbacks = [
-                    [Module._retro_set_environment, env_cb, "iii"],
-                    [Module._retro_set_video_refresh, video_cb, "viiii"],
-                    [Module._retro_set_audio_sample, audio_cb, "vii"],
-                    [Module._retro_set_audio_sample_batch, audio_batch_cb, "iii"],
-                    [Module._retro_set_input_poll, input_poll_cb, "v"],
-                    [Module._retro_set_input_state, input_state_cb, "iiiii"]
-                ];
+                const romPointer = Module._malloc(finalRomData.length), infoPointer = Module._malloc(16);
+                const callbacks = [[Module._retro_set_environment, env_cb, "iii"], [Module._retro_set_video_refresh, video_cb, "viiii"], [Module._retro_set_audio_sample, audio_cb, "vii"], [Module._retro_set_audio_sample_batch, audio_batch_cb, "iii"], [Module._retro_set_input_poll, input_poll_cb, "v"], [Module._retro_set_input_state, input_state_cb, "iiiii"]];
                 callbacks.forEach(([fn, cb, sig]) => fn(Module.addFunction(cb, sig)));
                 Module._retro_init();
                 // Step 6: BIOS management
-                await notifi("", "###", "", "", true);
-                if (config.bios) {
-                    await Promise.all(config.bios.map(async url => {
-                        const res = await fetch(url).catch(() => null);
-                        if (res?.ok) {
-                            Module.FS.writeFile('/' + url.split('/').pop(), new Uint8Array(await res.arrayBuffer()));
-                        }
-                    }));
+                if (biosFetches.length > 0) {
+                    const biosBuffers = await Promise.all(biosFetches);
+                    config.bios.forEach((url, i) => biosBuffers[i] && Module.FS.writeFile('/' + url.split('/').pop(), new Uint8Array(biosBuffers[i])));
                 }
-                if (isNDS && Module._retro_set_controller_port_device) {
-                    Module._retro_set_controller_port_device(0, 6);
-                }
+                if (isNDS && Module._retro_set_controller_port_device) Module._retro_set_controller_port_device(0, 6);
                 // Step 7: ROM mapping and game load
+                await notifi("", "###", "", "", true);
                 let romPath = isArcade ? `/${finalRomName}` : (isNDS ? '/game.nds' : `/game.${finalRomName.toLowerCase().split('.').pop()}`);
                 Module.FS.writeFile(romPath, finalRomData);
                 const loadInfo = [getPointer(romPath), 0, 0, 0];
@@ -120,23 +105,20 @@ async function initCore(romFile) {
                 audioContext.resume();
                 Module._free(avPtr);
                 let rafId;
-                function mainLoop() {
-                    if (isRunning) {
-                        Module._retro_run();
-                        rafId = requestAnimationFrame(mainLoop);
-                    }
-                }
+                function mainLoop() { if (isRunning) { Module._retro_run(); rafId = requestAnimationFrame(mainLoop); } }
                 window.startLoop = () => { if (!rafId) rafId = requestAnimationFrame(mainLoop); };
                 window.stopLoop = () => { if (rafId) { cancelAnimationFrame(rafId); rafId = 0; } };
                 startLoop();
                 await loadState();
                 await timer(true);
+                if (window.wasmUrl.startsWith('blob:')) URL.revokeObjectURL(window.wasmUrl);
                 resolve();
             }
         };
         // Step 9: Inject script to start engine
         const script = document.createElement('script');
         script.src = scriptSource;
+        script.onload = () => { if (scriptSource.startsWith('blob:')) URL.revokeObjectURL(scriptSource); };
         document.body.appendChild(script);
         gameName = romFile.name;
     });

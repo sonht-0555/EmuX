@@ -39,17 +39,16 @@ function findCore(name, data) {
         const config = CORE_CONFIG.find(c => c.ext.split(',').includes(ext));
         return { config, data, name };
     }
-    const list = fflate.unzipSync(data);
-    const internalFiles = Object.keys(list);
-    for (const fileName of internalFiles) {
+    const filenames = [];
+    fflate.unzipSync(data, { filter: (file) => { filenames.push(file.name); return false; } });
+    for (const fileName of filenames) {
         const ext = getExt(fileName);
         const consoleCore = CORE_CONFIG.find(c => c.ext !== '.zip' && c.ext.split(',').includes(ext));
         if (consoleCore) {
-            if (ext === '.bin' && internalFiles.length > 5) {
-                continue;
-            }
+            if (ext === '.bin' && filenames.length > 5) continue;
             if (consoleCore.ext === '.nes') {
-                return { config: consoleCore, data: list[fileName], name: fileName };
+                const nesFile = fflate.unzipSync(data, { filter: (f) => f.name === fileName });
+                return { config: consoleCore, data: nesFile[fileName], name: fileName };
             }
             return { config: consoleCore, data, name };
         }
