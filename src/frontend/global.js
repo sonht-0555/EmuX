@@ -1,171 +1,73 @@
-// ===== Global Element References =====
-tag("html");
-tag("body");
-tag("page00");
-tag("page01");
-tag("page02");
-tag("logo");
-tag("page02");
-tag("notification");
-tag("display");
-tag("list");
-tag("list01");
-tag("list02");
-tag("name");
-tag("ver");
-tag("gamepad");
-tag("title1");
-tag("vertical");
-tag("screen");
-tag("invis");
-tag("joypad");
-tag("message0");
-tag("skip1");
-tag("switch0");
-tag("title0");
-// ===== Global Variables =====
-let gameName;
-let gameType;
-let gameWidth;
-let gameHeight;
-let integer;
-let timerId;
-let count = null;
-let canSync = true;
-let recCount = 1;
-let swipe;
-let canvasB;
-let isStart = false;
-let hours = 0;
-let minutes = 0;
-let seconds = 0;
-let count1 = 0;
-let current = parseInt(local('vertical')) || 0;
+// ===== Global Elements & State =====
+const tags = ["html","body","page00","page01","page02","notification","display","list","list01","list02","name","ver","gamepad","title1","vertical","screen","invis","message0","skip1","switch0","title0","logo"];
+tags.forEach(s => window[s] = document.querySelector(s === "html" || s === "body" ? s : s)); // Compact tag initialization
+const tag = s => window[s] = document.querySelector(s);
+const local = (k, v) => v === undefined || v === null ? localStorage.getItem(k) : localStorage.setItem(k, v);
+const delay = ms => new Promise(res => setTimeout(res, ms));
+let gameName, gameType, gameWidth, gameHeight, integer, timerId, count = null, canSync = true, recCount = 1, swipe, canvasB, isStart = false, hours = 0, minutes = 0, seconds = 0, count1 = 0, current = parseInt(local('vertical')) || 0;
 const canvas = document.getElementById('canvas');
-// ===== tag =====
-function tag(selector) {
-    window[selector] = document.querySelector(selector);
-    return window[selector];
-}
-// ===== local =====
-function local(key, value) {
-    if (arguments.length < 2 || value === null) {
-        return localStorage.getItem(key);
-    }
-    return localStorage.setItem(key, value);
-}
 // ===== doubleTap =====
-function doubleTap(event, element, checkDistance) {
-    const currentTime = Date.now();
-    const lastTapTime = element._lastTapTime || 0;
-    const timeDifference = currentTime - lastTapTime;
-    const isValidTiming = event.isPrimary && timeDifference < 300 && timeDifference > 40;
-    let isValidDistance = true;
-    if (checkDistance) {
-        const distanceX = event.clientX - element._lastTapX;
-        const distanceY = event.clientY - element._lastTapY;
-        const distance = Math.hypot(distanceX, distanceY);
-        isValidDistance = distance < 30;
-    }
-    const isDouble = isValidTiming && isValidDistance;
-    element._lastTapTime = currentTime;
-    element._lastTapX = event.clientX;
-    element._lastTapY = event.clientY;
-    return isDouble;
+function doubleTap(e, el, dist) {
+    const now = Date.now(), dt = now - (el._lt || 0), isT = e.isPrimary && dt < 300 && dt > 40;
+    let isD = true;
+    if (dist) isD = Math.hypot(e.clientX - el._lx, e.clientY - el._ly) < 30;
+    const res = isT && isD;
+    el._lt = now; el._lx = e.clientX; el._ly = e.clientY;
+    return res;
 }
 // ===== svgGen =====
-function svgGen(repeat, size, pattern) {
-    const totalSize = repeat * size;
-    let cells;
-    if (typeof pattern === 'number') {
-        cells = Array.from({ length: pattern * pattern }, (_, index) => {
-            return index % (pattern + 1) ? 0 : 1;
-        });
-    } else {
-        cells = pattern.replace(/\s/g, '').split('.');
+function svgGen(rep, size, pat) {
+    const total = rep * size, cells = typeof pat === 'number' ? Array.from({length: pat*pat}, (_,i) => i % (pat+1) ? 0 : 1) : pat.replace(/\s/g,'').split('.');
+    const pSize = Math.sqrt(cells.length);
+    let svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${total}' height='${total}'>`;
+    for (let i = 0; i < total * total; i++) {
+        const cIdx = ((i / total % size * pSize / size) | 0) * pSize + ((i % total % size * pSize / size) | 0);
+        if (cells[cIdx] == 1) svg += `<rect x="${i % total}" y="${(i / total) | 0}" width="1" height="1"/>`;
     }
-    const patternSize = Math.sqrt(cells.length);
-    let svgContent = `<svg xmlns='http://www.w3.org/2000/svg' width='${totalSize}' height='${totalSize}'>`;
-    for (let pixelIndex = 0; pixelIndex < totalSize * totalSize; pixelIndex++) {
-        const rowInPattern = (pixelIndex / totalSize % size * patternSize / size) | 0;
-        const columnInPattern = (pixelIndex % totalSize % size * patternSize / size) | 0;
-        const cellIndex = rowInPattern * patternSize + columnInPattern;
-        if (cells[cellIndex] == 1) {
-            const pixelX = pixelIndex % totalSize;
-            const pixelY = (pixelIndex / totalSize) | 0;
-            svgContent += `<rect x="${pixelX}" y="${pixelY}" width="1" height="1"/>`;
-        }
-    }
-    return `url("data:image/svg+xml,${encodeURIComponent(svgContent + "</svg>")}")`;
-}
-// ===== delay =====
-async function delay(milliseconds) {
-    return new Promise(resolve => setTimeout(resolve, milliseconds));
+    return `url("data:image/svg+xml,${encodeURIComponent(svg + "</svg>")}")`;
 }
 // ===== notifi =====
-async function notifi(green, white, gray, messageText, shouldWait) {
+async function notifi(g, w, gy, txt, wait) {
     page00.hidden = false;
-    title0.setAttribute('green', green);
-    title0.setAttribute('gray', gray);
-    title0.textContent = white;
-    message0.textContent = messageText;
-    if (shouldWait) {
+    title0.setAttribute('green', g); title0.setAttribute('gray', gy);
+    title0.textContent = w; message0.textContent = txt;
+    if (wait) {
         window._loadDelay = 400;
-        while (window._loadDelay > 0) {
-            await delay(100);
-            window._loadDelay -= 100;
-        }
+        while (window._loadDelay > 0) { await delay(100); window._loadDelay -= 100; }
     }
 }
 // ===== message =====
-async function message(messageText, duration = 2000) {
-    if (count) {
-        count.cancelled = true;
-    }
-    const task = { cancelled: false };
-    count = task;
-    title1.textContent = messageText;
-    await delay(duration);
-    if (!task.cancelled && count === task) {
-        title1.textContent = gameName;
-        count = null;
-    }
+async function message(txt, dur = 2000) {
+    if (count) count.c = true;
+    const t = { c: false }; count = t;
+    title1.textContent = txt;
+    await delay(dur);
+    if (!t.c && count === t) { title1.textContent = gameName; count = null; }
 }
 // ===== gameView =====
-async function gameView(romName) {
-    page02.ontouchstart = (event) => event.preventDefault();
-    gameWidth = canvas.width;
-    gameHeight = canvas.height;
-    title1.textContent = romName;
-    switch0.textContent = local('render');
-    const maxInteger = Math.floor((window.innerWidth * window.devicePixelRatio) / gameWidth);
-    integer = (maxInteger > 6) ? maxInteger - (maxInteger % 2) : maxInteger;
-    const ratio = integer / window.devicePixelRatio;
-    display.style.height = `${Math.ceil(gameHeight * ratio) + 10}px`;
-    display.style.width = `${Math.ceil(gameWidth * ratio)}px`;
-    screen.style.width = `${Math.ceil(gameWidth * ratio)}px`;
-    screen.style.setProperty("--size", `${integer}px`);
-    screen.style.setProperty("--width", `${gameWidth * integer}px`);
-    screen.style.setProperty("--height", `${gameHeight * integer}px`);
-    screen.style.setProperty("--scale", ratio / integer);
-    const baseButtonSize = Math.round((window.innerWidth - 36) / 8);
-    const adjustedButtonSize = baseButtonSize % 2 === 0 ? baseButtonSize - 1 : baseButtonSize;
-    gamepad.style.gridTemplateColumns = `${adjustedButtonSize}px 1px ${adjustedButtonSize}px 1px ${adjustedButtonSize}px 1px ${adjustedButtonSize}px 1px auto 1px ${adjustedButtonSize}px 1px ${adjustedButtonSize}px 1px ${adjustedButtonSize}px 1px ${adjustedButtonSize}px`;
-    page02.style.gridTemplateRows = `auto ${window.innerWidth - (adjustedButtonSize * 8 + 30)}px ${adjustedButtonSize * 4 + 36}px ${window.innerWidth - (adjustedButtonSize * 8 + 20)}px 1fr 20px`;
-    joy.style.width = `${adjustedButtonSize * 4 + 3}px`;
-    page00.hidden = true;
-    page01.hidden = true;
-    list01.hidden = true;
-    list02.hidden = true;
-    switch0.hidden = true;
-    page02.hidden = false;
-    list.hidden = false;
-    const patternSize = (integer <= 4 || integer % 2 !== 0) ? integer : (integer / 2);
-    const shaderData = local(`shader0${local("shader")}`) || patternSize;
-    screen.style.setProperty("--shader", svgGen(integer / patternSize, patternSize, shaderData));
+async function gameView(name) {
+    page02.ontouchstart = e => e.preventDefault();
+    gameWidth = canvas.width; gameHeight = canvas.height;
+    title1.textContent = name; switch0.textContent = local('render');
+    const maxInt = Math.floor((window.innerWidth * window.devicePixelRatio) / gameWidth);
+    integer = (maxInt > 6) ? maxInt - (maxInt % 2) : maxInt;
+    const r = integer / window.devicePixelRatio, s = screen.style;
+    display.style.cssText = `height:${Math.ceil(gameHeight*r)+10}px;width:${Math.ceil(gameWidth*r)}px`;
+    s.width = `${Math.ceil(gameWidth*r)}px`;
+    s.setProperty("--size", `${integer}px`); s.setProperty("--width", `${gameWidth*integer}px`);
+    s.setProperty("--height", `${gameHeight*integer}px`); s.setProperty("--scale", r/integer);
+    const bt = (window.innerWidth - 36) / 8, sz = Math.round(bt) % 2 === 0 ? Math.round(bt) - 1 : Math.round(bt);
+    gamepad.style.gridTemplateColumns = `${sz}px 1px `.repeat(8) + "auto 1px " + `${sz}px 1px `.repeat(4).slice(0,-4); // Refined grid
+    gamepad.style.gridTemplateColumns = `${sz}px 1px ${sz}px 1px ${sz}px 1px ${sz}px 1px auto 1px ${sz}px 1px ${sz}px 1px ${sz}px 1px ${sz}px`;
+    page02.style.gridTemplateRows = `auto ${window.innerWidth - (sz*8+30)}px ${sz*4+36}px ${window.innerWidth - (sz*8+20)}px 1fr 20px`;
+    joy.style.width = `${sz*4+3}px`;
+    [page00, page01, list01, list02, switch0].forEach(p => p.hidden = true);
+    [page02, list].forEach(p => p.hidden = false);
+    const pSz = (integer <= 4 || integer % 2 !== 0) ? integer : (integer / 2);
+    s.setProperty("--shader", svgGen(integer / pSz, pSz, local(`shader0${local("shader")}`) || pSz));
 }
 // ===== DOMContentLoaded =====
-document.addEventListener("DOMContentLoaded", function() {
+document.addEventListener("DOMContentLoaded", () => {
     body.removeAttribute('hide');
     canvasB = document.getElementById("canvas-bottom");
     body.style.setProperty("--background", svgGen(1, window.devicePixelRatio, window.devicePixelRatio));

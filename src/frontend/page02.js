@@ -1,149 +1,63 @@
 // ===== Page02 State Variables =====
-let brightnessValue = 5;
-let swipeStartY = 0;
-let isSwiping = false;
-let shaderNumber = 1;
-let activeElement = null;
+let brightnessValue = 5, swipeStartY = 0, isSwiping = false, shaderNumber = 1, activeElement = null;
 const activePointers = new Map();
 // ===== handleButton =====
-function handleButton(isPressed, element) {
-    const dataParts = element?.getAttribute('data')?.split('-').slice(1) || [];
-    dataParts.forEach(part => {
-        if (isPressed) {
-            buttonPress(part);
-        } else {
-            buttonUnpress(part);
-        }
-    });
-}
+const handleButton = (p, el) => (el?.getAttribute('data')?.split('-').slice(1) || []).forEach(part => p ? buttonPress(part) : buttonUnpress(part));
 // ===== setPointerState =====
-function setPointerState(pointerId, element) {
-    const currentElement = activePointers.get(pointerId);
-    if (element === currentElement) {
-        return;
-    }
-    if (currentElement) {
-        handleButton(false, currentElement);
-    }
-    if (element) {
-        activePointers.set(pointerId, element);
-        handleButton(true, element);
-    } else {
-        activePointers.delete(pointerId);
-    }
+function setPointerState(pId, el) {
+    const cur = activePointers.get(pId);
+    if (el === cur) return;
+    if (cur) handleButton(false, cur);
+    if (el) { activePointers.set(pId, el); handleButton(true, el); }
+    else activePointers.delete(pId);
 }
 // ===== DOMContentLoaded =====
-document.addEventListener("DOMContentLoaded", function() {
-    // Document Pointer Down
-    document.onpointerdown = (event) => {
-        setPointerState(event.pointerId, event.target.closest('[data]'));
-    };
-    // Document Pointer Move (throttled to 60fps)
-    let lastMoveTime = 0;
-    document.onpointermove = (event) => {
+document.addEventListener("DOMContentLoaded", () => {
+    document.onpointerdown = e => setPointerState(e.pointerId, e.target.closest('[data]'));
+    let lastMove = 0;
+    document.onpointermove = e => {
         const now = performance.now();
-        if (now - lastMoveTime < 16) return;
-        lastMoveTime = now;
-        const activeElement = activePointers.get(event.pointerId);
-        if (!activeElement) {
-            return;
-        }
-        const targetElement = document.elementFromPoint(event.clientX, event.clientY)?.closest('[data]');
-        if (targetElement && targetElement !== activeElement) {
-            const activeDataType = activeElement.getAttribute('data').split('-')[0];
-            const targetDataType = targetElement.getAttribute('data').split('-')[0];
-            if (activeDataType === targetDataType) {
-                setPointerState(event.pointerId, targetElement);
-            }
-        }
+        if (now - lastMove < 16) return;
+        lastMove = now;
+        const cur = activePointers.get(e.pointerId);
+        if (!cur) return;
+        const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data]');
+        if (target && target !== cur && cur.getAttribute('data').split('-')[0] === target.getAttribute('data').split('-')[0]) setPointerState(e.pointerId, target);
     };
-    // Canvas Pointer Down
-    let canvasRect;
-    canvas.onpointerdown = (event) => {
-        canvasRect = canvas.getBoundingClientRect();
-        const touchX = event.clientX - canvasRect.left;
-        const touchY = event.clientY - canvasRect.top;
-        if (doubleTap(event, canvas, 1)) {
-            if (touchX < canvasRect.width / 2) {
-                if (touchY < canvasRect.height / 2) {
-                    loadState(3);
-                } else {
-                    loadState(2);
-                }
-            } else {
-                if (touchY < canvasRect.height / 2) {
-                    saveState(3);
-                } else {
-                    saveState(2);
-                }
-            }
+    let rect;
+    canvas.onpointerdown = e => {
+        rect = canvas.getBoundingClientRect();
+        const tx = e.clientX - rect.left, ty = e.clientY - rect.top;
+        if (doubleTap(e, canvas, 1)) {
+            if (tx < rect.width / 2) ty < rect.height / 2 ? loadState(3) : loadState(2);
+            else ty < rect.height / 2 ? saveState(3) : saveState(2);
         }
-        swipeStartY = event.clientY;
-        isSwiping = event.clientX > (canvasRect.right - 40);
+        swipeStartY = e.clientY;
+        isSwiping = e.clientX > (rect.right - 40);
     };
-    // Canvas Pointer Move
-    canvas.onpointermove = (event) => {
-        if (!isSwiping || !canvasRect) {
-            return;
-        }
-        const swipeDistance = Math.abs(swipeStartY - event.clientY);
-        if (swipeDistance >= 20) {
-            if (swipeStartY - event.clientY > 0) {
-                brightnessValue = Math.min(10, brightnessValue + 1);
-            } else {
-                brightnessValue = Math.max(0, brightnessValue - 1);
-            }
+    canvas.onpointermove = e => {
+        if (!isSwiping || !rect) return;
+        const dist = Math.abs(swipeStartY - e.clientY);
+        if (dist >= 20) {
+            brightnessValue = Math.max(0, Math.min(10, brightnessValue + (swipeStartY - e.clientY > 0 ? 1 : -1)));
             gamepad.style.opacity = brightnessValue / 10;
             message(`Brightness_${brightnessValue}0.nit`);
-            swipeStartY = event.clientY;
+            swipeStartY = e.clientY;
         }
     };
-    // Bottom Canvas (NDS Touch Screen)
-    let canvasBRect;
-    canvasB.onpointerdown = canvasB.onpointermove = (event) => {
-        if (!Module.isNDS) {
-            return;
-        }
-        if (event.type === "pointerdown" || !canvasBRect) {
-            canvasBRect = canvasB.getBoundingClientRect();
-        }
-        const touchX = event.clientX - canvasBRect.left;
-        const touchY = event.clientY - canvasBRect.top;
+    let bRect;
+    canvasB.onpointerdown = canvasB.onpointermove = e => {
+        if (!Module.isNDS) return;
+        if (e.type === "pointerdown" || !bRect) bRect = canvasB.getBoundingClientRect();
         window._pD = 1;
-        window._pX = Math.floor(touchX / canvasBRect.width * 65535 - 32768);
-        window._pY = Math.floor(touchY / canvasBRect.height * 32767);
-        event.preventDefault();
+        window._pX = Math.floor((e.clientX - bRect.left) / bRect.width * 65535 - 32768);
+        window._pY = Math.floor((e.clientY - bRect.top) / bRect.height * 32767);
+        e.preventDefault();
     };
-    canvasB.onpointerup = canvasB.onpointercancel = () => {
-        window._pD = 0;
-        isSwiping = false;
-    };
-    // Renderer Switch Button
-    switch0.onpointerdown = () => {
-        switchRenderer();
-    };
-    // Pointer Up/Cancel Handler
-    ['pointerup', 'pointercancel'].forEach(eventType => {
-        addEventListener(eventType, (event) => {
-            setPointerState(event.pointerId, null);
-            isSwiping = false;
-            joy.style.opacity = "0";
-        });
-    });
-    // Joy Button
-    joy.onpointerdown = () => {
-        joy.style.opacity = "1";
-    };
-    // Visibility Handler
-    invis.onpointermove = () => {
-        page00.hidden = false;
-        notifi(" pa", "use.", "", " double tap to resume.");
-        pauseGame();
-    };
-    page00.onpointerdown = (event) => {
-        if (doubleTap(event, page00)) {
-            page00.hidden = true;
-            resumeGame();
-        }
-    };
+    canvasB.onpointerup = canvasB.onpointercancel = () => { window._pD = 0; isSwiping = false; };
+    switch0.onpointerdown = switchRenderer;
+    ['pointerup', 'pointercancel'].forEach(t => addEventListener(t, e => { setPointerState(e.pointerId, null); isSwiping = false; joy.style.opacity = "0"; }));
+    joy.onpointerdown = () => joy.style.opacity = "1";
+    invis.onpointermove = () => { page00.hidden = false; notifi(" pa", "use.", "", " double tap to resume."); pauseGame(); };
+    page00.onpointerdown = e => { if (doubleTap(e, page00)) { page00.hidden = true; resumeGame(); } };
 });
