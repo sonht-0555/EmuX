@@ -1,3 +1,62 @@
+// ===== unzip ====
+async function unzip(binaryData, nameFilter) {
+    return new Promise((resolve, reject) => {
+        fflate.unzip(binaryData, (err, unzippedFiles) => {
+            if (err) {
+                return resolve({});
+            }
+            const result = {};
+            for (let entryName in unzippedFiles) {
+                if (entryName.endsWith('/')) {
+                    continue;
+                }
+                if (unzippedFiles[entryName].length === 0) {
+                    continue;
+                }
+                if (entryName.includes('__MACOSX/')) {
+                    continue;
+                }
+                if (!nameFilter || nameFilter.test(entryName)) {
+                    let data = unzippedFiles[entryName];
+                    if (entryName.toLowerCase().endsWith('.js')) {
+                        let len = data.length;
+                        while (len > 0 && data[len - 1] === 0) len--;
+                        data = data.slice(0, len);
+                    }
+                    result[entryName] = data;
+                }
+            }
+            resolve(result);
+        });
+    });
+}
+// ===== findCore ====
+function findCore(name, data) {
+    const nameLower = name.toLowerCase();
+    const getExt = n => '.' + n.split('.').pop().toLowerCase();
+    if (!nameLower.endsWith('.zip')) {
+        const ext = getExt(nameLower);
+        const config = CORE_CONFIG.find(c => c.ext.split(',').includes(ext));
+        return { config, data, name };
+    }
+    const list = fflate.unzipSync(data);
+    const internalFiles = Object.keys(list);
+    for (const fileName of internalFiles) {
+        const ext = getExt(fileName);
+        const consoleCore = CORE_CONFIG.find(c => c.ext !== '.zip' && c.ext.split(',').includes(ext));
+        if (consoleCore) {
+            if (ext === '.bin' && internalFiles.length > 5) {
+                continue;
+            }
+            if (consoleCore.ext === '.nes') {
+                return { config: consoleCore, data: list[fileName], name: fileName };
+            }
+            return { config: consoleCore, data, name };
+        }
+    }
+    const arcadeCore = CORE_CONFIG.find(c => c.ext === '.zip');
+    return { config: arcadeCore, data, name };
+}
 // ===== inputGame =====
 async function inputGame(event) {
     const file = event.target.files[0];
