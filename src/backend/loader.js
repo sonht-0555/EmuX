@@ -66,34 +66,45 @@ async function unzip(binaryData, nameFilter) {
         });
     });
 }
+// ===== findCore ====
+function findCore(name, data) {
+    const nameLower = name.toLowerCase();
+    const getExt = n => '.' + n.split('.').pop().toLowerCase();
+    if (!nameLower.endsWith('.zip')) {
+        const ext = getExt(nameLower);
+        const config = CORE_CONFIG.find(c => c.ext.split(',').includes(ext));
+        return { config, data, name };
+    }
+    const list = fflate.unzipSync(data);
+    const internalFiles = Object.keys(list);
+    for (const fileName of internalFiles) {
+        const ext = getExt(fileName);
+        const consoleCore = CORE_CONFIG.find(c => c.ext !== '.zip' && c.ext.split(',').includes(ext));
+        if (consoleCore) {
+            if (ext === '.bin' && internalFiles.length > 5) {
+                continue;
+            }
+            if (consoleCore.ext === '.nes') {
+                return { config: consoleCore, data: list[fileName], name: fileName };
+            }
+            return { config: consoleCore, data, name };
+        }
+    }
+    const arcadeCore = CORE_CONFIG.find(c => c.ext === '.zip');
+    return { config: arcadeCore, data, name };
+}
 // ===== initCore ====
 async function initCore(romFile) {
     isRunning = true;
     switch0.hidden = false;
     await notifi("", "", "---", "", true);
-    // Step 1: Prepare ROM data
-    const isZip = romFile.name.toLowerCase().endsWith('.zip');
-    let finalRomName = romFile.name;
-    let finalRomData = new Uint8Array(await romFile.arrayBuffer());
-    if (isZip) {
-        const extracted = await unzip(finalRomData, /\.(gba|gbc|gb|smc|sfc|nes|md|gen|ngp|ngc|nds|img|cue|pbp)$/i);
-        const consoleRomName = Object.keys(extracted)[0];
-        if (consoleRomName) {
-            finalRomName = consoleRomName;
-            finalRomData = extracted[consoleRomName];
-        }
-    }
-    // Step 2: Find core configuration
-    const coreConfiguration = CORE_CONFIG.find(configuration => {
-        const extensions = configuration.ext.split(',').map(extension => extension.trim().toLowerCase()).filter(extension => extension);
-        return extensions.some(extension => {
-            return finalRomName.toLowerCase().endsWith(extension) || finalRomName.toLowerCase() === extension.replace('.', '');
-        });
-    });
-    activeVars = coreConfiguration.vars || {};
-    updateButtons(coreConfiguration.btns);
+    // Nhận diện Core và chuẩn bị dữ liệu ROM
+    const rawData = new Uint8Array(await romFile.arrayBuffer());
+    const { config, data: finalRomData, name: finalRomName } = findCore(romFile.name, rawData);
+    activeVars = config.vars || {};
+    updateButtons(config.btns);
     // Step 3: Load core script
-    let scriptSource = coreConfiguration.script;
+    let scriptSource = config.script;
     const isArcade = scriptSource.includes('arcade');
     const isNDS = scriptSource.includes('nds');
     if (scriptSource.endsWith('.zip')) {
@@ -152,8 +163,8 @@ async function initCore(romFile) {
                 Module._retro_init();
                 await notifi("", "###", "", "", true);
                 // Load BIOS files
-                if (coreConfiguration.bios) {
-                    await Promise.all(coreConfiguration.bios.map(async biosUrl => {
+                if (config.bios) {
+                    await Promise.all(config.bios.map(async biosUrl => {
                         const response = await fetch(biosUrl).catch(() => null);
                         if (response?.ok) {
                             const biosData = new Uint8Array(await response.arrayBuffer());
