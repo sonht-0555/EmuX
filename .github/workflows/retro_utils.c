@@ -100,7 +100,11 @@ size_t strlcpy(char *dest, const char *src, size_t size) {
 
 // Stub cho VFS mà Gambatte yêu cầu
 EMSCRIPTEN_KEEPALIVE void filestream_vfs_init(void) {
-    // Không làm gì cả, chỉ để thỏa mãn Linker
+    // Không làm gì cả
+}
+
+EMSCRIPTEN_KEEPALIVE void* vfs_interface_get_ptr(void) {
+    return NULL;
 }
 
 EMSCRIPTEN_KEEPALIVE int emux_is_dirty(const uint32_t * restrict buf1, uint32_t * restrict buf2, size_t size) {
