@@ -39,7 +39,7 @@ function initGL(canvas) {
 // ===== render32 =====
 function render32(source, sourceOffset, lastFramePtr, vBufPtr, view, context, texture, width, height, length, textureType) {
     frameCount++;
-    const renderFn = cachedRender32Fn || (cachedRender32Fn = Module._emux_render32 || Module.asm?._emux_render32 || Module.instance?.exports?._emux_render32 || Module._retro_render32 || Module.asm?._retro_render32 || Module.instance?.exports?._retro_render32 || Module.instance?.exports?.retro_render32);
+    const renderFn = cachedRender32Fn || (cachedRender32Fn = Module._emux_render32 || Module.asm?._emux_render32 || Module.instance?.exports?._emux_render32);
     if (renderFn && lastFramePtr && renderFn(source.byteOffset + (sourceOffset << 2), lastFramePtr, vBufPtr, length)) {
         context.bindTexture(context.TEXTURE_2D, texture);
         if (textureType ? textureInitializedBottom : textureInitializedMain) context.texSubImage2D(context.TEXTURE_2D, 0, 0, 0, width, height, context.RGBA, context.UNSIGNED_BYTE, view);
@@ -50,7 +50,7 @@ function render32(source, sourceOffset, lastFramePtr, vBufPtr, view, context, te
 // ===== render16 =====
 function render16(source32, last32Ptr, vBufPtr, view, context, texture, width, height, stride, textureType) {
     frameCount++;
-    const renderFn = cachedRender16Fn || (cachedRender16Fn = Module._emux_render16 || Module.asm?._emux_render16 || Module.instance?.exports?._emux_render16 || Module._retro_render16 || Module.asm?._retro_render16 || Module.instance?.exports?._retro_render16 || Module.instance?.exports?.retro_render16);
+    const renderFn = cachedRender16Fn || (cachedRender16Fn = Module._emux_render16 || Module.asm?._emux_render16 || Module.instance?.exports?._emux_render16);
     if (!lutPtr && window.lookupTable565) {
         lutPtr = Module._malloc(lookupTable565.length << 2);
         new Uint32Array(Module.HEAPU8.buffer, lutPtr, lookupTable565.length).set(lookupTable565);
