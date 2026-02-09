@@ -54,6 +54,46 @@ bool path_is_absolute(const char *path) {
     return (path && path[0] == '/');
 }
 
+// Bổ sung các hàm phổ biến khác để tránh build đi build lại
+void fill_pathname_extension(char *out, const char *path, size_t size) {
+    const char *ext = strrchr(path, '.');
+    if (ext) strncpy(out, ext + 1, size);
+    else out[0] = '\0';
+}
+
+void fill_pathname_noext(char *out, const char *path, size_t size) {
+    strncpy(out, path, size);
+    char *dot = strrchr(out, '.');
+    if (dot) *dot = '\0';
+}
+
+const char* path_get_extension(const char *path) {
+    const char *dot = strrchr(path, '.');
+    return dot ? dot + 1 : "";
+}
+
+bool string_is_empty(const char *data) {
+    return (!data || (*data == '\0'));
+}
+
+bool string_is_equal(const char *a, const char *b) {
+    if (!a || !b) return false;
+    return strcmp(a, b) == 0;
+}
+
+bool path_is_directory(const char *path) {
+    return false;
+}
+
+// Cài đặt nhanh strlcpy nếu thiếu
+size_t strlcpy(char *dest, const char *src, size_t size) {
+    size_t i;
+    for (i = 0; i < size - 1 && src[i] != '\0'; i++) dest[i] = src[i];
+    if (size > 0) dest[i] = '\0';
+    while (src[i] != '\0') i++;
+    return i;
+}
+
 EMSCRIPTEN_KEEPALIVE int emux_is_dirty(const uint32_t * restrict buf1, uint32_t * restrict buf2, size_t size) {
     size_t len = size >> 2;
     size_t step = len >> 8;
