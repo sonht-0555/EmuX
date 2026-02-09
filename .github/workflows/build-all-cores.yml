@@ -23,7 +23,7 @@ jobs:
           - { id: snes2010, name: snes9x2010, fetch: snes9x2010, make: "-f Makefile.libretro STATIC_LINKING=0", initial_mem: 128mb, stack: 4mb, method: objects }
           - { id: nds, name: melonds, fetch: melonds, initial_mem: 512mb, stack: 32mb, method: objects }
           - { id: nds2021, name: melonds2021, fetch: melonds2021, initial_mem: 512mb, stack: 32mb, method: objects }
-          - { id: gbc, name: gearboy, fetch: gearboy, make: "-f Makefile.libretro", initial_mem: 64mb, stack: 2mb, method: objects }
+          - { id: gbc, name: gearboy, fetch: gearboy, subdir: "platforms/libretro", initial_mem: 64mb, stack: 2mb, method: objects }
 
     steps:
     - uses: actions/checkout@v3
