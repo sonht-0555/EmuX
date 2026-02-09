@@ -1,5 +1,5 @@
 // ===== Global Elements & State =====
-const tags = ["html","body","page00","page01","page02","notification","display","list","list01","list02","name","ver","gamepad","title1","vertical","screen","invis","message0","skip1","switch0","title0","logo"];
+const tags = ["html","body","page00","page01","page02","notification","display","list","list01","list02","name","ver","gamepad","title1","vertical","screen","invis","message0","skip1","switch0","title0","logo","joypad"];
 tags.forEach(s => window[s] = document.querySelector(s === "html" || s === "body" ? s : s)); // Compact tag initialization
 const tag = s => window[s] = document.querySelector(s);
 const local = (k, v) => v === undefined || v === null ? localStorage.getItem(k) : localStorage.setItem(k, v);
@@ -67,6 +67,7 @@ async function gameView(name) {
     s.setProperty("--shader", svgGen(integer / pSz, pSz, local(`shader0${local("shader")}`) || pSz));
 }
 // ===== DOMContentLoaded =====
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === 'visible' && window.resetAudioSync) window.resetAudioSync(); });
 document.addEventListener("DOMContentLoaded", () => {
     body.removeAttribute('hide');
     canvasB = document.getElementById("canvas-bottom");
