@@ -35,6 +35,10 @@ bool path_mkdir(const char *dir) {
     return true;
 }
 
+bool path_contains_rom_file(const char *path) {
+    return true;
+}
+
 // Bổ sung hàm dir name
 void fill_pathname_dir(char *out, const char *path, size_t size) {
     const char *slash = strrchr(path, '/');

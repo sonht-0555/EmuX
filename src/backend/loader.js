@@ -30,9 +30,8 @@ function env_cb(command, data) {
         if (data) Module.HEAP8[data] = 1;
         return true;
     }
-    // Cho phép thêm nhiều lệnh khởi tạo cơ bản (11: Message, v.v.)
-    // Gỡ lệnh 23 để buộc Core dùng batch audio truyền thống
-    const ok = [1, 3, 8, 9, 10, 11, 16, 27, 34, 39, 45, 52, 59, 64];
+    // Chỉ trả về true cho những lệnh thực sự an toàn hoặc cơ bản
+    const ok = [1, 3, 8, 9, 10, 11, 16, 34, 39, 45, 64];
     return ok.includes(command);
 }
 // ===== CORE_CONFIG =====
