@@ -6,7 +6,7 @@
 #include <emscripten.h>
 
 // Bổ sung hàm thiếu cho các Core như Gambatte
-void fill_pathname_join(char *out, const char *dir, const char *path, size_t size) {
+EMSCRIPTEN_KEEPALIVE void fill_pathname_join(char *out, const char *dir, const char *path, size_t size) {
     if (out != dir) {
         strncpy(out, dir, size);
     }
@@ -20,7 +20,7 @@ void fill_pathname_join(char *out, const char *dir, const char *path, size_t siz
 }
 
 // Bổ sung hàm base name
-void fill_pathname_base(char *out, const char *path, size_t size) {
+EMSCRIPTEN_KEEPALIVE void fill_pathname_base(char *out, const char *path, size_t size) {
     const char *slash = strrchr(path, '/');
     if (!slash) slash = strrchr(path, '\\');
     if (slash) {
@@ -31,16 +31,16 @@ void fill_pathname_base(char *out, const char *path, size_t size) {
 }
 
 // Stub cho mkdir
-bool path_mkdir(const char *dir) {
+EMSCRIPTEN_KEEPALIVE bool path_mkdir(const char *dir) {
     return true;
 }
 
-bool path_contains_rom_file(const char *path) {
+EMSCRIPTEN_KEEPALIVE bool path_contains_rom_file(const char *path) {
     return true;
 }
 
 // Bổ sung hàm dir name
-void fill_pathname_dir(char *out, const char *path, size_t size) {
+EMSCRIPTEN_KEEPALIVE void fill_pathname_dir(char *out, const char *path, size_t size) {
     const char *slash = strrchr(path, '/');
     if (!slash) slash = strrchr(path, '\\');
     if (slash) {

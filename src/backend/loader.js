@@ -14,7 +14,7 @@ const getPointer = (string, pointer) => {
 // ===== env_cb =====
 function env_cb(command, data) {
     const d32 = Number(data) >> 2;
-    console.log("[Env]", command, data);
+    // console.log("[Env]", command, data);
     if (command === 15) {
         const key = Module.UTF8ToString(Module.HEAP32[d32]);
         if (activeVars[key]) {
@@ -30,8 +30,7 @@ function env_cb(command, data) {
         if (data) Module.HEAP8[data] = 1;
         return true;
     }
-    // Chỉ trả về true cho những lệnh thực sự an toàn hoặc cơ bản
-    const ok = [1, 3, 8, 9, 10, 11, 16, 34, 39, 45, 64];
+    const ok = [1, 3, 8, 9, 10, 11, 15, 16, 27, 34, 39, 45, 64, 65537, 65581, 65587];
     return ok.includes(command);
 }
 // ===== CORE_CONFIG =====
