@@ -74,7 +74,7 @@ function recordDraw(context, bindGroup, encoder) {
 // ===== render32 =====
 function render32(source, sourceOffset, lastFrame, lastFramePtr, context, texture, width, height, length, bindGroup, encoder) {
     frameCount++;
-    const isDirtyFn = cachedIsDirtyFn || (cachedIsDirtyFn = Module._retro_is_dirty || Module.asm?._retro_is_dirty || Module.instance?.exports?._retro_is_dirty || Module.instance?.exports?.retro_is_dirty);
+    const isDirtyFn = cachedIsDirtyFn || (cachedIsDirtyFn = Module._emux_is_dirty || Module.asm?._emux_is_dirty || Module.instance?.exports?._emux_is_dirty || Module._retro_is_dirty || Module.asm?._retro_is_dirty || Module.instance?.exports?._retro_is_dirty || Module.instance?.exports?.retro_is_dirty);
     if (isDirtyFn && lastFramePtr && isDirtyFn(source.byteOffset + (sourceOffset << 2), lastFramePtr, length << 2)) {
         gpuQueue.writeTexture({ texture }, lastFrame, { bytesPerRow: width << 2 }, { width, height });
         recordDraw(context, bindGroup, encoder);
@@ -85,7 +85,7 @@ function render32(source, sourceOffset, lastFrame, lastFramePtr, context, textur
 // ===== render16 =====
 function render16(source32, last16, last32Ptr, context, texture, width, height, pitch, bindGroup, encoder) {
     frameCount++;
-    const isDirtyFn = cachedIsDirtyFn || (cachedIsDirtyFn = Module._retro_is_dirty || Module.asm?._retro_is_dirty || Module.instance?.exports?._retro_is_dirty || Module.instance?.exports?.retro_is_dirty);
+    const isDirtyFn = cachedIsDirtyFn || (cachedIsDirtyFn = Module._emux_is_dirty || Module.asm?._emux_is_dirty || Module.instance?.exports?._emux_is_dirty || Module._retro_is_dirty || Module.asm?._retro_is_dirty || Module.instance?.exports?._retro_is_dirty || Module.instance?.exports?.retro_is_dirty);
     if (isDirtyFn && last32Ptr && isDirtyFn(source32.byteOffset, last32Ptr, pitch * height)) {
         gpuQueue.writeTexture({ texture }, last16, { bytesPerRow: pitch }, { width, height });
         recordDraw(context, bindGroup, encoder);

@@ -6,7 +6,7 @@ let visualBufferPtr = 0, visualBufferBottomPtr = 0, lutPtr = 0;
 // ===== render32 =====
 function render32(source, sourceOffset, lastFramePtr, context, imageDataObject, length, vBufPtr) {
     frameCount++;
-    const renderFn = cachedRender32Fn || (cachedRender32Fn = Module._retro_render32 || Module.asm?._retro_render32 || Module.instance?.exports?._retro_render32 || Module.instance?.exports?.retro_render32);
+    const renderFn = cachedRender32Fn || (cachedRender32Fn = Module._emux_render32 || Module.asm?._emux_render32 || Module.instance?.exports?._emux_render32 || Module._retro_render32 || Module.asm?._retro_render32 || Module.instance?.exports?._retro_render32 || Module.instance?.exports?.retro_render32);
     if (renderFn && lastFramePtr && renderFn(source.byteOffset + (sourceOffset << 2), lastFramePtr, vBufPtr, length)) {
         context.putImageData(imageDataObject, 0, 0);
     } else { skippedFrames++; }
@@ -14,7 +14,7 @@ function render32(source, sourceOffset, lastFramePtr, context, imageDataObject, 
 // ===== render16 =====
 function render16(source32, last32Ptr, context, imageDataObject, width, height, stride) {
     frameCount++;
-    const renderFn = cachedRender16Fn || (cachedRender16Fn = Module._retro_render16 || Module.asm?._retro_render16 || Module.instance?.exports?._retro_render16 || Module.instance?.exports?.retro_render16);
+    const renderFn = cachedRender16Fn || (cachedRender16Fn = Module._emux_render16 || Module.asm?._emux_render16 || Module.instance?.exports?._emux_render16 || Module._retro_render16 || Module.asm?._retro_render16 || Module.instance?.exports?._retro_render16 || Module.instance?.exports?.retro_render16);
     if (!lutPtr && window.lookupTable565) {
         lutPtr = Module._malloc(lookupTable565.length << 2);
         new Uint32Array(Module.HEAPU8.buffer, lutPtr, lookupTable565.length).set(lookupTable565);

@@ -2,7 +2,7 @@
 #include <stdint.h>
 #include <emscripten.h>
 
-EMSCRIPTEN_KEEPALIVE int retro_is_dirty(const uint32_t * restrict buf1, uint32_t * restrict buf2, size_t size) {
+EMSCRIPTEN_KEEPALIVE int emux_is_dirty(const uint32_t * restrict buf1, uint32_t * restrict buf2, size_t size) {
     size_t len = size >> 2;
     size_t step = len >> 8;
     if (step) {
@@ -17,7 +17,7 @@ dirty:
     return 1;
 }
 
-EMSCRIPTEN_KEEPALIVE int retro_render16(const uint16_t * restrict src, uint16_t * restrict cache, uint32_t * restrict dst, int width, int height, int stride, const uint32_t * restrict lut) {
+EMSCRIPTEN_KEEPALIVE int emux_render16(const uint16_t * restrict src, uint16_t * restrict cache, uint32_t * restrict dst, int width, int height, int stride, const uint32_t * restrict lut) {
     size_t total_px = stride * height;
     size_t step = total_px >> 8;
     if (step) {
@@ -39,7 +39,7 @@ dirty16:
     return 1;
 }
 
-EMSCRIPTEN_KEEPALIVE int retro_render32(const uint32_t * restrict src, uint32_t * restrict cache, uint32_t * restrict dst, int length) {
+EMSCRIPTEN_KEEPALIVE int emux_render32(const uint32_t * restrict src, uint32_t * restrict cache, uint32_t * restrict dst, int length) {
     size_t step = length >> 8;
     if (step) {
         const uint32_t *p1 = src, *p2 = cache;
