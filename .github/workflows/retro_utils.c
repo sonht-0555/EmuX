@@ -66,14 +66,14 @@ static float audio_ring_r[AUDIO_RING_SIZE];
 static int audio_write_pos = 0;
 static float audio_read_pos = 0.0f;
 
-EMSCRIPTEN_KEEPALIVE void audio_reset() {
+EMSCRIPTEN_KEEPALIVE void emux_audio_reset() {
     audio_write_pos = 0;
     audio_read_pos = 0.0f;
     memset(audio_ring_l, 0, sizeof(audio_ring_l));
     memset(audio_ring_r, 0, sizeof(audio_ring_r));
 }
 
-EMSCRIPTEN_KEEPALIVE int retro_audio_process(const int16_t *src, int frames, float *dst_l, float *dst_r, float ratio) {
+EMSCRIPTEN_KEEPALIVE int emux_audio_process(const int16_t *src, int frames, float *dst_l, float *dst_r, float ratio) {
     const float inv = 1.0f / 32768.0f;
     
     // 1. Ghi cực nhanh vào ring buffer

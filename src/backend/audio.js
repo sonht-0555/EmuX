@@ -23,7 +23,7 @@ async function initAudio(ratio) {
         resampledPtrL = Module._malloc(4096 * 4);
         resampledPtrR = Module._malloc(4096 * 4);
     }
-    if (Module._audio_reset) Module._audio_reset();
+    if (Module._emux_audio_reset) Module._emux_audio_reset();
 
     audioWorkletNode.connect(audioGainNode).connect(audioContext.destination);
     audioStartTime = audioContext.currentTime;
@@ -32,10 +32,10 @@ async function initAudio(ratio) {
 }
 // ===== writeAudio =====
 function writeAudio(ptr, f) {
-    if (!audioWorkletNode || !isRunning || !Module._retro_audio_process) return f;
+    if (!audioWorkletNode || !isRunning || !Module._emux_audio_process) return f;
     
     // Thực hiện Resampling cực nhanh trong WASM
-    const count = Module._retro_audio_process(ptr, f, resampledPtrL, resampledPtrR, audioCoreRatio);
+    const count = Module._emux_audio_process(ptr, f, resampledPtrL, resampledPtrR, audioCoreRatio);
     
     if (count > 0) {
         // Gửi dữ liệu đã resample sang Worklet
@@ -55,5 +55,5 @@ window.getAudioBacklog = () => {
 window.resetAudioSync = () => {
     totalSamplesSent = 0;
     if (audioContext) audioStartTime = audioContext.currentTime;
-    if (Module._audio_reset) Module._audio_reset();
+    if (Module._emux_audio_reset) Module._emux_audio_reset();
 };
