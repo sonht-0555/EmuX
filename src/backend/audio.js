@@ -48,5 +48,5 @@ window.getAudioBacklog = () => {
 window.resetAudioSync = () => {
     totalSamplesSent = 0; 
     if (audioContext) audioStartTime = audioContext.currentTime;
-    if (Module._emux_audio_reset) Module._emux_audio_reset();
+    if (window.Module && window.Module._emux_audio_reset) window.Module._emux_audio_reset();
 };

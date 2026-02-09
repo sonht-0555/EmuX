@@ -46,9 +46,10 @@ function findCore(name, data) {
         const consoleCore = CORE_CONFIG.find(c => c.ext !== '.zip' && c.ext.split(',').includes(ext));
         if (consoleCore) {
             if (ext === '.bin' && filenames.length > 5) continue;
-            if (consoleCore.ext === '.nes') {
-                const nesFile = fflate.unzipSync(data, { filter: (f) => f.name === fileName });
-                return { config: consoleCore, data: nesFile[fileName], name: fileName };
+            const autoUnzipExts = ['.nes', '.gb', '.gbc'];
+            if (autoUnzipExts.includes(ext)) {
+                const unzipped = fflate.unzipSync(data, { filter: (f) => f.name === fileName });
+                return { config: consoleCore, data: unzipped[fileName], name: fileName };
             }
             return { config: consoleCore, data, name };
         }

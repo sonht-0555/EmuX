@@ -1,4 +1,4 @@
-let revision = 'EmuX_3.86';
+let revision = 'EmuX_3.87';
 var urlsToCache = [
     './', 
     './index.html',
@@ -10,6 +10,7 @@ var urlsToCache = [
     './src/font/mother.ttf',
     './src/font/3x3.ttf',
     './src/core/gba.zip',
+    './src/core/gbc.zip',
     './src/core/snes.zip',
     './src/core/snes2010.zip',
     './src/core/nes.zip',
