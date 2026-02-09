@@ -14,7 +14,6 @@ const getPointer = (string, pointer) => {
 // ===== env_cb =====
 function env_cb(command, data) {
     const d32 = Number(data) >> 2;
-    // console.log("[Env]", command, data);
     if (command === 15) {
         const key = Module.UTF8ToString(Module.HEAP32[d32]);
         if (activeVars[key]) {
@@ -26,12 +25,7 @@ function env_cb(command, data) {
         Module.HEAP32[d32] = getPointer('.');
         return true;
     }
-    if (command === 3) {
-        if (data) Module.HEAP8[data] = 1;
-        return true;
-    }
-    const ok = [1, 3, 8, 9, 10, 11, 15, 16, 34, 39, 45, 64, 65537, 65581, 65587];
-    return ok.includes(command);
+    return command === 10;
 }
 // ===== CORE_CONFIG =====
 const CORE_CONFIG = [
@@ -103,7 +97,7 @@ async function initCore(romFile) {
                     loadInfo[2] = finalRomData.length;
                 }
                 Module.HEAPU32.set(loadInfo, Number(infoPointer) >> 2);
-                if (!Module._retro_load_game(infoPointer)) return resolve();
+                Module._retro_load_game(infoPointer);
                 // Step 8: Audio & render loop start
                 const avPtr = Module._malloc(120);
                 Module._retro_get_system_av_info(avPtr);
