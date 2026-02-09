@@ -126,7 +126,7 @@ async function initCore(romFile) {
                     }
                 }
                 window.startLoop = () => { if (window.mainRafId) cancelAnimationFrame(window.mainRafId); mainLoop(); };
-                window.stopLoop = () => { isRunning = false; window.currentSessionId = null; };
+                window.stopLoop = () => { isRunning = false; };
                 startLoop();
                 await loadState();
                 await timer(true);

@@ -141,19 +141,23 @@ async function autoSave() {
 }
 // ===== resumeGame =====
 async function resumeGame() {
-    timer(true);
     isRunning = true;
-    if (window.startLoop) startLoop();
-    if (audioContext && (audioContext.state === 'suspended' || audioContext.state === 'interrupted')) {
-        audioContext.resume();
+    if (window.startLoop) window.startLoop();
+    if (audioContext) {
+        await audioContext.resume();
+        if (window.resetAudioSync) window.resetAudioSync();
     }
+    timer(true);
     message("[_] Resumed!");
 }
 // ===== pauseGame =====
 async function pauseGame() {
-    timer(false);
     isRunning = false;
-    if (window.stopLoop) stopLoop();
+    if (window.stopLoop) window.stopLoop();
+    if (audioContext && audioContext.state === 'running') {
+        await audioContext.suspend();
+    }
+    timer(false);
     message("[_] Paused!");
 }
 // ===== rebootGame =====

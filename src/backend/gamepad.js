@@ -11,7 +11,7 @@ function buttonPress(btn) {
         gamepadState[id] = 1;
         gamepadMask |= (1 << id);
     }
-    if (audioContext?.state !== 'running') audioContext?.resume();
+    if (audioContext?.state !== 'running') { audioContext?.resume(); window.resetAudioSync?.(); }
 }
 // ===== buttonUnpress =====
 function buttonUnpress(btn) {
