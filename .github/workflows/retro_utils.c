@@ -35,6 +35,25 @@ bool path_mkdir(const char *dir) {
     return true;
 }
 
+// Bổ sung hàm dir name
+void fill_pathname_dir(char *out, const char *path, size_t size) {
+    const char *slash = strrchr(path, '/');
+    if (!slash) slash = strrchr(path, '\\');
+    if (slash) {
+        size_t len = slash - path;
+        if (len >= size) len = size - 1;
+        strncpy(out, path, len);
+        out[len] = '\0';
+    } else {
+        out[0] = '\0';
+    }
+}
+
+// Stub kiểm tra đường dẫn tuyệt đối
+bool path_is_absolute(const char *path) {
+    return (path && path[0] == '/');
+}
+
 EMSCRIPTEN_KEEPALIVE int emux_is_dirty(const uint32_t * restrict buf1, uint32_t * restrict buf2, size_t size) {
     size_t len = size >> 2;
     size_t step = len >> 8;
