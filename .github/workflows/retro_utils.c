@@ -1,6 +1,23 @@
-#include <string.h>
+#include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdbool.h>
 #include <emscripten.h>
+
+// Bổ sung hàm thiếu cho các Core như Gambatte
+void fill_pathname_join(char *out, const char *dir, const char *path, size_t size) {
+    if (out != dir) {
+        strncpy(out, dir, size);
+    }
+    
+    size_t len = strlen(out);
+    if (len > 0 && out[len-1] != '/' && out[len-1] != '\\' && len < size - 1) {
+        strcat(out, "/");
+    }
+    
+    strncat(out, path, size - strlen(out) - 1);
+}
 
 EMSCRIPTEN_KEEPALIVE int emux_is_dirty(const uint32_t * restrict buf1, uint32_t * restrict buf2, size_t size) {
     size_t len = size >> 2;
