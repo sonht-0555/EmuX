@@ -111,6 +111,10 @@ async function initCore(romFile) {
                     if (!isRunning || window.currentSessionId !== session) return window.mainRafId = 0; 
                     window.mainRafId = requestAnimationFrame(mainLoop);
                     let backlog = window.getAudioBacklog();
+                    if (window.Perf && window.Perf.enabled) {
+                        window.Perf.samples.backlog += backlog;
+                        window.Perf.samples.backlogCount++;
+                    }
                     let targetRuns = 1; 
                     if (backlog > 4000) targetRuns = 0; 
                     if (backlog < 1000) targetRuns = 2; 

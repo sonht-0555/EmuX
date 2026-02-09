@@ -1,42 +1,48 @@
 // ===== EmuX Performance Tool =====
 window.Perf = {
-    enabled: false,
-    samples: { count: 0, min: 9999, max: 0, batches: 0 },
-    video: { frames: 0, skipped: 0 },
+    enabled: false, lastReportTime: performance.now(),
+    samples: { count: 0, backlog: 0, backlogCount: 0 },
+    video: { frames: 0, skipped: 0, gpuTime: 0, lastGpuStart: 0 },
     cpu: { totalWorkTime: 0, lastFrameStart: 0 },
-    lastReportTime: performance.now(),
+
     toggle() {
         this.enabled = !this.enabled;
-        this.reset();
-    },
-    countAudio(f) {
-        if (!this.enabled) return;
-        this.samples.count += f;
-        this.samples.batches++;
-        if (f < this.samples.min) this.samples.min = f;
-        if (f > this.samples.max) this.samples.max = f;
-    },
-    beginCore() { if (this.enabled) this.cpu.lastFrameStart = performance.now(); },
-    endCore() { if (this.enabled) this.cpu.totalWorkTime += (performance.now() - this.cpu.lastFrameStart); },
-    report(scriptName, coreRuns) {
-        const now = performance.now();
-        const elapsed = now - this.lastReportTime;
-        const speedPct = Math.min(100, (1000 / elapsed) * 100) | 0;
-        if (this.enabled) {
-            const avgCpuMs = (this.cpu.totalWorkTime / coreRuns).toFixed(2);
-            const rendered = this.video.frames - this.video.skipped;
-            const renderPct = (this.video.frames > 0) ? (rendered * 100 / this.video.frames) | 0 : 0;
-            const div = (typeof Module !== 'undefined' && Module.isNDS) ? (coreRuns / 2) : coreRuns;
-            const avgAudio = (this.samples.count / div) | 0;
-            console.log(`[${scriptName.toUpperCase()}] Speed:${speedPct}% CPU:${avgCpuMs}ms Render:${renderPct}% Audio:${avgAudio}`);
-        }
-        this.lastReportTime = now;
+        console.log(`Perf Diagnostics: ${this.enabled ? 'ON' : 'OFF'}`);
         this.reset();
     },
     reset() {
-        this.samples = { count: 0, min: 9999, max: 0, batches: 0 };
-        this.video = { frames: 0, skipped: 0 };
-        this.cpu.totalWorkTime = 0;
+        this.samples = { count: 0, backlog: 0, backlogCount: 0 };
+        this.video = { frames: 0, skipped: 0, gpuTime: 0, lastGpuStart: 0 };
+        this.cpu.totalWorkTime = this.cpu.lastFrameStart = 0;
+    },
+    countAudio(f) { if (this.enabled) this.samples.count += f; },
+    beginGpu() { if (this.enabled) this.video.lastGpuStart = performance.now(); },
+    endGpu() { 
+        if (this.enabled && this.video.lastGpuStart > 0) {
+            this.video.gpuTime += (performance.now() - this.video.lastGpuStart);
+            this.video.lastGpuStart = 0;
+        }
+    },
+    beginCore() { if (this.enabled) this.cpu.lastFrameStart = performance.now(); },
+    endCore() { 
+        if (this.enabled && this.cpu.lastFrameStart > 0) {
+            this.cpu.totalWorkTime += (performance.now() - this.cpu.lastFrameStart);
+            this.cpu.lastFrameStart = 0;
+        }
+    },
+    report(scriptName, coreRuns) {
+        const now = performance.now(), elapsed = now - this.lastReportTime;
+        this.lastReportTime = now;
+        if (this.enabled) {
+            const speedPct = Math.min(100, (1000 / elapsed) * 100) | 0,
+                  avgCpu = (this.cpu.totalWorkTime / coreRuns).toFixed(2),
+                  rendered = this.video.frames - this.video.skipped,
+                  avgGpu = rendered > 0 ? (this.video.gpuTime / rendered).toFixed(2) : "0.00",
+                  renderPct = (this.video.frames > 0) ? (rendered * 100 / this.video.frames) | 0 : 0,
+                  avgBacklog = this.samples.backlogCount > 0 ? (this.samples.backlog / this.samples.backlogCount) | 0 : 0,
+                  div = (typeof Module !== 'undefined' && Module.isNDS) ? (coreRuns / 2) : coreRuns;
+            console.log(`[${scriptName.toUpperCase()}] Speed:${speedPct}% CPU:${avgCpu}ms GPU:${avgGpu}ms Render:${renderPct}% Audio:${(this.samples.count / div) | 0} Backlog:${avgBacklog}`);
+        }
+        this.reset();
     }
 };
-console.log("Perf.toggle() to enable/disable logging.");

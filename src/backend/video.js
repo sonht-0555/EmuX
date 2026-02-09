@@ -23,7 +23,12 @@ function logSkip() {
 }
 // ===== video_cb =====
 function video_cb(pointer, width, height, pitch) {
-    if (renderFunction) return renderFunction(pointer, width, height, pitch);
+    if (renderFunction) {
+        if (window.Perf) window.Perf.beginGpu();
+        const res = renderFunction(pointer, width, height, pitch);
+        if (window.Perf) window.Perf.endGpu();
+        return res;
+    }
     if (rendererReady) return;
     rendererReady = true;
     scriptName = local('render') || 'wgpu';
