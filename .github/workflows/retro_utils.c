@@ -19,6 +19,22 @@ void fill_pathname_join(char *out, const char *dir, const char *path, size_t siz
     strncat(out, path, size - strlen(out) - 1);
 }
 
+// Bổ sung hàm base name
+void fill_pathname_base(char *out, const char *path, size_t size) {
+    const char *slash = strrchr(path, '/');
+    if (!slash) slash = strrchr(path, '\\');
+    if (slash) {
+        strncpy(out, slash + 1, size);
+    } else {
+        strncpy(out, path, size);
+    }
+}
+
+// Stub cho mkdir
+bool path_mkdir(const char *dir) {
+    return true;
+}
+
 EMSCRIPTEN_KEEPALIVE int emux_is_dirty(const uint32_t * restrict buf1, uint32_t * restrict buf2, size_t size) {
     size_t len = size >> 2;
     size_t step = len >> 8;

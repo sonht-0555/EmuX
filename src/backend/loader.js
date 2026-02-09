@@ -14,6 +14,7 @@ const getPointer = (string, pointer) => {
 // ===== env_cb =====
 function env_cb(command, data) {
     const d32 = Number(data) >> 2;
+    console.log("[Env]", command, data);
     if (command === 15) {
         const key = Module.UTF8ToString(Module.HEAP32[d32]);
         if (activeVars[key]) {
@@ -25,13 +26,19 @@ function env_cb(command, data) {
         Module.HEAP32[d32] = getPointer('.');
         return true;
     }
-    return command === 10;
+    if (command === 3) {
+        if (data) Module.HEAP8[data] = 1;
+        return true;
+    }
+    // Cho phép thêm nhiều lệnh khởi tạo cơ bản (11: Message, 23: Audio callback, v.v.)
+    const ok = [1, 3, 8, 9, 10, 11, 16, 23, 27, 34, 39, 45, 52, 59, 64];
+    return ok.includes(command);
 }
 // ===== CORE_CONFIG =====
 const CORE_CONFIG = [
     { ext: '.nes', script: './src/core/nes.zip', btns: { 'btn-1': ['A', 8], 'btn-3': ['B', 0], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3] } },
     { ext: '.ngp,.ngc', script: './src/core/ngp.zip', btns: { 'btn-1': ['A', 0], 'btn-3': ['B', 8], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3] } },
-    { ext: '.gb,.gbc', script: './src/core/gba.zip', btns: { 'btn-1': ['A', 8], 'btn-3': ['B', 0], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3] } },
+    { ext: '.gb,.gbc', script: './src/core/gbc.zip', btns: { 'btn-1': ['A', 8], 'btn-3': ['B', 0], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3] } },
     { ext: '.gba', script: './src/core/gba.zip', btns: { 'btn-1': ['A', 8], 'btn-3': ['B', 0], 'btn-l': [' bl.', 10], 'btn-r': [' br.', 11], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3] } },
     { ext: '.md,.gen', script: './src/core/genesis.zip', btns: { 'btn-1': ['A', 1], 'btn-3': ['B', 0], 'btn-4': ['C', 8], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3] } },
     { ext: '.smc,.sfc', script: './src/core/snes2010.zip', btns: { 'btn-1': ['A', 8], 'btn-2': ['X', 9], 'btn-3': ['B', 0], 'btn-4': ['Y', 1], 'btn-l': [' bl.', 10], 'btn-r': [' br.', 11], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3] } },
@@ -97,7 +104,7 @@ async function initCore(romFile) {
                     loadInfo[2] = finalRomData.length;
                 }
                 Module.HEAPU32.set(loadInfo, Number(infoPointer) >> 2);
-                Module._retro_load_game(infoPointer);
+                if (!Module._retro_load_game(infoPointer)) return resolve();
                 // Step 8: Audio & render loop start
                 const avPtr = Module._malloc(120);
                 Module._retro_get_system_av_info(avPtr);
