@@ -9,8 +9,13 @@ for (let i = 0; i < 65536; i++) {
 // ===== logSkip =====
 function logSkip() {
     if (window._runCount >= 60 && window.skip1) {
-        const skipPct = (frameCount > 0) ? ((frameCount - skippedFrames) * 100 / frameCount) | 0 : 0;
-        skip1.textContent = `${scriptName.toUpperCase()}.[${skipPct}]`;
+        const renderPct = (frameCount > 0) ? ((frameCount - skippedFrames) * 100 / frameCount) | 0 : 0;
+        window.skip1.textContent = `${scriptName.toUpperCase()}.[${renderPct}] `;
+        if (window.Perf) {
+            window.Perf.video.frames = frameCount;
+            window.Perf.video.skipped = skippedFrames;
+            window.Perf.report(scriptName, window._runCount);
+        }
         window._runCount = 0;
         frameCount = skippedFrames = 0;
     }
@@ -18,7 +23,6 @@ function logSkip() {
 }
 // ===== video_cb =====
 function video_cb(pointer, width, height, pitch) {
-    // Không đếm frame ở đây nữa, để renderer (wgpu/wgl...) gọi logSkip khi vẽ xong 1 frame game
     if (renderFunction) return renderFunction(pointer, width, height, pitch);
     if (rendererReady) return;
     rendererReady = true;

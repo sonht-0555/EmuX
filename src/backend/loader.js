@@ -115,7 +115,9 @@ async function initCore(romFile) {
                     if (backlog > 4000) targetRuns = 0; 
                     if (backlog < 1000) targetRuns = 2; 
                     for (let i = 0; i < targetRuns; i++) {
+                        if (window.Perf) window.Perf.beginCore();
                         Module._retro_run();
+                        if (window.Perf) window.Perf.endCore();
                         window._runCount = (window._runCount || 0) + 1;
                     }
                 }

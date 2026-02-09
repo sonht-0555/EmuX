@@ -6,7 +6,6 @@ const audio_cb = () => {};
 var audioContext, audioWorkletNode, audioGainNode;
 var totalSamplesSent = 0, audioStartTime = 0, audioCoreRatio = 1.0;
 var currentModule = null, resampledPtrL = 0, resampledPtrR = 0;
-
 // ===== initAudio =====
 async function initAudio(ratio) {
     if (audioContext) return audioContext.resume();
@@ -16,15 +15,12 @@ async function initAudio(ratio) {
     audioGainNode = audioContext.createGain();
     audioGainNode.gain.value = 1;
     audioCoreRatio = ratio;
-    
-    // Đảm bảo con trỏ luôn thuộc về Module hiện tại
     if (currentModule !== Module) {
         currentModule = Module;
         resampledPtrL = Module._malloc(4096 * 4);
         resampledPtrR = Module._malloc(4096 * 4);
     }
     if (Module._emux_audio_reset) Module._emux_audio_reset();
-
     audioWorkletNode.connect(audioGainNode).connect(audioContext.destination);
     audioStartTime = audioContext.currentTime;
     totalSamplesSent = 0;
@@ -33,18 +29,15 @@ async function initAudio(ratio) {
 // ===== writeAudio =====
 function writeAudio(ptr, f) {
     if (!audioWorkletNode || !isRunning || !Module._emux_audio_process) return f;
-    
-    // Thực hiện Resampling cực nhanh trong WASM
     const count = Module._emux_audio_process(ptr, f, resampledPtrL, resampledPtrR, audioCoreRatio);
-    
     if (count > 0) {
-        // Gửi dữ liệu đã resample sang Worklet
         audioWorkletNode.port.postMessage({ 
             l: new Float32Array(Module.HEAPU8.buffer, resampledPtrL, count).slice(), 
             r: new Float32Array(Module.HEAPU8.buffer, resampledPtrR, count).slice() 
         });
         totalSamplesSent += count;
     }
+    if (window.Perf) window.Perf.countAudio(f);
     return f;
 }
 window.getAudioBacklog = () => {
