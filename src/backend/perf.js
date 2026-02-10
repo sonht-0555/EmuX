@@ -17,7 +17,7 @@ window.Perf = {
         this.cpu.totalWorkTime = this.cpu.lastFrameStart = 0;
     },
     // ===== countAudio =====
-    countAudio(f) {if (this.enabled) this.samples.count += f;},
+    countAudio(frames) {if (this.enabled) this.samples.count += frames;},
     // ===== beginGpu =====
     beginGpu() {if (this.enabled) this.video.lastGpuStart = performance.now();},
     // ===== endGpu =====
