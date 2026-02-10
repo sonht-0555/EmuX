@@ -25,6 +25,7 @@ class AudioProcessor extends AudioWorkletProcessor {
             }
         }
         Atomics.store(this.idx, 1, (r + outLen) & this.m);
+        Atomics.notify(this.idx, 1); // Wake up the worker
         return true;
     }
 }
