@@ -47,8 +47,8 @@ async function message(txt, dur = 2000) {
 // ===== gameView =====
 async function gameView(name, w, h) {
     page02.ontouchstart = e => e.preventDefault();
-    gameWidth = w || window.gameWidth || canvas.width; 
-    gameHeight = h || window.gameHeight || canvas.height;
+    if (!w || !h) return;
+    gameWidth = w; gameHeight = h;
     title1.textContent = name; switch0.textContent = local('render');
     const maxInt = Math.floor((window.innerWidth * window.devicePixelRatio) / gameWidth);
     integer = (maxInt > 6) ? maxInt - (maxInt % 2) : maxInt;
@@ -58,7 +58,6 @@ async function gameView(name, w, h) {
     s.setProperty("--size", `${integer}px`); s.setProperty("--width", `${gameWidth*integer}px`);
     s.setProperty("--height", `${gameHeight*integer}px`); s.setProperty("--scale", r/integer);
     const bt = (window.innerWidth - 36) / 8, sz = Math.round(bt) % 2 === 0 ? Math.round(bt) - 1 : Math.round(bt);
-    gamepad.style.gridTemplateColumns = `${sz}px 1px `.repeat(8) + "auto 1px " + `${sz}px 1px `.repeat(4).slice(0,-4); // Refined grid
     gamepad.style.gridTemplateColumns = `${sz}px 1px ${sz}px 1px ${sz}px 1px ${sz}px 1px auto 1px ${sz}px 1px ${sz}px 1px ${sz}px 1px ${sz}px`;
     page02.style.gridTemplateRows = `auto ${window.innerWidth - (sz*8+30)}px ${sz*4+36}px ${window.innerWidth - (sz*8+20)}px 1fr 20px`;
     joy.style.width = `${sz*4+3}px`;

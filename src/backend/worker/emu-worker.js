@@ -63,13 +63,14 @@ self.onmessage = async (e) => {
                 Module._retro_load_game(infoPointer);
                 const avPtr = Module._malloc(120);
                 Module._retro_get_system_av_info(avPtr);
+                const baseW = Module.HEAPU32[avPtr >> 2], baseH = Module.HEAPU32[(avPtr + 4) >> 2];
                 audioCoreRatio = Module.HEAPF64[(Number(avPtr) + 32) >> 3] / 48000;
                 Module._free(avPtr);
                 resampledPtrL = Module._malloc(4096 * 4); resampledPtrR = Module._malloc(4096 * 4);
                 if (Module._emux_audio_reset) Module._emux_audio_reset();
                 isRunning = true;
                 mainLoop();
-                self.postMessage({ type: 'READY', data: { width: canvas.width, height: canvas.height, ratio: audioCoreRatio } });
+                self.postMessage({ type: 'READY', data: { width: baseW || canvas.width, height: baseH || canvas.height, ratio: audioCoreRatio } });
             }
         };
         importScripts(jsUrl);
