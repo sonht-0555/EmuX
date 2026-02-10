@@ -17,8 +17,14 @@ function buttonUnpress(button) {
 }
 // ===== input_state_cb =====
 function input_state_cb(port, device, index, id) {
-    if (port) return 0;
-    if (device === 1) return id === 256 ? gamepadMask : gamepadState[id];
+    if (device === 1) {
+        if (window.isNetplaying) {
+            const mask = typeof getNetplayInput === 'function' ? getNetplayInput(port) : null;
+            if (mask !== null) {return id === 256 ? mask : (mask >> id) & 1;}
+        }
+        if (port) return 0;
+        return id === 256 ? gamepadMask : gamepadState[id];
+    }
     if (device === 6) return [window._pX, window._pY, window._pD][id] ?? 0;
     return 0;
 }

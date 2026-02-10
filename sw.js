@@ -1,4 +1,4 @@
-let revision = 'EmuX_4.29';
+let revision = 'EmuX_4.30';
 var urlsToCache = [
     './',
     './index.html',
@@ -23,7 +23,8 @@ var urlsToCache = [
     './src/core/bios/bios7.bin',
     './src/core/bios/bios9.bin',
     './src/core/bios/firmware.bin',
-    './src/backend/zip.js',
+    './src/core/library/zip.js',
+    './src/core/library/peer.js',
     './src/backend/loader.js',
     './src/backend/audio.js',
     './src/backend/audio-processor.js',
@@ -34,6 +35,7 @@ var urlsToCache = [
     './src/backend/gamepad.js',
     './src/backend/storage.js',
     './src/backend/main.js',
+    './src/backend/netplay.js',
     './src/backend/perf.js',
     './src/frontend/global.js',
     './src/frontend/page01.js',
