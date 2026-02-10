@@ -24,9 +24,9 @@ function logSkip() {
 function video_cb(pointer, width, height, pitch) {
     if (renderFunction) {
         if (window.Perf) window.Perf.beginGpu();
-        const res = renderFunction(pointer, width, height, pitch);
+        const result = renderFunction(pointer, width, height, pitch);
         if (window.Perf) window.Perf.endGpu();
-        return res;
+        return result;
     }
     if (rendererReady) return;
     rendererReady = true;
