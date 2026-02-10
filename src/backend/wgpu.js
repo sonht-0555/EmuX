@@ -101,8 +101,8 @@ function renderNDS(pointer, width, height, encoder) {
     const pixelCount = width * halfHeight;
     if (cachedWidth !== width || cachedHeight !== halfHeight || !textureMain) {
         cachedWidth = width; cachedHeight = halfHeight;
-        Module.canvas.width = canvasB.width = width;
-        Module.canvas.height = canvasB.height = halfHeight;
+        Module.canvas.width = canvasBottom.width = width;
+        Module.canvas.height = canvasBottom.height = halfHeight;
         textureMain = createTexture(width, halfHeight, true);
         textureBottom = createTexture(width, halfHeight, true);
         const bindGroupLayout = renderPipeline.getBindGroupLayout(0);
@@ -141,10 +141,10 @@ function renderNDS(pointer, width, height, encoder) {
 // ===== activeRenderFn =====
 window.activeRenderFn = async function (pointer, width, height, pitch) {
     if (!gpuDevice) {
-        if (!gpuInitializing) gpuInitializing = initGPU(Module.canvas, Module.isNDS ? canvasB : null);
+        if (!gpuInitializing) gpuInitializing = initGPU(Module.canvas, Module.isNDS ? canvasBottom : null);
         if (!await gpuInitializing) return;
         if (Module.isNDS) {
-            page02.style.paddingTop = "5px"; canvasB.style.display = "block";
+            page02.style.paddingTop = "5px"; canvasBottom.style.display = "block";
             joypad.style.justifyContent = "center"; joy.style.display = "none";
         }
     }

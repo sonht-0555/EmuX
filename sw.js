@@ -1,6 +1,6 @@
-let revision = 'EmuX_4.28';
+let revision = 'EmuX_4.29';
 var urlsToCache = [
-    './', 
+    './',
     './index.html',
     './manifest.json',
     './src/css/main.css',
@@ -40,7 +40,7 @@ var urlsToCache = [
     './src/frontend/page02.js'
 ];
 self.addEventListener('install', function (event) {
-    postMsg({msg:'Updating...'});
+    postMsg({msg: 'Updating...'});
     event.waitUntil(
         caches.open(revision).then((newCache) => {
             return Promise.all(
@@ -51,12 +51,12 @@ self.addEventListener('install', function (event) {
 });
 self.addEventListener('fetch', function (event) {
     event.respondWith(
-        caches.match(event.request, { ignoreSearch: true }).then(function (response) {
+        caches.match(event.request, {ignoreSearch: true}).then(function (response) {
             if (response) return addHeaders(response, event.request.url);
-            return fetch(event.request).then(function(res) {
+            return fetch(event.request).then(function (res) {
                 return addHeaders(res, event.request.url);
-            }).catch(function() {
-                return new Response("Offline", { status: 503 });
+            }).catch(function () {
+                return new Response("Offline", {status: 503});
             });
         })
     );
@@ -91,12 +91,12 @@ self.addEventListener('activate', function (event) {
             })
         ])
     );
-    postMsg({msg:'Updated'})
+    postMsg({msg: 'Updated'});
 });
 function postMsg(obj) {
-    clients.matchAll({ includeUncontrolled: true, type: 'window' }).then((arr) => {
+    clients.matchAll({includeUncontrolled: true, type: 'window'}).then((arr) => {
         for (client of arr) {
             client.postMessage(obj);
         }
-    })
+    });
 }

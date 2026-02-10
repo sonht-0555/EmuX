@@ -1,36 +1,36 @@
 // ===== Audio Processor =====
 class AudioProcessor extends AudioWorkletProcessor {
-    constructor(o) {
+    constructor(options) {
         super();
-        const {sabL, sabR, sabIndices, bufSize} = o.processorOptions;
-        this.lb = new Float32Array(sabL);
-        this.rb = new Float32Array(sabR);
-        this.idx = new Uint32Array(sabIndices);
-        this.b = bufSize;
-        this.m = bufSize - 1;
+        const {sabL, sabR, sabIndices, bufSize} = options.processorOptions;
+        this.leftBuffer = new Float32Array(sabL);
+        this.rightBuffer = new Float32Array(sabR);
+        this.indices = new Uint32Array(sabIndices);
+        this.bufferSize = bufSize;
+        this.mask = bufSize - 1;
     }
     // ===== process =====
     process(_, outputs) {
-        const out = outputs[0], outL = out[0], outR = out[1], outLen = outL.length;
-        const w = Atomics.load(this.idx, 0), r = Atomics.load(this.idx, 1);
-        if (((w - r + this.b) & this.m) < outLen) {
-            outL.fill(0);
-            if (outR) outR.fill(0);
+        const output = outputs[0], outputLeft = output[0], outputRight = output[1], outputLength = outputLeft.length;
+        const writeIndex = Atomics.load(this.indices, 0), readIndex = Atomics.load(this.indices, 1);
+        if (((writeIndex - readIndex + this.bufferSize) & this.mask) < outputLength) {
+            outputLeft.fill(0);
+            if (outputRight) outputRight.fill(0);
             return true;
         }
-        const space = this.b - r;
-        if (outLen <= space) {
-            outL.set(this.lb.subarray(r, r + outLen));
-            if (outR) outR.set(this.rb.subarray(r, r + outLen));
+        const space = this.bufferSize - readIndex;
+        if (outputLength <= space) {
+            outputLeft.set(this.leftBuffer.subarray(readIndex, readIndex + outputLength));
+            if (outputRight) outputRight.set(this.rightBuffer.subarray(readIndex, readIndex + outputLength));
         } else {
-            outL.set(this.lb.subarray(r, r + space));
-            outL.set(this.lb.subarray(0, outLen - space), space);
-            if (outR) {
-                outR.set(this.rb.subarray(r, r + space));
-                outR.set(this.rb.subarray(0, outLen - space), space);
+            outputLeft.set(this.leftBuffer.subarray(readIndex, readIndex + space));
+            outputLeft.set(this.leftBuffer.subarray(0, outputLength - space), space);
+            if (outputRight) {
+                outputRight.set(this.rightBuffer.subarray(readIndex, readIndex + space));
+                outputRight.set(this.rightBuffer.subarray(0, outputLength - space), space);
             }
         }
-        Atomics.store(this.idx, 1, (r + outLen) & this.m);
+        Atomics.store(this.indices, 1, (readIndex + outputLength) & this.mask);
         return true;
     }
 }

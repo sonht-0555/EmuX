@@ -4,22 +4,22 @@ let lastMainFramePtr = 0, lastBottomFramePtr = 0;
 let sourceView32, cachedRender32Fn, cachedRender16Fn;
 let visualBufferPtr = 0, visualBufferBottomPtr = 0, lutPtr = 0;
 // ===== render32 =====
-function render32(source, sourceOffset, lastFramePtr, context, imageDataObject, length, vBufPtr) {
+function render32(source, sourceOffset, lastFramePtr, context, imageDataObject, length, visualBufferPointer) {
     frameCount++;
     const renderFn = cachedRender32Fn || (cachedRender32Fn = Module._emux_render32 || Module.asm?._emux_render32 || Module.instance?.exports?._emux_render32);
-    if (renderFn && lastFramePtr && renderFn(source.byteOffset + (sourceOffset << 2), lastFramePtr, vBufPtr, length)) {
+    if (renderFn && lastFramePtr && renderFn(source.byteOffset + (sourceOffset << 2), lastFramePtr, visualBufferPointer, length)) {
         context.putImageData(imageDataObject, 0, 0);
     } else {skippedFrames++;}
 }
 // ===== render16 =====
-function render16(source32, last32Ptr, context, imageDataObject, width, height, stride) {
+function render16(source32, lastFrame32Pointer, context, imageDataObject, width, height, stride) {
     frameCount++;
     const renderFn = cachedRender16Fn || (cachedRender16Fn = Module._emux_render16 || Module.asm?._emux_render16 || Module.instance?.exports?._emux_render16);
     if (!lutPtr && window.lookupTable565) {
         lutPtr = Module._malloc(lookupTable565.length << 2);
         new Uint32Array(Module.HEAPU8.buffer, lutPtr, lookupTable565.length).set(lookupTable565);
     }
-    if (renderFn && last32Ptr && renderFn(source32.byteOffset, last32Ptr, visualBufferPtr, width, height, stride, lutPtr)) {
+    if (renderFn && lastFrame32Pointer && renderFn(source32.byteOffset, lastFrame32Pointer, visualBufferPtr, width, height, stride, lutPtr)) {
         context.putImageData(imageDataObject, 0, 0);
     } else {skippedFrames++;}
 }
@@ -29,7 +29,7 @@ function renderNDS(pointer, width, height) {
     const halfHeight = height >> 1; const pixelCount = width * halfHeight;
     if (cachedWidth !== width || cachedHeight !== halfHeight || !visualBufferPtr) {
         cachedWidth = width; cachedHeight = halfHeight;
-        Module.canvas.width = canvasB.width = width; Module.canvas.height = canvasB.height = halfHeight;
+        Module.canvas.width = canvasBottom.width = width; Module.canvas.height = canvasBottom.height = halfHeight;
         if (visualBufferPtr) Module._free(visualBufferPtr); if (visualBufferBottomPtr) Module._free(visualBufferBottomPtr);
         visualBufferPtr = Module._malloc(pixelCount << 2); visualBufferBottomPtr = Module._malloc(pixelCount << 2);
         imageData = new ImageData(new Uint8ClampedArray(heap.buffer, visualBufferPtr, pixelCount << 2), width, halfHeight);
@@ -50,13 +50,13 @@ window.activeRenderFn = function (pointer, width, height, pitch) {
     if (!context2d) {
         context2d = Module.canvas.getContext('2d', {alpha: false, desynchronized: true, willReadFrequently: false});
         if (Module.isNDS) {
-            page02.style.paddingTop = "5px"; canvasB.style.display = "block";
+            page02.style.paddingTop = "5px"; canvasBottom.style.display = "block";
             joypad.style.justifyContent = "center"; joy.style.display = "none";
-            context2dBottom = canvasB.getContext('2d', {alpha: false, desynchronized: true, willReadFrequently: false});
+            context2dBottom = canvasBottom.getContext('2d', {alpha: false, desynchronized: true, willReadFrequently: false});
         }
     }
     if (Module.isNDS) return renderNDS(pointer, width, height);
-    const pixelCount = width * height; const is32 = pitch === (width << 2); const heap = Module.HEAPU8;
+    const pixelCount = width * height; const is32Bit = pitch === (width << 2); const heap = Module.HEAPU8;
     if (width !== cachedWidth || height !== cachedHeight || pitch !== cachedPitch || !visualBufferPtr) {
         cachedWidth = width; cachedHeight = height; cachedPitch = pitch; cachedBuffer = null;
         Module.canvas.width = width; Module.canvas.height = height;
@@ -69,9 +69,9 @@ window.activeRenderFn = function (pointer, width, height, pitch) {
     }
     if (heap.buffer !== cachedBuffer || pointer !== cachedPointer) {
         cachedBuffer = heap.buffer; cachedPointer = pointer;
-        sourceView32 = new Uint32Array(heap.buffer, pointer, is32 ? pixelCount : ((pitch >> 1) * height) >> 1);
+        sourceView32 = new Uint32Array(heap.buffer, pointer, is32Bit ? pixelCount : ((pitch >> 1) * height) >> 1);
     }
-    if (is32) render32(sourceView32, 0, lastMainFramePtr, context2d, imageData, pixelCount, visualBufferPtr);
+    if (is32Bit) render32(sourceView32, 0, lastMainFramePtr, context2d, imageData, pixelCount, visualBufferPtr);
     else render16(sourceView32, lastMainFramePtr, context2d, imageData, width, height, pitch >> 1);
     logSkip();
 };

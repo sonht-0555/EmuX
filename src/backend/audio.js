@@ -1,5 +1,5 @@
 // ===== Audio System =====
-const audio_batch_cb = (ptr, f) => writeAudio(ptr, f), audio_cb = () => { };
+const audio_batch_cb = (pointer, frames) => writeAudio(pointer, frames), audio_cb = () => { };
 var audioContext, audioWorkletNode, audioGainNode, totalSamplesSent = 0, audioStartTime = 0, audioCoreRatio = 1.0;
 var currentModule = null, resampledPtrL = 0, resampledPtrR = 0, sabL, sabR, sabIndices;
 // ===== initAudio =====
@@ -26,31 +26,31 @@ async function initAudio(ratio) {
     totalSamplesSent = 0;
 }
 // ===== writeAudio =====
-function writeAudio(ptr, f) {
-    if (!audioWorkletNode || !isRunning || !Module._emux_audio_process) return f;
-    const count = Module._emux_audio_process(ptr, f, resampledPtrL, resampledPtrR, audioCoreRatio);
+function writeAudio(pointer, frames) {
+    if (!audioWorkletNode || !isRunning || !Module._emux_audio_process) return frames;
+    const count = Module._emux_audio_process(pointer, frames, resampledPtrL, resampledPtrR, audioCoreRatio);
     if (count > 0) {
-        const l = new Float32Array(Module.HEAPU8.buffer, resampledPtrL, count);
-        const r = new Float32Array(Module.HEAPU8.buffer, resampledPtrR, count);
-        const vL = new Float32Array(sabL), vR = new Float32Array(sabR);
-        const idx = new Uint32Array(sabIndices), b = vL.length;
-        let w = Atomics.load(idx, 0), space = b - w;
-        if (count <= space) {vL.set(l, w); vR.set(r, w);}
+        const left = new Float32Array(Module.HEAPU8.buffer, resampledPtrL, count);
+        const right = new Float32Array(Module.HEAPU8.buffer, resampledPtrR, count);
+        const viewLeft = new Float32Array(sabL), viewRight = new Float32Array(sabR);
+        const indices = new Uint32Array(sabIndices), bufferSize = viewLeft.length;
+        let writeIndex = Atomics.load(indices, 0), space = bufferSize - writeIndex;
+        if (count <= space) {viewLeft.set(left, writeIndex); viewRight.set(right, writeIndex);}
         else {
-            vL.set(l.subarray(0, space), w); vL.set(l.subarray(space), 0);
-            vR.set(r.subarray(0, space), w); vR.set(r.subarray(space), 0);
+            viewLeft.set(left.subarray(0, space), writeIndex); viewLeft.set(left.subarray(space), 0);
+            viewRight.set(right.subarray(0, space), writeIndex); viewRight.set(right.subarray(space), 0);
         }
-        Atomics.store(idx, 0, (w + count) & (b - 1));
+        Atomics.store(indices, 0, (writeIndex + count) & (bufferSize - 1));
         totalSamplesSent += count;
     }
-    if (window.Perf) window.Perf.countAudio(f);
-    return f;
+    if (window.Perf) window.Perf.countAudio(frames);
+    return frames;
 }
 // ===== getAudioBacklog =====
 window.getAudioBacklog = () => {
     if (!audioContext || audioContext.state !== 'running') return 0;
-    const bl = totalSamplesSent - (audioContext.currentTime - audioStartTime) * 48000;
-    return Math.max(-5000, Math.min(5000, bl));
+    const backlog = totalSamplesSent - (audioContext.currentTime - audioStartTime) * 48000;
+    return Math.max(-5000, Math.min(5000, backlog));
 };
 // ===== resetAudioSync =====
 window.resetAudioSync = () => {

@@ -1,24 +1,24 @@
 // ===== findCore =====
 function findCore(name, data) {
-    const nameLower = name.toLowerCase(), getExt = n => '.' + n.split('.').pop().toLowerCase();
+    const nameLower = name.toLowerCase(), getExtension = fileName => '.' + fileName.split('.').pop().toLowerCase();
     if (!nameLower.endsWith('.zip')) {
-        const ext = getExt(nameLower), config = CORE_CONFIG.find(c => c.ext.split(',').includes(ext));
+        const extension = getExtension(nameLower), config = CORE_CONFIG.find(core => core.ext.split(',').includes(extension));
         return {config, data, name};
     }
     const filenames = [];
     fflate.unzipSync(data, {filter: (file) => {filenames.push(file.name); return false;}});
     for (const fileName of filenames) {
-        const ext = getExt(fileName), consoleCore = CORE_CONFIG.find(c => c.ext !== '.zip' && c.ext.split(',').includes(ext));
+        const extension = getExtension(fileName), consoleCore = CORE_CONFIG.find(core => core.ext !== '.zip' && core.ext.split(',').includes(extension));
         if (consoleCore) {
-            if (ext === '.bin' && filenames.length > 5) continue;
-            if (['.nes', '.gb', '.gbc'].includes(ext)) {
-                const unzipped = fflate.unzipSync(data, {filter: (f) => f.name === fileName});
+            if (extension === '.bin' && filenames.length > 5) continue;
+            if (['.nes', '.gb', '.gbc'].includes(extension)) {
+                const unzipped = fflate.unzipSync(data, {filter: (file) => file.name === fileName});
                 return {config: consoleCore, data: unzipped[fileName], name: fileName};
             }
             return {config: consoleCore, data, name};
         }
     }
-    return {config: CORE_CONFIG.find(c => c.ext === '.zip'), data, name};
+    return {config: CORE_CONFIG.find(core => core.ext === '.zip'), data, name};
 }
 // ===== inputGame =====
 async function inputGame(event) {

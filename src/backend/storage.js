@@ -11,22 +11,22 @@ const getAllStoreNames = () => Object.keys(STORES);
 function storeForFilename(filename) {
     if (!filename || typeof filename !== 'string') return 'games';
     const ext = filename.split('.').pop()?.toLowerCase();
-    return (ext && getAllStoreNames().find(s => STORES[s].includes(ext))) || 'games';
+    return (ext && getAllStoreNames().find(storeName => STORES[storeName].includes(ext))) || 'games';
 }
 // ===== getDB =====
 async function getDB() {
     if (databaseCache) return databaseCache;
     const openDB = version => new Promise((resolve, reject) => {
-        const req = indexedDB.open(DATABASE_NAME, version);
-        if (version) req.onupgradeneeded = e => {
-            const db = e.target.result;
-            getAllStoreNames().forEach(s => !db.objectStoreNames.contains(s) && db.createObjectStore(s));
+        const request = indexedDB.open(DATABASE_NAME, version);
+        if (version) request.onupgradeneeded = event => {
+            const db = event.target.result;
+            getAllStoreNames().forEach(storeName => !db.objectStoreNames.contains(storeName) && db.createObjectStore(storeName));
         };
-        req.onsuccess = e => resolve(e.target.result);
-        req.onerror = reject;
+        request.onsuccess = event => resolve(event.target.result);
+        request.onerror = reject;
     });
     const db = await openDB();
-    if (getAllStoreNames().some(s => !db.objectStoreNames.contains(s))) {
+    if (getAllStoreNames().some(storeName => !db.objectStoreNames.contains(storeName))) {
         db.close();
         return databaseCache = await openDB(db.version + 1);
     }
@@ -35,16 +35,16 @@ async function getDB() {
 // ===== emuxDB =====
 async function emuxDB(dataOrKey, name) {
     const db = await getDB(), key = name || dataOrKey, store = storeForFilename(String(key));
-    const tx = db.transaction(store, name ? 'readwrite' : 'readonly'), os = tx.objectStore(store);
+    const transaction = db.transaction(store, name ? 'readwrite' : 'readonly'), objectStore = transaction.objectStore(store);
     return new Promise((resolve, reject) => {
         if (name) {
-            os.put(dataOrKey instanceof ArrayBuffer ? new Uint8Array(dataOrKey) : dataOrKey, name);
-            tx.oncomplete = () => resolve(true);
-            tx.onerror = e => reject(e);
+            objectStore.put(dataOrKey instanceof ArrayBuffer ? new Uint8Array(dataOrKey) : dataOrKey, name);
+            transaction.oncomplete = () => resolve(true);
+            transaction.onerror = event => reject(event);
         } else {
-            const req = os.get(dataOrKey);
-            req.onsuccess = () => resolve(req.result);
-            req.onerror = e => reject(e);
+            const request = objectStore.get(dataOrKey);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = event => reject(event);
         }
     });
 }
@@ -53,13 +53,13 @@ async function listStore(storeName) {
     const db = await getDB();
     const getKeys = store => new Promise((resolve, reject) => {
         if (!db.objectStoreNames.contains(store)) return resolve([]);
-        const req = db.transaction(store, 'readonly').objectStore(store).getAllKeys();
-        req.onsuccess = () => resolve(req.result.map(String));
-        req.onerror = reject;
+        const request = db.transaction(store, 'readonly').objectStore(store).getAllKeys();
+        request.onsuccess = () => resolve(request.result.map(String));
+        request.onerror = reject;
     });
     if (!storeName) {
         const names = getAllStoreNames(), keys = await Promise.all(names.map(getKeys));
-        return names.reduce((acc, name, i) => ({...acc, [name]: keys[i]}), {});
+        return names.reduce((accumulator, name, index) => ({...accumulator, [name]: keys[index]}), {});
     }
     return getKeys(storeName);
 }
@@ -67,10 +67,10 @@ async function listStore(storeName) {
 async function deleteFromStore(key) {
     const db = await getDB(), store = storeForFilename(String(key));
     return new Promise((resolve, reject) => {
-        const tx = db.transaction(store, 'readwrite'), os = tx.objectStore(store);
-        os.delete(key);
-        tx.oncomplete = () => resolve(true);
-        tx.onerror = e => reject(e);
+        const transaction = db.transaction(store, 'readwrite'), objectStore = transaction.objectStore(store);
+        objectStore.delete(key);
+        transaction.oncomplete = () => resolve(true);
+        transaction.onerror = event => reject(event);
     });
 }
 // ===== downloadFromStore =====

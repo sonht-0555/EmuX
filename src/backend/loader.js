@@ -13,16 +13,16 @@ const getPointer = (string, pointer) => {
 };
 // ===== env_cb =====
 function env_cb(command, data) {
-    const d32 = Number(data) >> 2;
+    const data32 = Number(data) >> 2;
     if (command === 15) {
-        const key = Module.UTF8ToString(Module.HEAP32[d32]);
+        const key = Module.UTF8ToString(Module.HEAP32[data32]);
         if (activeVars[key]) {
-            Module.HEAP32[d32 + 1] = getPointer(activeVars[key]);
+            Module.HEAP32[data32 + 1] = getPointer(activeVars[key]);
             return true;
         }
     }
     if (command === 9) {
-        Module.HEAP32[d32] = getPointer('.');
+        Module.HEAP32[data32] = getPointer('.');
         return true;
     }
     return command === 10;
@@ -45,50 +45,50 @@ var isRunning = false;
 async function initCore(romFile) {
     // Step 1: Identify core and start parallel loading
     isRunning = true, switch0.hidden = false;
-    await notifi("", "", "---", "", true);
+    await showNotification("", "", "---", "", true);
     let rawData = new Uint8Array(await romFile.arrayBuffer());
     const {config, data: finalRomData, name: finalRomName} = findCore(romFile.name, rawData);
     if (!config) return;
     rawData = null;
-    const coreFetch = fetch(config.script).then(r => r.ok ? r.arrayBuffer() : null);
-    const biosFetches = config.bios ? config.bios.map(url => fetch(url).then(r => r.ok ? r.arrayBuffer() : null).catch(() => null)) : [];
+    const coreFetch = fetch(config.script).then(response => response.ok ? response.arrayBuffer() : null);
+    const biosFetches = config.bios ? config.bios.map(url => fetch(url).then(response => response.ok ? response.arrayBuffer() : null).catch(() => null)) : [];
     // Step 2: Setup State
     activeVars = config.vars || {};
     updateButtons(config.btns);
     const isArcade = config.script.includes('arcade'), isNDS = config.script.includes('nds');
     let scriptSource = config.script;
     // Step 3: Prepare Core Engine
-    await notifi("", "#", "--", "", true);
+    await showNotification("", "#", "--", "", true);
     if (scriptSource.endsWith('.zip')) {
-        const coreBuf = await coreFetch;
-        if (!coreBuf) return;
-        const coreFiles = fflate.unzipSync(new Uint8Array(coreBuf));
-        const jsFile = Object.keys(coreFiles).find(n => n.endsWith('.js')), wasmFile = Object.keys(coreFiles).find(n => n.endsWith('.wasm'));
+        const coreBuffer = await coreFetch;
+        if (!coreBuffer) return;
+        const coreFiles = fflate.unzipSync(new Uint8Array(coreBuffer));
+        const jsFile = Object.keys(coreFiles).find(name => name.endsWith('.js')), wasmFile = Object.keys(coreFiles).find(name => name.endsWith('.wasm'));
         if (!jsFile || !wasmFile) return;
         scriptSource = URL.createObjectURL(new Blob([coreFiles[jsFile]], {type: 'application/javascript'}));
         window.wasmUrl = URL.createObjectURL(new Blob([coreFiles[wasmFile]], {type: 'application/wasm'}));
     }
     // Step 4: Initialize emulator module
     return new Promise(async (resolve) => {
-        await notifi("", "##", "-", "", true);
+        await showNotification("", "##", "-", "", true);
         window.Module = {
             isArcade, isNDS, canvas: document.getElementById("canvas"),
             print: () => { }, printErr: () => { },
-            locateFile: p => p.endsWith('.wasm') ? (window.wasmUrl || p) : p,
+            locateFile: path => path.endsWith('.wasm') ? (window.wasmUrl || path) : path,
             async onRuntimeInitialized() {
                 // Step 5: Core engine setup
                 const romPointer = Module._malloc(finalRomData.length), infoPointer = Module._malloc(16);
                 const callbacks = [[Module._retro_set_environment, env_cb, "iii"], [Module._retro_set_video_refresh, video_cb, "viiii"], [Module._retro_set_audio_sample, audio_cb, "vii"], [Module._retro_set_audio_sample_batch, audio_batch_cb, "iii"], [Module._retro_set_input_poll, input_poll_cb, "v"], [Module._retro_set_input_state, input_state_cb, "iiiii"]];
-                callbacks.forEach(([fn, cb, sig]) => fn(Module.addFunction(cb, sig)));
+                callbacks.forEach(([functionPointer, callback, signature]) => functionPointer(Module.addFunction(callback, signature)));
                 Module._retro_init();
                 // Step 6: BIOS management
                 if (biosFetches.length > 0) {
                     const biosBuffers = await Promise.all(biosFetches);
-                    config.bios.forEach((url, i) => biosBuffers[i] && Module.FS.writeFile('/' + url.split('/').pop(), new Uint8Array(biosBuffers[i])));
+                    config.bios.forEach((url, index) => biosBuffers[index] && Module.FS.writeFile('/' + url.split('/').pop(), new Uint8Array(biosBuffers[index])));
                 }
                 if (isNDS && Module._retro_set_controller_port_device) Module._retro_set_controller_port_device(0, 6);
                 // Step 7: ROM mapping and game load
-                await notifi("", "###", "", "", true);
+                await showNotification("", "###", "", "", true);
                 let romPath = isArcade ? `/${finalRomName}` : (isNDS ? '/game.nds' : `/game.${finalRomName.toLowerCase().split('.').pop()}`);
                 Module.FS.writeFile(romPath, finalRomData);
                 const loadInfo = [getPointer(romPath), 0, 0, 0];
@@ -100,11 +100,11 @@ async function initCore(romFile) {
                 Module.HEAPU32.set(loadInfo, Number(infoPointer) >> 2);
                 Module._retro_load_game(infoPointer);
                 // Step 8: Audio & render loop start
-                const avPtr = Module._malloc(120);
-                Module._retro_get_system_av_info(avPtr);
-                initAudio(Module.HEAPF64[(Number(avPtr) + 32) >> 3] / 48000);
+                const audioVideoPointer = Module._malloc(120);
+                Module._retro_get_system_av_info(audioVideoPointer);
+                initAudio(Module.HEAPF64[(Number(audioVideoPointer) + 32) >> 3] / 48000);
                 audioContext.resume();
-                Module._free(avPtr);
+                Module._free(audioVideoPointer);
                 if (window.resetAudioSync) window.resetAudioSync();
                 const session = Math.random();
                 window.currentSessionId = session;
@@ -119,7 +119,7 @@ async function initCore(romFile) {
                     let targetRuns = 1;
                     if (backlog > 4000) targetRuns = 0;
                     if (backlog < 1000) targetRuns = 2;
-                    for (let i = 0; i < targetRuns; i++) {
+                    for (let index = 0; index < targetRuns; index++) {
                         if (window.Perf) window.Perf.beginCore();
                         Module._retro_run();
                         if (window.Perf) window.Perf.endCore();

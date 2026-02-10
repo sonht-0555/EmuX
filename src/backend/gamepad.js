@@ -5,14 +5,14 @@ window._pX = window._pY = window._pD = 0;
 // ===== input_poll_cb =====
 function input_poll_cb() { }
 // ===== buttonPress =====
-function buttonPress(btn) {
-    const id = buttonMap[btn];
+function buttonPress(button) {
+    const id = buttonMap[button];
     if (id !== undefined && id !== '') {gamepadState[id] = 1; gamepadMask |= (1 << id);}
     if (audioContext?.state !== 'running') {audioContext?.resume(); window.resetAudioSync?.();}
 }
 // ===== buttonUnpress =====
-function buttonUnpress(btn) {
-    const id = buttonMap[btn];
+function buttonUnpress(button) {
+    const id = buttonMap[button];
     if (id !== undefined && id !== '') {gamepadState[id] = 0; gamepadMask &= ~(1 << id);}
 }
 // ===== input_state_cb =====
@@ -23,18 +23,18 @@ function input_state_cb(port, device, index, id) {
     return 0;
 }
 // ===== updateButtons =====
-function updateButtons(cfg) {
-    if (!cfg) return;
+function updateButtons(config) {
+    if (!config) return;
     ['btn-1', 'btn-2', 'btn-3', 'btn-4', 'btn-l', 'btn-r', 'btn-select', 'btn-start'].forEach(tag => {
-        const el = document.querySelector(tag), bCfg = cfg[tag];
-        if (!el) return;
-        if (bCfg) {
-            el.innerText = bCfg[0];
-            if (bCfg[1] !== undefined) buttonMap[tag.replace('btn-', '')] = bCfg[1];
-        } else el.style.display = 'none';
+        const element = document.querySelector(tag), buttonConfig = config[tag];
+        if (!element) return;
+        if (buttonConfig) {
+            element.innerText = buttonConfig[0];
+            if (buttonConfig[1] !== undefined) buttonMap[tag.replace('btn-', '')] = buttonConfig[1];
+        } else element.style.display = 'none';
     });
     ['sec-12', 'sec-34'].forEach(tag => {
-        const el = document.querySelector(tag);
-        if (el && Array.from(el.children).every(c => c.style.display === 'none')) el.style.display = 'none';
+        const element = document.querySelector(tag);
+        if (element && Array.from(element.children).every(child => child.style.display === 'none')) element.style.display = 'none';
     });
 }
