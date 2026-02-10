@@ -1,4 +1,3 @@
-// ===== wgl.js =====
 let glContext, glContextBottom, glTexture, glTextureBottom;
 let lastMainFramePtr = 0, lastBottomFramePtr = 0;
 let pixelView, pixelViewBottom, sourceView32;
@@ -117,4 +116,3 @@ self.activeRenderFn = function(pointer, width, height, pitch) {
     else render16(sourceView32, lastMainFramePtr, visualBufferPtr, pixelView, glContext, glTexture, width, height, pitch >> 1, 0);
     logSkip();
 };
-console.log("wgl.js loaded");

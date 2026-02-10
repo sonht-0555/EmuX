@@ -32,7 +32,7 @@ async function verSetting(vals = [80, 160, 5]) {
 }
 // ===== optionClick =====
 const optionClick = txt => ({ 'Cloud': () => {}, 'Restore': () => {}, 'Backup': () => {} }[txt]?.());
-// ===== DOMContentLoaded =====
+// ===== domContentLoaded =====
 document.addEventListener("DOMContentLoaded", () => {
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').then(reg => reg.active && !navigator.serviceWorker.controller && location.reload()));
@@ -45,11 +45,11 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
     }
-    ver.textContent = gameVer;
+    if (window.ver) ver.textContent = gameVer;
     switch0.textContent = local('render') || 'WGPU';
     setTimeout(() => { listGame(); verSetting(); }, 2000);
     romInput.onchange = e => inputGame(e);
     vertical.onclick = () => verSetting();
-    logo.onclick = () => { list.hidden = false; list01.hidden = list02.hidden = true; listGame(); };
+    if (window.logo) logo.onclick = () => { list.hidden = false; list01.hidden = list02.hidden = true; listGame(); };
     document.querySelectorAll('opti').forEach(el => el.onclick = () => optionClick(el.textContent.trim()));
 });

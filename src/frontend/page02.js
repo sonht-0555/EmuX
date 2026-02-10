@@ -11,7 +11,7 @@ function setPointerState(pId, el) {
     if (el) { activePointers.set(pId, el); handleButton(true, el); }
     else activePointers.delete(pId);
 }
-// ===== DOMContentLoaded =====
+// ===== domContentLoaded =====
 document.addEventListener("DOMContentLoaded", () => {
     document.onpointerdown = e => setPointerState(e.pointerId, e.target.closest('[data]'));
     let lastMove = 0;

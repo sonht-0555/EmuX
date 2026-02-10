@@ -1,6 +1,5 @@
-// ===== GamePad (Main Thread - ghi input vào SAB) =====
+// ===== GamePad (Handles input writing to SAB) =====
 var buttonMap = { up: 4, down: 5, left: 6, right: 7, 1: 8, 3: 0, 2: 9, 4: 1, l: 10, r: 11, start: 3, select: 2 };
-
 // ===== buttonPress =====
 function buttonPress(btn) {
     const id = buttonMap[btn];
@@ -16,7 +15,7 @@ function buttonUnpress(btn) {
         Atomics.store(window.inputView, id, 0);
     }
 }
-// ===== Touch Update (NDS bottom screen) =====
+// ===== updateTouch =====
 window.updateTouch = (x, y, d) => {
     if (!window.inputView) return;
     Atomics.store(window.inputView, 16, x);

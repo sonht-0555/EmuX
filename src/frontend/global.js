@@ -1,10 +1,9 @@
-// ===== Global Elements & State =====
-var tags = ["html","body","page00","page01","page02","notification","display","list","list01","list02","name","ver","gamepad","title1","vertical","screen","invis","message0","skip1","switch0","title0","logo","joypad","joy"];
+// ===== globalTags =====
+var tags = ["html","body","page00","page01","page02","display","list","list01","list02","gamepad","title1","vertical","screen","invis","message0","skip1","switch0","title0","joypad","joy"];
 tags.forEach(s => window[s] = document.getElementById(s) || document.querySelector(s)); 
 var local = (k, v) => v === undefined || v === null ? localStorage.getItem(k) : localStorage.setItem(k, v);
 var delay = ms => new Promise(res => setTimeout(res, ms));
-
-var gameType, gameWidth, gameHeight, integer, timerId, count = null, canSync = true, current = parseInt(local('vertical')) || 0;
+var gameWidth, gameHeight, integer, timerId, count = null, current = parseInt(local('vertical')) || 0;
 var canvas = document.getElementById("canvas"), canvasB = document.getElementById("canvas-bottom");
 // ===== doubleTap =====
 function doubleTap(e, el, dist) {
@@ -66,8 +65,9 @@ async function gameView(name, w, h) {
     const pSz = (integer <= 4 || integer % 2 !== 0) ? integer : (integer / 2);
     s.setProperty("--shader", svgGen(integer / pSz, pSz, local(`shader0${local("shader")}`) || pSz));
 }
-// ===== DOMContentLoaded =====
+// ===== visibilityChange =====
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === 'visible' && window.resetAudioSync) window.resetAudioSync(); });
+// ===== domContentLoaded =====
 document.addEventListener("DOMContentLoaded", () => {
     body.removeAttribute('hide');
     body.style.setProperty("--background", svgGen(1, window.devicePixelRatio, window.devicePixelRatio));

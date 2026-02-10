@@ -1,4 +1,3 @@
-// ===== w2d.js =====
 let context2d, context2dBottom, imageData, imageDataBottom;
 let lastMainFramePtr = 0, lastBottomFramePtr = 0;
 let sourceView32, cachedRender32Fn, cachedRender16Fn;
@@ -74,4 +73,3 @@ self.activeRenderFn = function(pointer, width, height, pitch) {
     else render16(sourceView32, lastMainFramePtr, context2d, imageData, width, height, pitch >> 1);
     logSkip();
 };
-console.log("w2d.js loaded");

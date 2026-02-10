@@ -1,7 +1,6 @@
-// ===== Audio System (Main Thread - AudioContext only) =====
-// writeAudio đã chuyển sang Worker, main thread chỉ giữ AudioContext & AudioWorklet
+// ===== Audio System (Main Thread) =====
 var audioContext, audioWorkletNode, audioGainNode, sabL, sabR, sabIndices;
-
+// ===== initAudio =====
 async function initAudio(ratio) {
     if (audioContext) { audioContext.resume(); return; }
     audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
@@ -16,7 +15,5 @@ async function initAudio(ratio) {
     audioWorkletNode.connect(audioGainNode).connect(audioContext.destination);
     audioContext.resume();
 }
-
-window.resetAudioSync = () => {
-    if (audioContext) audioContext.resume();
-};
+// ===== resetAudioSync =====
+window.resetAudioSync = () => { if (audioContext) audioContext.resume(); };

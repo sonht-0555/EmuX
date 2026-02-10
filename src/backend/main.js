@@ -1,6 +1,4 @@
 // ===== EmuX Main Manager (Core + UI Proxy) =====
-
-// ===== CORE_CONFIG =====
 const CORE_BASE = 'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/';
 const CORE_CONFIG = [
     { ext: '.nes', script: CORE_BASE + 'nes.zip', btns: { 'btn-1': ['A', 8], 'btn-3': ['B', 0], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3] } },
@@ -13,12 +11,10 @@ const CORE_CONFIG = [
     { ext: '.nds', script: CORE_BASE + 'nds2021.zip', btns: { 'btn-1': ['A', 8], 'btn-2': ['X', 9], 'btn-3': ['B', 0], 'btn-4': ['Y', 1], 'btn-l': [' bl.', 10], 'btn-r': [' br.', 11], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3] }, bios: ['./src/core/bios/bios7.bin', './src/core/bios/bios9.bin', './src/core/bios/firmware.bin'], vars: { melonds_console_mode: 'DS', melonds_boot_directly: 'Enabled', melonds_screen_layout: 'Top/Bottom', melonds_screen_gap: '0', melonds_hybrid_small_screen: 'Disabled', melonds_swapscreen_mode: 'Disabled', melonds_randomize_mac_address: 'Disabled', melonds_touch_mode: 'Touch', melonds_dsi_sdcard: 'Disabled', melonds_mic_input: 'None', melonds_audio_bitrate: 'Low', melonds_audio_interpolation: 'None', melonds_use_fw_settings: 'Disabled', melonds_language: 'English' } },
     { ext: '.bin,.iso,.img,.cue,.pbp', script: CORE_BASE + 'ps1.zip', btns: { 'btn-1': ['A', 8], 'btn-2': ['X', 9], 'btn-3': ['B', 0], 'btn-4': ['Y', 1], 'btn-l': [' bl.', 10], 'btn-r': [' br.', 11], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3] }, bios: ['./src/core/bios/scph5501.bin'] },
 ];
-
 var isRunning = false, emuWorker = null;
 window.inputSAB = new SharedArrayBuffer(128);
 window.inputView = new Int32Array(window.inputSAB);
-
-// ===== findCore ====
+// ===== findCore =====
 function findCore(name, data) {
     const nameLower = name.toLowerCase();
     const getExt = n => '.' + n.split('.').pop().toLowerCase();
@@ -44,17 +40,14 @@ function findCore(name, data) {
     }
     return { config: CORE_CONFIG.find(c => c.ext === '.zip'), data, name };
 }
-
-// ===== initCore ====
+// ===== initCore =====
 async function initCore(romFile) {
-    gameName = romFile.name;
-    switch0.hidden = false;
+    gameName = romFile.name; switch0.hidden = false;
     await notifi("", "", "---", "", true);
     let rawData = new Uint8Array(await romFile.arrayBuffer());
     const { config, data: finalRomData, name: finalRomName } = findCore(romFile.name, rawData);
     if (!config) return;
     rawData = null;
-
     const coreFetch = fetch(config.script).then(r => r.ok ? r.arrayBuffer() : null);
     const biosFetches = config.bios ? config.bios.map(url => fetch(url).then(r => r.ok ? r.arrayBuffer() : null).catch(() => null)) : [];
     updateButtons(config.btns);
@@ -66,7 +59,6 @@ async function initCore(romFile) {
     if (!jsFile || !wasmFile) return;
     const jsUrl = URL.createObjectURL(new Blob([coreFiles[jsFile]], { type: 'application/javascript' }));
     const wasmUrl = URL.createObjectURL(new Blob([coreFiles[wasmFile]], { type: 'application/wasm' }));
-
     await initAudio(1.0);
     await notifi("", "##", "-", "", true);
     if (!window.offMain) {
@@ -74,7 +66,6 @@ async function initCore(romFile) {
         window.offBottom = canvasB.transferControlToOffscreen();
     }
     const offMain = window.offMain, offBottom = window.offBottom;
-
     if (emuWorker) emuWorker.terminate();
     emuWorker = new Worker('./src/backend/worker/emu-worker.js');
     emuWorker.onmessage = (e) => {
@@ -102,44 +93,49 @@ async function initCore(romFile) {
     }, [offMain, offBottom].filter(Boolean));
     await notifi("", "###", "", "", true);
 }
-
-// ===== Input/UI Actions =====
+// ===== inputGame =====
 window.inputGame = async (e) => {
     const file = e.target.files[0];
     await emuxDB(await file.arrayBuffer(), file.name);
     if (storeForFilename(file.name) === 'games') await initCore(file);
 };
+// ===== loadGame =====
 window.loadGame = async (name) => {
     const data = await emuxDB(name);
     await initCore(new File([data], name));
 };
+// ===== switchRenderer =====
 window.switchRenderer = () => {
     const list = ['w2d', 'wgl', 'wgpu'], next = list[(list.indexOf(local('render')) + 1) % 3];
     local('render', next); switch0.textContent = next;
     emuWorker?.postMessage({ type: 'CHANGE_RENDERER', data: next });
 };
-
-// ===== State & Control =====
+// ===== saveState =====
 window.saveState = (slot = 1) => { if (isRunning && emuWorker) emuWorker.postMessage({ type: 'SAVE_STATE', data: { slot } }); };
+// ===== loadState =====
 window.loadState = (slot = 1) => {
     if (!isRunning || !emuWorker) return;
     emuxDB(`${gameName}.ss${slot}`).then(s => s && emuWorker.postMessage({ type: 'LOAD_STATE', data: { state: s, slot } }));
 };
+// ===== startLoop =====
 window.startLoop = () => { isRunning = true; emuWorker?.postMessage({ type: 'RESUME' }); };
+// ===== stopLoop =====
 window.stopLoop = () => { isRunning = false; emuWorker?.postMessage({ type: 'PAUSE' }); };
+// ===== resumeGame =====
 window.resumeGame = async () => {
     isRunning = true; startLoop();
     if (audioContext) { await audioContext.resume(); window.resetAudioSync?.(); }
     timer(true); message("[_] Resumed!");
 };
+// ===== pauseGame =====
 window.pauseGame = async () => {
     isRunning = false; stopLoop();
     if (audioContext?.state === 'running') await audioContext.suspend();
     timer(false); message("[_] Paused!");
 };
+// ===== rebootGame =====
 window.rebootGame = () => location.reload();
-
-// ===== Timer & AutoSave =====
+// ===== timer =====
 var timerId, seconds = 0, minutes = 0, hours = 0, count1 = 0, recCount = 1;
 async function timer(isStart) {
     if (isStart && !timerId) {

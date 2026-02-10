@@ -1,7 +1,6 @@
-// ===== Worker Environment Module =====
 var POINTER_CACHE = {};
 var activeVars = {};
-
+// ===== getPointer =====
 const getPointer = (string, pointer) => {
     if (POINTER_CACHE[string]) return POINTER_CACHE[string];
     pointer = Module._malloc(string.length + 1);
@@ -9,7 +8,7 @@ const getPointer = (string, pointer) => {
     POINTER_CACHE[string] = pointer;
     return pointer;
 };
-
+// ===== env_cb =====
 function env_cb(command, data) {
     const d32 = Number(data) >> 2;
     if (command === 1) { // SET_PIXEL_FORMAT

@@ -1,9 +1,8 @@
-// ===== Worker Audio Module =====
 var sabL, sabR, sabIndices, audioCoreRatio = 1.0;
 var resampledPtrL = 0, resampledPtrR = 0;
-
+// ===== audio_cb =====
 const audio_cb = () => {};
-
+// ===== audio_batch_cb =====
 function audio_batch_cb(ptr, f) {
     if (!isRunning || !Module._emux_audio_process) return f;
     const count = Module._emux_audio_process(ptr, f, resampledPtrL, resampledPtrR, audioCoreRatio);
@@ -22,7 +21,7 @@ function audio_batch_cb(ptr, f) {
     }
     return f;
 }
-
+// ===== getAudioBacklog =====
 function getAudioBacklog() {
     if (!sabIndices) return 0;
     const idx = new Uint32Array(sabIndices);
