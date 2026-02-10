@@ -8,7 +8,7 @@ async function initAudio(ratio) {
     const bufSize = 16384;
     sabL = new SharedArrayBuffer(bufSize * 4);
     sabR = new SharedArrayBuffer(bufSize * 4);
-    sabIndices = new SharedArrayBuffer(8);
+    sabIndices = new SharedArrayBuffer(16); // [0]=writePtr, [1]=readPtr, [8..15]=currentTime(f64)
     audioWorkletNode = new AudioWorkletNode(audioContext, 'audio-processor', { processorOptions: { sabL, sabR, sabIndices, bufSize } });
     audioGainNode = audioContext.createGain();
     audioGainNode.gain.value = 1;

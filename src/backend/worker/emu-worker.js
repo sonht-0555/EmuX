@@ -58,7 +58,7 @@ self.onmessage = async (e) => {
         };
         importScripts(jsUrl);
     }
-    if (type === 'RESUME') { isRunning = true; mainLoop(); }
+    if (type === 'RESUME') { isRunning = true; resetAudioSync(); mainLoop(); }
     if (type === 'PAUSE') isRunning = false;
     if (type === 'CHANGE_RENDERER') {
         self.rendererName = data; renderFunction = null; rendererReady = false;
@@ -84,5 +84,9 @@ self.onmessage = async (e) => {
 function mainLoop() {
     if (!isRunning) return;
     requestAnimationFrame(mainLoop);
-    Module._retro_run();
+    let backlog = getAudioBacklog();
+    let targetRuns = 1;
+    if (backlog > 4000) targetRuns = 0;
+    if (backlog < 1000) targetRuns = 2;
+    for (let i = 0; i < targetRuns; i++) Module._retro_run();
 }
