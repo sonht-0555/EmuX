@@ -93,6 +93,10 @@ async function initCore(romFile) {
     }, [offMain, offBottom].filter(Boolean));
     await notifi("", "###", "", "", true);
 }
+// ===== startLoop =====
+window.startLoop = () => { isRunning = true; emuWorker?.postMessage({ type: 'RESUME' }); };
+// ===== stopLoop =====
+window.stopLoop = () => { isRunning = false; emuWorker?.postMessage({ type: 'PAUSE' }); };
 // ===== inputGame =====
 window.inputGame = async (e) => {
     const file = e.target.files[0];
@@ -117,10 +121,6 @@ window.loadState = (slot = 1) => {
     if (!isRunning || !emuWorker) return;
     emuxDB(`${gameName}.ss${slot}`).then(s => s && emuWorker.postMessage({ type: 'LOAD_STATE', data: { state: s, slot } }));
 };
-// ===== startLoop =====
-window.startLoop = () => { isRunning = true; emuWorker?.postMessage({ type: 'RESUME' }); };
-// ===== stopLoop =====
-window.stopLoop = () => { isRunning = false; emuWorker?.postMessage({ type: 'PAUSE' }); };
 // ===== resumeGame =====
 window.resumeGame = async () => {
     isRunning = true; startLoop();

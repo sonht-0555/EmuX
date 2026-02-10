@@ -25,8 +25,7 @@ self.onmessage = async (e) => {
     const { type, data } = e.data;
     if (type === 'INIT') {
         const { config, romData, romName, wasmUrl, jsUrl, isArcade, isNDS, canvas, canvasBottom, renderer, sabInput, audioSABs, biosFiles } = data;
-        inputView = new Int32Array(sabInput);
-        sabL = audioSABs.sabL; sabR = audioSABs.sabR; sabIndices = audioSABs.sabIndices;
+        inputView = new Int32Array(sabInput); sabL = audioSABs.sabL; sabR = audioSABs.sabR; sabIndices = audioSABs.sabIndices;
         activeVars = config.vars || {}; canvasB = canvasBottom; self.rendererName = renderer;
         self.Module = {
             isArcade, isNDS, canvas: canvas,
@@ -88,6 +87,6 @@ function mainLoop() {
     let backlog = getAudioBacklog();
     let targetRuns = 1;
     if (backlog > 4000) targetRuns = 0;
-    if (backlog < 1000) targetRuns = 2;
+    else if (backlog < 1000) targetRuns = 2;
     for (let i = 0; i < targetRuns; i++) Module._retro_run();
 }
