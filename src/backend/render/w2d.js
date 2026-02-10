@@ -15,7 +15,7 @@ function render32(source, sourceOffset, lastFramePtr, context, imageDataObject, 
 function render16(source32, last32Ptr, context, imageDataObject, width, height, stride) {
     frameCount++;
     const renderFn = cachedRender16Fn || (cachedRender16Fn = Module._emux_render16 || Module.asm?._emux_render16 || Module.instance?.exports?._emux_render16);
-    if (!lutPtr && window.lookupTable565) {
+    if (!lutPtr && (typeof lookupTable565 !== 'undefined')) {
         lutPtr = Module._malloc(lookupTable565.length << 2);
         new Uint32Array(Module.HEAPU8.buffer, lutPtr, lookupTable565.length).set(lookupTable565);
     }
@@ -36,7 +36,7 @@ function renderNDS(pointer, width, height) {
         imageDataBottom = new ImageData(new Uint8ClampedArray(heap.buffer, visualBufferBottomPtr, pixelCount << 2), width, halfHeight);
         if (lastMainFramePtr) Module._free(lastMainFramePtr); if (lastBottomFramePtr) Module._free(lastBottomFramePtr);
         lastMainFramePtr = Module._malloc(pixelCount << 2); lastBottomFramePtr = Module._malloc(pixelCount << 2);
-        sourceView32 = null; if (window.gameView) gameView(gameName);
+        sourceView32 = null; if (typeof gameView !== 'undefined') gameView(gameName);
     }
     if (!sourceView32 || sourceView32.buffer !== heap.buffer || ndsPointer !== pointer) {
         ndsPointer = pointer; sourceView32 = new Uint32Array(heap.buffer, pointer, width * height);
@@ -46,13 +46,12 @@ function renderNDS(pointer, width, height) {
     logSkip();
 }
 // ===== activeRenderFn =====
-window.activeRenderFn = function(pointer, width, height, pitch) {
+self.activeRenderFn = function(pointer, width, height, pitch) {
     if (!context2d) {
         context2d = Module.canvas.getContext('2d', { alpha: false, desynchronized: true, willReadFrequently: false });
-        if (Module.isNDS) {
-            page02.style.paddingTop = "5px"; canvasB.style.display = "block";
-            joypad.style.justifyContent = "center"; joy.style.display = "none";
+        if (Module.isNDS && canvasB) {
             context2dBottom = canvasB.getContext('2d', { alpha: false, desynchronized: true, willReadFrequently: false });
+            self.postMessage({ type: 'NDS_LAYOUT' });
         }
     }
     if (Module.isNDS) return renderNDS(pointer, width, height);
@@ -65,7 +64,7 @@ window.activeRenderFn = function(pointer, width, height, pitch) {
         imageData = new ImageData(new Uint8ClampedArray(heap.buffer, visualBufferPtr, pixelCount << 2), width, height);
         if (lastMainFramePtr) Module._free(lastMainFramePtr);
         lastMainFramePtr = Module._malloc(pitch * height);
-        if (window.gameView) gameView(gameName);
+        if (typeof gameView !== 'undefined') gameView(gameName);
     }
     if (heap.buffer !== cachedBuffer || pointer !== cachedPointer) {
         cachedBuffer = heap.buffer; cachedPointer = pointer;

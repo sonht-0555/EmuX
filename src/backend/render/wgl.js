@@ -51,7 +51,7 @@ function render32(source, sourceOffset, lastFramePtr, vBufPtr, view, context, te
 function render16(source32, last32Ptr, vBufPtr, view, context, texture, width, height, stride, textureType) {
     frameCount++;
     const renderFn = cachedRender16Fn || (cachedRender16Fn = Module._emux_render16 || Module.asm?._emux_render16 || Module.instance?.exports?._emux_render16);
-    if (!lutPtr && window.lookupTable565) {
+    if (!lutPtr && (typeof lookupTable565 !== 'undefined')) {
         lutPtr = Module._malloc(lookupTable565.length << 2);
         new Uint32Array(Module.HEAPU8.buffer, lutPtr, lookupTable565.length).set(lookupTable565);
     }
@@ -77,7 +77,7 @@ function renderNDS(pointer, width, height) {
         if (lastMainFramePtr) Module._free(lastMainFramePtr); if (lastBottomFramePtr) Module._free(lastBottomFramePtr);
         lastMainFramePtr = Module._malloc(pixelCount << 2); lastBottomFramePtr = Module._malloc(pixelCount << 2);
         sourceView32 = null; textureInitializedMain = textureInitializedBottom = 0;
-        if (window.gameView) gameView(gameName);
+        if (typeof gameView !== 'undefined') gameView(gameName);
     }
     if (!sourceView32 || sourceView32.buffer !== heap.buffer || ndsPointer !== pointer) {
         ndsPointer = pointer; sourceView32 = new Uint32Array(heap.buffer, pointer, width * height);
@@ -87,14 +87,14 @@ function renderNDS(pointer, width, height) {
     logSkip();
 }
 // ===== activeRenderFn =====
-window.activeRenderFn = function(pointer, width, height, pitch) {
+self.activeRenderFn = function(pointer, width, height, pitch) {
     if (!glContext) {
         const main = initGL(Module.canvas); if (!main) return;
         glContext = main.context; glTexture = main.tex;
-        if (Module.isNDS) {
-            page02.style.paddingTop = "5px"; canvasB.style.display = "block";
-            joypad.style.justifyContent = "center"; joy.style.display = "none";
-            const bottom = initGL(canvasB); glContextBottom = bottom.context; glTextureBottom = bottom.tex;
+        if (Module.isNDS && canvasB) {
+            const bottom = initGL(canvasB);
+            if (bottom) { glContextBottom = bottom.context; glTextureBottom = bottom.tex; }
+            self.postMessage({ type: 'NDS_LAYOUT' });
         }
     }
     if (Module.isNDS) return renderNDS(pointer, width, height);
@@ -107,7 +107,7 @@ window.activeRenderFn = function(pointer, width, height, pitch) {
         pixelView = new Uint8Array(heap.buffer, visualBufferPtr, pixelCount << 2);
         if (lastMainFramePtr) Module._free(lastMainFramePtr);
         lastMainFramePtr = Module._malloc(pitch * height);
-        textureInitializedMain = 0; if (window.gameView) gameView(gameName);
+        textureInitializedMain = 0; if (typeof gameView !== 'undefined') gameView(gameName);
     }
     if (heap.buffer !== cachedBuffer || pointer !== cachedPointer) {
         cachedBuffer = heap.buffer; cachedPointer = pointer;

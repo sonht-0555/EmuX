@@ -139,14 +139,11 @@ function renderNDS(pointer, width, height, encoder) {
     render32(sourceView32, pixelCount, lastBottomFrame, lastBottomFramePtr, contextBottom, textureBottom, width, halfHeight, pixelCount, bindGroupBottom, encoder);
 }
 // ===== activeRenderFn =====
-window.activeRenderFn = async function(pointer, width, height, pitch) {
+self.activeRenderFn = async function(pointer, width, height, pitch) {
     if (!gpuDevice) {
         if (!gpuInitializing) gpuInitializing = initGPU(Module.canvas, Module.isNDS ? canvasB : null);
         if (!await gpuInitializing) return;
-        if (Module.isNDS) {
-            page02.style.paddingTop = "5px"; canvasB.style.display = "block";
-            joypad.style.justifyContent = "center"; joy.style.display = "none";
-        }
+        if (Module.isNDS) self.postMessage({ type: 'NDS_LAYOUT' });
     }
     const encoder = gpuDevice.createCommandEncoder();
     const is32BitFormat = pitch === (width << 2);
@@ -178,7 +175,7 @@ window.activeRenderFn = async function(pointer, width, height, pitch) {
             } else {
                 lastMain16 = new Uint16Array(heap.buffer, lastMainFramePtr, byteSize >> 1);
             }
-            if (window.gameView) gameView(gameName);
+            if (typeof gameView !== 'undefined') gameView(gameName);
         }
         if (heap.buffer !== cachedBuffer || pointer !== cachedPointer) {
             cachedBuffer = heap.buffer; cachedPointer = pointer;

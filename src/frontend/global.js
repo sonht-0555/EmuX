@@ -1,11 +1,11 @@
 // ===== Global Elements & State =====
-const tags = ["html","body","page00","page01","page02","notification","display","list","list01","list02","name","ver","gamepad","title1","vertical","screen","invis","message0","skip1","switch0","title0","logo","joypad"];
-tags.forEach(s => window[s] = document.querySelector(s === "html" || s === "body" ? s : s)); // Compact tag initialization
-const tag = s => window[s] = document.querySelector(s);
-const local = (k, v) => v === undefined || v === null ? localStorage.getItem(k) : localStorage.setItem(k, v);
-const delay = ms => new Promise(res => setTimeout(res, ms));
-let gameName, gameType, gameWidth, gameHeight, integer, timerId, count = null, canSync = true, recCount = 1, swipe, canvasB, isStart = false, hours = 0, minutes = 0, seconds = 0, count1 = 0, current = parseInt(local('vertical')) || 0;
-const canvas = document.getElementById('canvas');
+var tags = ["html","body","page00","page01","page02","notification","display","list","list01","list02","name","ver","gamepad","title1","vertical","screen","invis","message0","skip1","switch0","title0","logo","joypad","joy"];
+tags.forEach(s => window[s] = document.getElementById(s) || document.querySelector(s)); 
+var local = (k, v) => v === undefined || v === null ? localStorage.getItem(k) : localStorage.setItem(k, v);
+var delay = ms => new Promise(res => setTimeout(res, ms));
+
+var gameType, gameWidth, gameHeight, integer, timerId, count = null, canSync = true, current = parseInt(local('vertical')) || 0;
+var canvas = document.getElementById("canvas"), canvasB = document.getElementById("canvas-bottom");
 // ===== doubleTap =====
 function doubleTap(e, el, dist) {
     const now = Date.now(), dt = now - (el._lt || 0), isT = e.isPrimary && dt < 300 && dt > 40;
@@ -45,9 +45,10 @@ async function message(txt, dur = 2000) {
     if (!t.c && count === t) { title1.textContent = gameName; count = null; }
 }
 // ===== gameView =====
-async function gameView(name) {
+async function gameView(name, w, h) {
     page02.ontouchstart = e => e.preventDefault();
-    gameWidth = canvas.width; gameHeight = canvas.height;
+    gameWidth = w || window.gameWidth || canvas.width; 
+    gameHeight = h || window.gameHeight || canvas.height;
     title1.textContent = name; switch0.textContent = local('render');
     const maxInt = Math.floor((window.innerWidth * window.devicePixelRatio) / gameWidth);
     integer = (maxInt > 6) ? maxInt - (maxInt % 2) : maxInt;
@@ -70,6 +71,5 @@ async function gameView(name) {
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === 'visible' && window.resetAudioSync) window.resetAudioSync(); });
 document.addEventListener("DOMContentLoaded", () => {
     body.removeAttribute('hide');
-    canvasB = document.getElementById("canvas-bottom");
     body.style.setProperty("--background", svgGen(1, window.devicePixelRatio, window.devicePixelRatio));
 });

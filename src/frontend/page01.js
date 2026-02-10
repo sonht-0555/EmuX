@@ -49,7 +49,7 @@ document.addEventListener("DOMContentLoaded", () => {
     switch0.textContent = local('render') || 'WGPU';
     setTimeout(() => { listGame(); verSetting(); }, 2000);
     romInput.onchange = e => inputGame(e);
-    vertical.onclick = verSetting;
+    vertical.onclick = () => verSetting();
     logo.onclick = () => { list.hidden = false; list01.hidden = list02.hidden = true; listGame(); };
     document.querySelectorAll('opti').forEach(el => el.onclick = () => optionClick(el.textContent.trim()));
 });

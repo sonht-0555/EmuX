@@ -8,7 +8,7 @@
   <link rel="stylesheet" type="text/css" href="./src/css/main.css" />
   <link rel="manifest" href="/manifest.json" />
 </head>
-<script> let gameVer = 'EmuX_3.88'; </script>
+<script> let gameVer = 'EmuX_4.21'; </script>
 <body hide>
   <page00 hidden>
     <divide></divide>
@@ -88,14 +88,11 @@
     <invis></invis>
   </page02>
 </body>
-<script src="./src/backend/perf.js"></script>
-<script src="src/backend/audio.js"></script>
-<script src="src/backend/video.js"></script>
-<script src="src/backend/gamepad.js"></script>
-<script src="src/backend/loader.js"></script>
-<script src="src/backend/storage.js"></script>
+<script src="src/backend/lib/zip.js"></script>
+<script src="src/backend/system/audio/audio.js"></script>
+<script src="src/backend/system/gamepad.js"></script>
+<script src="src/backend/system/storage.js"></script>
 <script src="src/backend/main.js"></script>
-<script src="src/backend/zip.js"></script>
 <script src="src/frontend/global.js"></script>
 <script src="src/frontend/page01.js"></script>
 <script src="src/frontend/page02.js"></script>

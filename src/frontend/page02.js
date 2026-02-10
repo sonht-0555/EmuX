@@ -47,14 +47,13 @@ document.addEventListener("DOMContentLoaded", () => {
     };
     let bRect;
     canvasB.onpointerdown = canvasB.onpointermove = e => {
-        if (!Module.isNDS) return;
         if (e.type === "pointerdown" || !bRect) bRect = canvasB.getBoundingClientRect();
-        window._pD = 1;
-        window._pX = Math.floor((e.clientX - bRect.left) / bRect.width * 65535 - 32768);
-        window._pY = Math.floor((e.clientY - bRect.top) / bRect.height * 32767);
+        const tx = Math.floor((e.clientX - bRect.left) / bRect.width * 65535 - 32768);
+        const ty = Math.floor((e.clientY - bRect.top) / bRect.height * 32767);
+        if (window.updateTouch) window.updateTouch(tx, ty, 1);
         e.preventDefault();
     };
-    canvasB.onpointerup = canvasB.onpointercancel = () => { window._pD = 0; isSwiping = false; };
+    canvasB.onpointerup = canvasB.onpointercancel = () => { if (window.updateTouch) window.updateTouch(0, 0, 0); isSwiping = false; };
     switch0.onpointerdown = switchRenderer;
     ['pointerup', 'pointercancel'].forEach(t => addEventListener(t, e => { setPointerState(e.pointerId, null); isSwiping = false; joy.style.opacity = "0"; }));
     joy.onpointerdown = () => joy.style.opacity = "1";
