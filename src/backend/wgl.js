@@ -1,3 +1,4 @@
+// ===== wgl.js =====
 let glContext, glContextBottom, glTexture, glTextureBottom;
 let lastMainFramePtr = 0, lastBottomFramePtr = 0;
 let pixelView, pixelViewBottom, sourceView32;
@@ -8,7 +9,7 @@ const vertexShaderSource = `attribute vec2 p;attribute vec2 t;varying vec2 v;voi
 const fragmentShaderSource = `precision mediump float;varying vec2 v;uniform sampler2D s;void main(){gl_FragColor=texture2D(s,v);}`;
 // ===== initGL =====
 function initGL(canvas) {
-    const context = canvas.getContext('webgl', { alpha: false, antialias: false, desynchronized: true, preserveDrawingBuffer: false, powerPreference: 'high-performance' });
+    const context = canvas.getContext('webgl', {alpha: false, antialias: false, desynchronized: true, preserveDrawingBuffer: false, powerPreference: 'high-performance'});
     if (!context) return null;
     const vs = context.createShader(context.VERTEX_SHADER);
     context.shaderSource(vs, vertexShaderSource); context.compileShader(vs);
@@ -33,7 +34,7 @@ function initGL(canvas) {
     context.texParameteri(context.TEXTURE_2D, context.TEXTURE_WRAP_T, context.CLAMP_TO_EDGE);
     context.texParameteri(context.TEXTURE_2D, context.TEXTURE_MIN_FILTER, context.NEAREST);
     context.texParameteri(context.TEXTURE_2D, context.TEXTURE_MAG_FILTER, context.NEAREST);
-    return { context, tex };
+    return {context, tex};
 }
 // ===== render32 =====
 function render32(source, sourceOffset, lastFramePtr, vBufPtr, view, context, texture, width, height, length, textureType) {
@@ -42,24 +43,24 @@ function render32(source, sourceOffset, lastFramePtr, vBufPtr, view, context, te
     if (renderFn && lastFramePtr && renderFn(source.byteOffset + (sourceOffset << 2), lastFramePtr, vBufPtr, length)) {
         context.bindTexture(context.TEXTURE_2D, texture);
         if (textureType ? textureInitializedBottom : textureInitializedMain) context.texSubImage2D(context.TEXTURE_2D, 0, 0, 0, width, height, context.RGBA, context.UNSIGNED_BYTE, view);
-        else { context.texImage2D(context.TEXTURE_2D, 0, context.RGBA, width, height, 0, context.RGBA, context.UNSIGNED_BYTE, view); if (textureType) textureInitializedBottom = 1; else textureInitializedMain = 1; }
+        else {context.texImage2D(context.TEXTURE_2D, 0, context.RGBA, width, height, 0, context.RGBA, context.UNSIGNED_BYTE, view); if (textureType) textureInitializedBottom = 1; else textureInitializedMain = 1;}
         context.drawArrays(context.TRIANGLES, 0, 6);
-    } else { skippedFrames++; }
+    } else {skippedFrames++;}
 }
 // ===== render16 =====
 function render16(source32, last32Ptr, vBufPtr, view, context, texture, width, height, stride, textureType) {
     frameCount++;
     const renderFn = cachedRender16Fn || (cachedRender16Fn = Module._emux_render16 || Module.asm?._emux_render16 || Module.instance?.exports?._emux_render16);
-    if (!lutPtr && (typeof lookupTable565 !== 'undefined')) {
+    if (!lutPtr && window.lookupTable565) {
         lutPtr = Module._malloc(lookupTable565.length << 2);
         new Uint32Array(Module.HEAPU8.buffer, lutPtr, lookupTable565.length).set(lookupTable565);
     }
     if (renderFn && last32Ptr && renderFn(source32.byteOffset, last32Ptr, vBufPtr, width, height, stride, lutPtr)) {
         context.bindTexture(context.TEXTURE_2D, texture);
         if (textureType ? textureInitializedBottom : textureInitializedMain) context.texSubImage2D(context.TEXTURE_2D, 0, 0, 0, width, height, context.RGBA, context.UNSIGNED_BYTE, view);
-        else { context.texImage2D(context.TEXTURE_2D, 0, context.RGBA, width, height, 0, context.RGBA, context.UNSIGNED_BYTE, view); if (textureType) textureInitializedBottom = 1; else textureInitializedMain = 1; }
+        else {context.texImage2D(context.TEXTURE_2D, 0, context.RGBA, width, height, 0, context.RGBA, context.UNSIGNED_BYTE, view); if (textureType) textureInitializedBottom = 1; else textureInitializedMain = 1;}
         context.drawArrays(context.TRIANGLES, 0, 6);
-    } else { skippedFrames++; }
+    } else {skippedFrames++;}
 }
 // ===== renderNDS =====
 function renderNDS(pointer, width, height) {
@@ -76,7 +77,7 @@ function renderNDS(pointer, width, height) {
         if (lastMainFramePtr) Module._free(lastMainFramePtr); if (lastBottomFramePtr) Module._free(lastBottomFramePtr);
         lastMainFramePtr = Module._malloc(pixelCount << 2); lastBottomFramePtr = Module._malloc(pixelCount << 2);
         sourceView32 = null; textureInitializedMain = textureInitializedBottom = 0;
-        if (typeof gameView !== 'undefined') gameView(gameName);
+        if (window.gameView) gameView(gameName);
     }
     if (!sourceView32 || sourceView32.buffer !== heap.buffer || ndsPointer !== pointer) {
         ndsPointer = pointer; sourceView32 = new Uint32Array(heap.buffer, pointer, width * height);
@@ -86,14 +87,14 @@ function renderNDS(pointer, width, height) {
     logSkip();
 }
 // ===== activeRenderFn =====
-self.activeRenderFn = function(pointer, width, height, pitch) {
+window.activeRenderFn = function (pointer, width, height, pitch) {
     if (!glContext) {
         const main = initGL(Module.canvas); if (!main) return;
         glContext = main.context; glTexture = main.tex;
-        if (Module.isNDS && canvasB) {
-            const bottom = initGL(canvasB);
-            if (bottom) { glContextBottom = bottom.context; glTextureBottom = bottom.tex; }
-            self.postMessage({ type: 'NDS_LAYOUT' });
+        if (Module.isNDS) {
+            page02.style.paddingTop = "5px"; canvasB.style.display = "block";
+            joypad.style.justifyContent = "center"; joy.style.display = "none";
+            const bottom = initGL(canvasB); glContextBottom = bottom.context; glTextureBottom = bottom.tex;
         }
     }
     if (Module.isNDS) return renderNDS(pointer, width, height);
@@ -106,7 +107,7 @@ self.activeRenderFn = function(pointer, width, height, pitch) {
         pixelView = new Uint8Array(heap.buffer, visualBufferPtr, pixelCount << 2);
         if (lastMainFramePtr) Module._free(lastMainFramePtr);
         lastMainFramePtr = Module._malloc(pitch * height);
-        textureInitializedMain = 0; if (typeof gameView !== 'undefined') gameView(gameName);
+        textureInitializedMain = 0; if (window.gameView) gameView(gameName);
     }
     if (heap.buffer !== cachedBuffer || pointer !== cachedPointer) {
         cachedBuffer = heap.buffer; cachedPointer = pointer;
@@ -116,3 +117,4 @@ self.activeRenderFn = function(pointer, width, height, pitch) {
     else render16(sourceView32, lastMainFramePtr, visualBufferPtr, pixelView, glContext, glTexture, width, height, pitch >> 1, 0);
     logSkip();
 };
+console.log("wgl.js loaded");

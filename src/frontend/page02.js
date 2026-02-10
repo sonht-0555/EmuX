@@ -1,5 +1,5 @@
-// ===== Page02 State Variables =====
-let brightnessValue = 5, swipeStartY = 0, isSwiping = false, shaderNumber = 1, activeElement = null;
+// ===== Page02 Logic =====
+let brightnessValue = 5, swipeStartY = 0, isSwiping = false;
 const activePointers = new Map();
 // ===== handleButton =====
 const handleButton = (p, el) => (el?.getAttribute('data')?.split('-').slice(1) || []).forEach(part => p ? buttonPress(part) : buttonUnpress(part));
@@ -8,10 +8,10 @@ function setPointerState(pId, el) {
     const cur = activePointers.get(pId);
     if (el === cur) return;
     if (cur) handleButton(false, cur);
-    if (el) { activePointers.set(pId, el); handleButton(true, el); }
+    if (el) {activePointers.set(pId, el); handleButton(true, el);}
     else activePointers.delete(pId);
 }
-// ===== domContentLoaded =====
+// ===== Event Listeners =====
 document.addEventListener("DOMContentLoaded", () => {
     document.onpointerdown = e => setPointerState(e.pointerId, e.target.closest('[data]'));
     let lastMove = 0;
@@ -47,16 +47,17 @@ document.addEventListener("DOMContentLoaded", () => {
     };
     let bRect;
     canvasB.onpointerdown = canvasB.onpointermove = e => {
+        if (!Module.isNDS) return;
         if (e.type === "pointerdown" || !bRect) bRect = canvasB.getBoundingClientRect();
-        const tx = Math.floor((e.clientX - bRect.left) / bRect.width * 65535 - 32768);
-        const ty = Math.floor((e.clientY - bRect.top) / bRect.height * 32767);
-        if (window.updateTouch) window.updateTouch(tx, ty, 1);
+        window._pD = 1;
+        window._pX = Math.floor((e.clientX - bRect.left) / bRect.width * 65535 - 32768);
+        window._pY = Math.floor((e.clientY - bRect.top) / bRect.height * 32767);
         e.preventDefault();
     };
-    canvasB.onpointerup = canvasB.onpointercancel = () => { if (window.updateTouch) window.updateTouch(0, 0, 0); isSwiping = false; };
+    canvasB.onpointerup = canvasB.onpointercancel = () => {window._pD = 0; isSwiping = false;};
     switch0.onpointerdown = switchRenderer;
-    ['pointerup', 'pointercancel'].forEach(t => addEventListener(t, e => { setPointerState(e.pointerId, null); isSwiping = false; joy.style.opacity = "0"; }));
+    ['pointerup', 'pointercancel'].forEach(t => addEventListener(t, e => {setPointerState(e.pointerId, null); isSwiping = false; joy.style.opacity = "0";}));
     joy.onpointerdown = () => joy.style.opacity = "1";
-    invis.onpointermove = () => { page00.hidden = false; notifi(" pa", "use.", "", " double tap to resume."); pauseGame(); };
-    page00.onpointerdown = e => { if (doubleTap(e, page00)) { page00.hidden = true; resumeGame(); } };
+    invis.onpointermove = () => {page00.hidden = false; notifi(" pa", "use.", "", " double tap to resume."); pauseGame();};
+    page00.onpointerdown = e => {if (doubleTap(e, page00)) {page00.hidden = true; resumeGame();} };
 });

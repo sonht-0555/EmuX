@@ -1,18 +1,21 @@
+// ===== Audio Processor =====
 class AudioProcessor extends AudioWorkletProcessor {
     constructor(o) {
         super();
-        const { sabL, sabR, sabIndices, bufSize } = o.processorOptions;
-        this.lb = new Float32Array(sabL); this.rb = new Float32Array(sabR);
-        this.idx = new Uint32Array(sabIndices); this.timeView = new Float64Array(sabIndices);
-        this.b = bufSize; this.m = bufSize - 1;
+        const {sabL, sabR, sabIndices, bufSize} = o.processorOptions;
+        this.lb = new Float32Array(sabL);
+        this.rb = new Float32Array(sabR);
+        this.idx = new Uint32Array(sabIndices);
+        this.b = bufSize;
+        this.m = bufSize - 1;
     }
+    // ===== process =====
     process(_, outputs) {
         const out = outputs[0], outL = out[0], outR = out[1], outLen = outL.length;
         const w = Atomics.load(this.idx, 0), r = Atomics.load(this.idx, 1);
-        // Write currentTime into SAB for worker to read (Float64 at byte offset 8 = index 1)
-        this.timeView[1] = currentTime;
         if (((w - r + this.b) & this.m) < outLen) {
-            outL.fill(0); if (outR) outR.fill(0);
+            outL.fill(0);
+            if (outR) outR.fill(0);
             return true;
         }
         const space = this.b - r;

@@ -1,3 +1,4 @@
+// ===== Storage System =====
 let databaseCache = null;
 const DATABASE_NAME = 'EmuxDB', STORES = {
     games: ['nes', 'sfc', 'smc', 'gba', 'gb', 'gbc', 'bin', 'rom', 'md', 'gen', 'ngp', 'ngc', 'nds', 'iso', 'img', 'cue', 'pbp', 'zip', 'pce'],
@@ -58,7 +59,7 @@ async function listStore(storeName) {
     });
     if (!storeName) {
         const names = getAllStoreNames(), keys = await Promise.all(names.map(getKeys));
-        return names.reduce((acc, name, i) => ({ ...acc, [name]: keys[i] }), {});
+        return names.reduce((acc, name, i) => ({...acc, [name]: keys[i]}), {});
     }
     return getKeys(storeName);
 }
@@ -76,10 +77,8 @@ async function deleteFromStore(key) {
 async function downloadFromStore(name) {
     const data = await emuxDB(name);
     if (!data) return message("File not found!");
-    const url = URL.createObjectURL(new Blob([data]));
-    const link = document.createElement('a');
-    link.href = url; link.download = name;
-    link.click();
+    const url = URL.createObjectURL(new Blob([data])), link = document.createElement('a');
+    link.href = url; link.download = name; link.click();
     URL.revokeObjectURL(url);
     message(`[#]_Exported!`);
 }
