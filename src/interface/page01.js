@@ -14,8 +14,10 @@ async function showFileGroups(gameName) {
 }
 // ===== listGame =====
 async function listGame() {
-    const games = await listStore('games');
-    list.innerHTML = games.map(game => `<rom><name>${game}</name><more></more></rom>`).join('');
+    const games = await listStore('games'), ver = list.querySelector('rom:has(ver)');
+    list.innerHTML = '';
+    if (ver) list.appendChild(ver);
+    list.innerHTML += games.map(game => `<rom><name>${game}</name><more></more></rom>`).join('');
     list.querySelectorAll('name').forEach(element => element.onclick = () => loadGame(element.textContent));
     list.querySelectorAll('more').forEach(button => button.onclick = () => {
         const name = button.parentElement.querySelector('name').textContent;

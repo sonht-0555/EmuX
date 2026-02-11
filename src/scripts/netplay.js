@@ -2,16 +2,16 @@
 var peer = null;
 var connection = null;
 var isHost = false;
-var remoteInputs = { 0: 0, 1: 0 };
+var remoteInputs = {0: 0, 1: 0};
 var netplayInterval = null;
 // ===== generateShortId =====
 function generateShortId() {
   return Math.random().toString(36).substring(2, 6).toUpperCase();
 }
 // ===== initNetplay =====
-function initNetplay() {
-  if (typeof Peer === "undefined") return (alert("PeerJS not loaded!"), false);
-  if (!window.Module) return (alert("Please load a game first!"), false);
+function initNetplay(isClient = false) {
+  if (typeof Peer === "undefined") return console.warn("[Netplay] PeerJS missing"), false;
+  if (!isClient && !window.Module) return false;
   window.isNetplaying = true;
   window.isRunning = true;
   return true;
@@ -31,12 +31,11 @@ function getCoreState() {
 }
 // ===== setCoreState =====
 function setCoreState(state) {
-  if (!state || state.length === 0) return;
+  if (!state || state.length === 0 || !window.Module || !window.Module._malloc) return;
   const buffer = window.Module._malloc(state.length);
   window.Module.HEAPU8.set(state, buffer);
   window.Module._retro_unserialize(buffer, state.length);
   window.Module._free(buffer);
-  // Fast-forward to sync audio/video
   for (let i = 0; i < 3; i++) window.Module._retro_run();
 }
 // ===== startNetplayHost =====
@@ -50,7 +49,6 @@ async function startNetplayHost() {
   peer.on("open", (id) => {
     const idString = id.toString().toUpperCase();
     console.log("[Netplay] Room ID:", idString);
-    prompt("NETPLAY HOST ACTIVE\nGive this Code to Friend:", idString);
     updateNetplayStatus(`Room: ${idString}`);
   });
 
@@ -70,16 +68,46 @@ async function startNetplayHost() {
     updateNetplayStatus("CONNECTED (HOST)");
 
     connection.on("open", () => {
-      setTimeout(() => {
-        console.log("[Netplay] Sending initial state to client");
-        connection.send({ type: "sync-state", state: getCoreState() });
-      }, 1000);
+      if (window.currentRomFile) {
+        console.log("[Netplay] Host sending Rom Info:", window.currentRomFile.name);
+        connection.send({type: "rom-info", romName: window.currentRomFile.name});
+      }
 
-      connection.on("data", (data) => {
+      connection.on("data", async (data) => {
         if (data.type === "input") {
           remoteInputs[1] = data.mask;
         } else if (data.type === "request-sync") {
-          connection.send({ type: "sync-state", state: getCoreState() });
+          connection.send({type: "sync-state", state: getCoreState()});
+        } else if (data.type === "client-ready") {
+          console.log("[Netplay] Client ready, sending state...");
+          connection.send({type: "sync-state", state: getCoreState()});
+        } else if (data.type === "request-rom") {
+          // STEADY STREAMING: Gửi chậm hơn để đạt tốc độ nhanh nhất (không bị Stall)
+          console.log("[Netplay] Starting steady stream...");
+          const romData = await emuxDB(window.currentRomFile.name);
+          const chunkSize = 65536; // 64KB - Kích thước an toàn nhất
+          const totalChunks = Math.ceil(romData.byteLength / chunkSize);
+          const dc = connection.dataChannel;
+
+          connection.send({type: "rom-start", romName: window.currentRomFile.name, totalChunks});
+
+          let currentChunk = 0;
+          const stream = () => {
+            if (currentChunk >= totalChunks) {
+              console.log("[Netplay] Steady stream complete.");
+              return;
+            }
+            if (dc && dc.bufferedAmount > 512 * 1024) {
+              setTimeout(stream, 20);
+              return;
+            }
+            const start = currentChunk * chunkSize;
+            const end = Math.min(start + chunkSize, romData.byteLength);
+            connection.send(romData.slice(start, end));
+            currentChunk++;
+            setTimeout(stream, 5); // NGHỈ 5ms: Bí thuật để dữ liệu không bị nghẽn
+          };
+          stream();
         }
       });
 
@@ -101,35 +129,88 @@ async function startNetplayHost() {
 }
 // ===== startNetplayClient =====
 async function startNetplayClient() {
-  if (!initNetplay()) return;
+  if (!initNetplay(true)) return;
   const hostId = prompt("Enter Host ID:");
   if (!hostId) return;
-
   peer = new Peer();
   isHost = false;
   updateNetplayStatus("Connecting...");
-
   peer.on("open", () => {
-    connection = peer.connect(hostId, { reliable: true });
-
+    connection = peer.connect(hostId, {reliable: true});
     connection.on("open", () => {
       if (netplayInterval) clearInterval(netplayInterval);
       showToast("Connected to Host!");
       updateNetplayStatus("CONNECTED (CLIENT)");
+      let romChunks = [];
+      let receivedChunks = 0;
+      let targetChunks = 0;
 
-      connection.on("data", (data) => {
+      connection.on("data", async (data) => {
+        // NHẬN CHUNKS CƯỜNG ĐỘ CAO
+        if (data instanceof ArrayBuffer || (data.buffer && data.buffer instanceof ArrayBuffer)) {
+          const buffer = data instanceof ArrayBuffer ? data : data.buffer;
+          romChunks.push(buffer);
+          receivedChunks++;
+
+          if (receivedChunks % 5 === 0 || receivedChunks === targetChunks) {
+            const progress = Math.round((receivedChunks / targetChunks) * 100);
+            const elapsed = ((Date.now() - (window.downloadStartTime || Date.now())) / 1000).toFixed(1);
+            console.log(`[Netplay] Download: ${progress}% (${receivedChunks}/${targetChunks}) | ${elapsed}s`);
+            showToast(`Downloading: ${progress}%`);
+          }
+
+          if (receivedChunks === targetChunks) {
+            const finalTime = ((Date.now() - (window.downloadStartTime || Date.now())) / 1000).toFixed(2);
+            console.log(`[Netplay] Download Complete in ${finalTime}s!`);
+            const finalBlob = new Blob(romChunks);
+            const arrayBuffer = await finalBlob.arrayBuffer();
+            const romFile = new File([arrayBuffer], window.pendingRomName || "game.bin");
+
+            showToast("Success! Starting game...");
+            await emuxDB(arrayBuffer, romFile.name);
+            await window.initCore(romFile);
+            console.log("[Netplay] Game settled, requesting sync...");
+            connection.send({type: "client-ready"});
+            romChunks = []; receivedChunks = 0;
+          }
+          return;
+        }
+
         if (data.type === "host-update") {
           remoteInputs[0] = data.hMask;
+        } else if (data.type === "rom-info") {
+          console.log("[Netplay] Host plays:", data.romName);
+          const hasRom = await emuxDB(data.romName);
+          if (hasRom) {
+            showToast("Game found! Loading...");
+            await window.loadGame(data.romName);
+            console.log("[Netplay] Game loaded, requesting sync...");
+            connection.send({type: "client-ready"});
+          } else {
+            showToast("Game not found! Requesting from host...");
+            connection.send({type: "request-rom"});
+          }
+        } else if (data.type === "rom-start") {
+          window.pendingRomName = data.romName;
+          targetChunks = data.totalChunks;
+          romChunks = [];
+          receivedChunks = 0;
+          window.downloadStartTime = Date.now();
+          console.log(`[Netplay] Starting download: ${data.romName} (${targetChunks} chunks)`);
+          showToast("Starting download...");
         } else if (data.type === "sync-state") {
-          console.log("[Netplay] Received state from host");
-          setCoreState(data.state);
+          console.log("[Netplay] Syncing state from host");
+          if (!window.Module || !window.Module._malloc) {
+            setCoreState(data.state);
+          } else {
+            setCoreState(data.state);
+          }
           if (window.startLoop) window.startLoop();
         }
       });
-
       netplayInterval = setInterval(() => {
         if (connection && connection.open) {
-          connection.send({ type: "input", mask: window.getGamepadMask() });
+          connection.send({type: "input", mask: window.getGamepadMask()});
         } else {
           clearInterval(netplayInterval);
           updateNetplayStatus("DISCONNECTED");
@@ -141,8 +222,6 @@ async function startNetplayClient() {
 // ===== window.getNetplayInput =====
 window.getNetplayInput = (port) => {
   if (!window.isNetplaying) return null;
-  // Host: Port 0 = Local, Port 1 = Client
-  // Client: Port 0 = Host, Port 1 = Local
   if (isHost) {
     return port === 0 ? window.getGamepadMask() : remoteInputs[1] || 0;
   } else {
@@ -169,8 +248,8 @@ function showToast(msg) {
 }
 window.netplaySync = () => {
   if (isHost && connection)
-    connection.send({ type: "sync-state", state: getCoreState() });
-  else if (connection) connection.send({ type: "request-sync" });
+    connection.send({type: "sync-state", state: getCoreState()});
+  else if (connection) connection.send({type: "request-sync"});
   showToast("Syncing state...");
 };
 // ===== injectNetplayUI =====
@@ -193,7 +272,6 @@ function injectNetplayUI() {
   container.innerHTML = `
         <div id="np-toast" class="np-toast">Message</div>
         <div id="np-menu" class="np-menu">
-            <button onclick="startNetplayHost()">Create Room (Host)</button>
             <button onclick="startNetplayClient()">Join Room (Client)</button>
             <button onclick="window.netplaySync()" style="color: #0084ff">Force Sync</button>
             <button onclick="location.reload()" style="color: #ff4d4d">Disconnect</button>

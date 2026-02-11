@@ -23,12 +23,14 @@ function findCore(name, data) {
 // ===== inputGame =====
 async function inputGame(event) {
     const file = event.target.files[0], storeName = storeForFilename(file.name);
+    window.currentRomFile = file;
     await emuxDB(await file.arrayBuffer(), file.name);
     if (storeName === 'games') await initCore(file);
 }
 // ===== loadGame =====
 async function loadGame(name) {
     const gameData = await emuxDB(name), gameFile = new File([gameData], name);
+    window.currentRomFile = gameFile;
     await initCore(gameFile);
 }
 // ===== saveState =====

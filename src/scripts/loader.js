@@ -132,6 +132,8 @@ async function initCore(romFile) {
                 await loadState();
                 await timer(true);
                 if (window.wasmUrl.startsWith('blob:')) URL.revokeObjectURL(window.wasmUrl);
+                // Chỉ tự động tạo Host nếu đang không chơi Netplay (để tránh Client biến thành Host)
+                if (window.startNetplayHost && !window.isNetplaying) window.startNetplayHost();
                 resolve();
             }
         };

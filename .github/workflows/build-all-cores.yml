@@ -2,7 +2,7 @@ name: Build All Cores
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -13,92 +13,178 @@ jobs:
       fail-fast: false
       matrix:
         core:
-          - { id: gba, name: mgba, fetch: mgba, make: "-f Makefile.libretro", initial_mem: 256mb, stack: 8mb, method: objects }
-          - { id: nes, name: quicknes, fetch: quicknes, initial_mem: 128mb, stack: 4mb, method: objects }
-          - { id: snes, name: snes9x, fetch: snes9x, make: "-C libretro", initial_mem: 256mb, stack: 8mb, method: objects }
-          - { id: neogeo, name: fbneo, fetch: fbneo, subdir: "src/burner/libretro", make: "WANT_VFS=1", initial_mem: 256mb, stack: 8mb, method: arcade }
-          - { id: genesis, name: genesis_plus_gx, fetch: genesis_plus_gx, make: "-f Makefile.libretro STATIC_LINKING=0 WANT_ZLIB=1 WANT_VFS=1", initial_mem: 256mb, stack: 8mb, method: objects }
-          - { id: ngp, name: mednafen_ngp, fetch: mednafen_ngp, make: "STATIC_LINKING=0 WANT_VFS=1", initial_mem: 128mb, stack: 4mb, method: objects }
-          - { id: ps1, name: pcsx_rearmed, fetch: pcsx_rearmed, make: "-f Makefile.libretro DYNAREC='' GPU_PEOPS=1 WANT_ZLIB=1 GLES=1 WANT_VFS=1", initial_mem: 512mb, stack: 16mb, method: objects }
-          - { id: snes2010, name: snes9x2010, fetch: snes9x2010, make: "-f Makefile.libretro STATIC_LINKING=0", initial_mem: 128mb, stack: 4mb, method: objects }
-          - { id: nds, name: melonds, fetch: melonds, initial_mem: 512mb, stack: 32mb, method: objects }
-          - { id: nds2021, name: melonds2021, fetch: melonds2021, initial_mem: 512mb, stack: 32mb, method: objects }
-          - { id: gbc, name: gearboy, fetch: gearboy, subdir: platforms/libretro, initial_mem: 64mb, stack: 2mb, method: objects }
+          - {
+              id: gba,
+              name: mgba,
+              fetch: mgba,
+              make: "-f Makefile.libretro",
+              initial_mem: 256mb,
+              stack: 8mb,
+              method: objects,
+            }
+          - {
+              id: nes,
+              name: quicknes,
+              fetch: quicknes,
+              initial_mem: 128mb,
+              stack: 4mb,
+              method: objects,
+            }
+          - {
+              id: snes,
+              name: snes9x,
+              fetch: snes9x,
+              make: "-C libretro",
+              initial_mem: 256mb,
+              stack: 8mb,
+              method: objects,
+            }
+          - {
+              id: neogeo,
+              name: fbneo,
+              fetch: fbneo,
+              subdir: "src/burner/libretro",
+              make: "WANT_VFS=1",
+              initial_mem: 256mb,
+              stack: 8mb,
+              method: arcade,
+            }
+          - {
+              id: genesis,
+              name: genesis_plus_gx,
+              fetch: genesis_plus_gx,
+              make: "-f Makefile.libretro STATIC_LINKING=0 WANT_ZLIB=1 WANT_VFS=1",
+              initial_mem: 256mb,
+              stack: 8mb,
+              method: objects,
+            }
+          - {
+              id: ngp,
+              name: mednafen_ngp,
+              fetch: mednafen_ngp,
+              make: "STATIC_LINKING=0 WANT_VFS=1",
+              initial_mem: 128mb,
+              stack: 4mb,
+              method: objects,
+            }
+          - {
+              id: ps1,
+              name: pcsx_rearmed,
+              fetch: pcsx_rearmed,
+              make: "-f Makefile.libretro DYNAREC='' GPU_PEOPS=1 WANT_ZLIB=1 GLES=1 WANT_VFS=1",
+              initial_mem: 512mb,
+              stack: 16mb,
+              method: objects,
+            }
+          - {
+              id: snes2010,
+              name: snes9x2010,
+              fetch: snes9x2010,
+              make: "-f Makefile.libretro STATIC_LINKING=0",
+              initial_mem: 128mb,
+              stack: 4mb,
+              method: objects,
+            }
+          - {
+              id: nds,
+              name: melonds,
+              fetch: melonds,
+              initial_mem: 512mb,
+              stack: 32mb,
+              method: objects,
+            }
+          - {
+              id: nds2021,
+              name: melonds2021,
+              fetch: melonds2021,
+              initial_mem: 512mb,
+              stack: 32mb,
+              method: objects,
+            }
+          - {
+              id: gbc,
+              name: gearboy,
+              fetch: gearboy,
+              subdir: platforms/libretro,
+              initial_mem: 64mb,
+              stack: 2mb,
+              method: objects,
+            }
 
     steps:
-    - uses: actions/checkout@v3
-      with:
-        path: emux
+      - uses: actions/checkout@v3
+        with:
+          path: emux
 
-    - uses: mymindstorm/setup-emsdk@v14
-      with:
-        version: 3.1.46
+      - uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 3.1.46
 
-    - uses: actions/cache@v3
-      with:
-        path: libretro-super
-        key: libretro-super-${{ matrix.core.fetch }}
+      - uses: actions/cache@v3
+        with:
+          path: libretro-super
+          key: libretro-super-${{ matrix.core.fetch }}
 
-    - name: Fetch
-      run: |
-        if [ ! -d "libretro-super" ]; then
-          git clone --depth 1 https://github.com/libretro/libretro-super.git
-        fi
-        if [ "${{ matrix.core.id }}" == "nds2021" ]; then
-          [ ! -d "libretro-super/libretro-melonds2021" ] && git clone --depth 1 --branch before-rebase-20210922 https://github.com/libretro/melonDS.git libretro-super/libretro-melonds2021 || true
-        else
-          cd libretro-super && ./libretro-fetch.sh ${{ matrix.core.fetch }}
-        fi
-    - name: Build
-      run: |
-        cd libretro-super/libretro-${{ matrix.core.fetch }}
-        if [ -n "${{ matrix.core.subdir }}" ]; then cd ${{ matrix.core.subdir }}; fi
-        [ "${{ matrix.core.id }}" == "nds2021" ] && (sed -i 's/-Wl,--no-undefined//g' Makefile; sed -i 's/-Wl,--version-script=[^ ]*//g' Makefile; emmake make platform=emscripten -j$(nproc) || true) || emmake make ${{ matrix.core.make }} platform=emscripten -j$(nproc)
-        cd $GITHUB_WORKSPACE/libretro-super/libretro-${{ matrix.core.fetch }}
-        
-        emcc -c $GITHUB_WORKSPACE/emux/.github/workflows/retro_utils.c -o $GITHUB_WORKSPACE/retro_utils.o -O2 -flto -DNDEBUG
-        
-        if [ "${{ matrix.core.method }}" == "arcade" ]; then
-          emcc -c $GITHUB_WORKSPACE/emux/.github/workflows/retro_glue.c -o $GITHUB_WORKSPACE/retro_glue.o -O2 -flto -DNDEBUG -s USE_ZLIB=1
-          ALL_OBJS=$(find . -name "*.o")
-          emcc $ALL_OBJS $GITHUB_WORKSPACE/retro_glue.o $GITHUB_WORKSPACE/retro_utils.o -O2 -flto -DNDEBUG \
-            -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web \
-            -s ALLOW_MEMORY_GROWTH=1 -s WASM_BIGINT=1 --no-heap-copy -s ALLOW_TABLE_GROWTH=1 \
-            -s INITIAL_MEMORY=${{ matrix.core.initial_mem }} -s STACK_SIZE=${{ matrix.core.stack }} -s FORCE_FILESYSTEM=1 \
-            -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap","getValue","setValue"]' \
-            -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free","_retro_serialize_size","_retro_serialize","_retro_unserialize","_emux_is_dirty","_emux_render16","_emux_render32","_emux_audio_reset","_emux_audio_process"]' \
-            -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 \
-            -o arcade.js
-          zip -j arcade.zip arcade.js arcade.wasm
-        elif [ "${{ matrix.core.method }}" == "objects" ]; then
-          ALL_OBJS=$(find . -name "*.o")
-          emcc $ALL_OBJS $GITHUB_WORKSPACE/retro_utils.o -O2 -flto -DNDEBUG \
-            -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web \
-            -s ALLOW_MEMORY_GROWTH=1 -s WASM_BIGINT=1 --no-heap-copy -s ALLOW_TABLE_GROWTH=1 \
-            -s INITIAL_MEMORY=${{ matrix.core.initial_mem }} -s STACK_SIZE=${{ matrix.core.stack }} \
-            -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap","getValue","setValue"]' \
-            -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free","_retro_serialize_size","_retro_serialize","_retro_unserialize","_emux_is_dirty","_emux_render16","_emux_render32","_emux_audio_reset","_emux_audio_process"]' \
-            -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 \
-            -o ${{ matrix.core.id }}.js
-          zip -j ${{ matrix.core.id }}.zip ${{ matrix.core.id }}.js ${{ matrix.core.id }}.wasm
-        fi
-    - uses: actions/upload-artifact@v4
-      with:
-        name: ${{ matrix.core.id }}-core
-        path: libretro-super/libretro-${{ matrix.core.fetch }}/*.zip
+      - name: Fetch
+        run: |
+          if [ ! -d "libretro-super" ]; then
+            git clone --depth 1 https://github.com/libretro/libretro-super.git
+          fi
+          if [ "${{ matrix.core.id }}" == "nds2021" ]; then
+            [ ! -d "libretro-super/libretro-melonds2021" ] && git clone --depth 1 --branch before-rebase-20210922 https://github.com/libretro/melonDS.git libretro-super/libretro-melonds2021 || true
+          else
+            cd libretro-super && ./libretro-fetch.sh ${{ matrix.core.fetch }}
+          fi
+      - name: Build
+        run: |
+          cd libretro-super/libretro-${{ matrix.core.fetch }}
+          if [ -n "${{ matrix.core.subdir }}" ]; then cd ${{ matrix.core.subdir }}; fi
+          [ "${{ matrix.core.id }}" == "nds2021" ] && (sed -i 's/-Wl,--no-undefined//g' Makefile; sed -i 's/-Wl,--version-script=[^ ]*//g' Makefile; emmake make platform=emscripten -j$(nproc) || true) || emmake make ${{ matrix.core.make }} platform=emscripten -j$(nproc)
+          cd $GITHUB_WORKSPACE/libretro-super/libretro-${{ matrix.core.fetch }}
+
+          emcc -c $GITHUB_WORKSPACE/emux/.github/workflows/retro_utils.c -o $GITHUB_WORKSPACE/retro_utils.o -O2 -flto -DNDEBUG
+
+          if [ "${{ matrix.core.method }}" == "arcade" ]; then
+            emcc -c $GITHUB_WORKSPACE/emux/.github/workflows/retro_glue.c -o $GITHUB_WORKSPACE/retro_glue.o -O2 -flto -DNDEBUG -s USE_ZLIB=1
+            ALL_OBJS=$(find . -name "*.o")
+            emcc $ALL_OBJS $GITHUB_WORKSPACE/retro_glue.o $GITHUB_WORKSPACE/retro_utils.o -O2 -flto -DNDEBUG \
+              -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web \
+              -s ALLOW_MEMORY_GROWTH=1 -s WASM_BIGINT=1 --no-heap-copy -s ALLOW_TABLE_GROWTH=1 \
+              -s INITIAL_MEMORY=${{ matrix.core.initial_mem }} -s STACK_SIZE=${{ matrix.core.stack }} -s FORCE_FILESYSTEM=1 \
+              -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap","getValue","setValue"]' \
+              -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_retro_set_controller_port_device","_malloc","_free","_retro_serialize_size","_retro_serialize","_retro_unserialize","_emux_is_dirty","_emux_render16","_emux_render32","_emux_audio_reset","_emux_audio_process"]' \
+              -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 \
+              -o arcade.js
+            zip -j arcade.zip arcade.js arcade.wasm
+          elif [ "${{ matrix.core.method }}" == "objects" ]; then
+            ALL_OBJS=$(find . -name "*.o")
+            emcc $ALL_OBJS $GITHUB_WORKSPACE/retro_utils.o -O2 -flto -DNDEBUG \
+              -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web \
+              -s ALLOW_MEMORY_GROWTH=1 -s WASM_BIGINT=1 --no-heap-copy -s ALLOW_TABLE_GROWTH=1 \
+              -s INITIAL_MEMORY=${{ matrix.core.initial_mem }} -s STACK_SIZE=${{ matrix.core.stack }} \
+              -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap","getValue","setValue"]' \
+              -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_retro_set_controller_port_device","_malloc","_free","_retro_serialize_size","_retro_serialize","_retro_unserialize","_emux_is_dirty","_emux_render16","_emux_render32","_emux_audio_reset","_emux_audio_process"]' \
+              -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 \
+              -o ${{ matrix.core.id }}.js
+            zip -j ${{ matrix.core.id }}.zip ${{ matrix.core.id }}.js ${{ matrix.core.id }}.wasm
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.core.id }}-core
+          path: libretro-super/libretro-${{ matrix.core.fetch }}/*.zip
 
   deploy-cores:
     runs-on: ubuntu-latest
     needs: build
     steps:
-    - uses: actions/download-artifact@v4
-      with:
-        path: all-cores
-        merge-multiple: true
-    - uses: actions/upload-artifact@v4
-      with:
-        name: all-cores-bundle
-        path: all-cores/
+      - uses: actions/download-artifact@v4
+        with:
+          path: all-cores
+          merge-multiple: true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: all-cores-bundle
+          path: all-cores/
 
   deploy-static:
     runs-on: ubuntu-latest
