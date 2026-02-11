@@ -25,7 +25,8 @@ async function listGame() {
     });
 }
 // ===== verticalSetting =====
-async function verticalSetting(values = [80, 160, 5]) {
+async function verticalSetting(values) {
+    if (!Array.isArray(values)) values = [80, 160, 5];
     page02.style.paddingTop = `${values[current]}px`;
     values.forEach((value, index) => document.getElementById(`k${value}`).style.stroke = index === current ? "var(--profile-1)" : "var(--profile-4)");
     local('vertical', current);
@@ -50,7 +51,7 @@ document.addEventListener("DOMContentLoaded", () => {
     switch0.textContent = local('render') || 'WGPU';
     setTimeout(() => {listGame(); verticalSetting();}, 2000);
     romInput.onchange = event => inputGame(event);
-    vertical.onclick = verticalSetting;
+    vertical.onclick = () => verticalSetting();
     logo.onclick = () => {list.hidden = false; list01.hidden = list02.hidden = true; listGame();};
     document.querySelectorAll('opti').forEach(element => element.onclick = () => optionClick(element.textContent.trim()));
 });

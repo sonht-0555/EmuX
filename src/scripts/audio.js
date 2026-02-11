@@ -1,17 +1,38 @@
 // ===== Audio System =====
+const processorCode = `
+class Audio extends AudioWorkletProcessor {
+    constructor({processorOptions: {sabL, sabR, sabIndices, bufSize}}) {
+        super();
+        this.L = new Float32Array(sabL); this.R = new Float32Array(sabR);
+        this.I = new Uint32Array(sabIndices); this.S = bufSize; this.M = bufSize - 1;
+    }
+    process(_, [[oL, oR]]) {
+        const {L, R, I, S, M} = this;
+        let r = Atomics.load(I, 1), n = oL.length;
+        if (((Atomics.load(I, 0) - r + S) & M) < n) { oL.fill(0); oR?.fill(0); return true; }
+        if (oR) for (let i = 0; i < n; i++) { oL[i] = L[r]; oR[i] = R[r]; r = (r + 1) & M; }
+        else for (let i = 0; i < n; i++) { oL[i] = L[r]; r = (r + 1) & M; }
+        Atomics.store(I, 1, r); return true;
+    }
+}
+registerProcessor('audio', Audio);
+`;
 const audio_batch_cb = (pointer, frames) => writeAudio(pointer, frames), audio_cb = () => { };
 var audioContext, audioWorkletNode, audioGainNode, totalSamplesSent = 0, audioStartTime = 0, audioCoreRatio = 1.0;
 var currentModule = null, resampledPtrL = 0, resampledPtrR = 0, sabL, sabR, sabIndices;
 // ===== initAudio =====
 async function initAudio(ratio) {
     if (audioContext) return audioContext.resume();
-    audioContext = new (window.AudioContext || window.webkitAudioContext)({sampleRate: 48000});
-    await audioContext.audioWorklet.addModule('./src/backend/audio-processor.js');
+    audioContext = new AudioContext({sampleRate: 48000});
+    const blob = new Blob([processorCode], {type: 'application/javascript'});
+    const url = URL.createObjectURL(blob);
+    await audioContext.audioWorklet.addModule(url);
+    URL.revokeObjectURL(url);
     const bufSize = 16384;
     sabL = new SharedArrayBuffer(bufSize * 4);
     sabR = new SharedArrayBuffer(bufSize * 4);
     sabIndices = new SharedArrayBuffer(8);
-    audioWorkletNode = new AudioWorkletNode(audioContext, 'audio-processor', {processorOptions: {sabL, sabR, sabIndices, bufSize}});
+    audioWorkletNode = new AudioWorkletNode(audioContext, 'audio', {processorOptions: {sabL, sabR, sabIndices, bufSize}});
     audioGainNode = audioContext.createGain();
     audioGainNode.gain.value = 1;
     audioCoreRatio = ratio;
