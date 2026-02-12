@@ -44,14 +44,14 @@ async function message(text, duration = 2000) {
     count = token;
     title1.textContent = text;
     await delay(duration);
-    if (!token.cancelled && count === token) {title1.textContent = gameName; count = null;}
+    if (!token.cancelled && count === token) {title1.textContent = `[${idString}]_${gameName}`; count = null;}
 }
 // ===== gameView =====
 async function gameView(name) {
     page02.ontouchstart = event => event.preventDefault();
     gameWidth = canvas.width;
     gameHeight = canvas.height;
-    title1.textContent = name;
+    title1.textContent = `[${idString}]_${name}`;
     switch0.textContent = local('render');
     const maxInteger = Math.floor((window.innerWidth * window.devicePixelRatio) / gameWidth);
     integer = (maxInteger > 6) ? maxInteger - (maxInteger % 2) : maxInteger;

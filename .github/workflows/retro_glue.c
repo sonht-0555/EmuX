@@ -120,6 +120,11 @@ WEAK EMSCRIPTEN_KEEPALIVE bool path_mkdir(const char *dir) {
   return mkdir(dir, 0777) == 0;
 }
 
+WEAK EMSCRIPTEN_KEEPALIVE bool path_is_valid(const char *path) {
+  struct stat st;
+  return (path && stat(path, &st) == 0);
+}
+
 WEAK EMSCRIPTEN_KEEPALIVE bool path_is_directory(const char *path) {
   struct stat st;
   return (stat(path, &st) == 0 && S_ISDIR(st.st_mode));

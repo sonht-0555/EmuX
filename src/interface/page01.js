@@ -12,12 +12,55 @@ async function showFileGroups(gameName) {
         if (confirm(`Delete this file? ${name}`)) {await deleteFromStore(name); showFileGroups(gameName);}
     });
 }
+// ===== initVerAnimation =====
+async function initVerAnimation() {
+    if (!joinHost) return;
+    const phrases = [gameVer, "keep joining", "ready to play online", "enter host id"];
+    let i = 0;
+    const type = async (text, speed = 200) => {
+        for (let char of text) {
+            joinHost.textContent = joinHost.textContent.slice(0, -1) + char + "_";
+            await delay(speed);
+        }
+    };
+    const erase = async (speed = 100) => {
+        while (joinHost.textContent.length > 1) {
+            joinHost.textContent = joinHost.textContent.slice(0, -2) + "_";
+            await delay(speed);
+        }
+    };
+    const blink = async (count = 2, speed = 500) => {
+        const base = joinHost.textContent.slice(0, -1);
+        for (let j = 0; j < count; j++) {
+            joinHost.textContent = base + " ";
+            await delay(speed);
+            joinHost.textContent = base + "_";
+            await delay(speed);
+        }
+    };
+    while (true) {
+        await erase();
+        await delay(500);
+        await type(phrases[i]);
+        await blink(3);
+        i = (i + 1) % phrases.length;
+    }
+}
 // ===== listGame =====
 async function listGame() {
-    const games = await listStore('games'), ver = list.querySelector('rom:has(ver)');
+    const games = await listStore('games'), verElem = list.querySelector('ver');
+    const verRom = verElem ? verElem.closest('rom') : null;
     list.innerHTML = '';
-    if (ver) list.appendChild(ver);
-    list.innerHTML += games.map(game => `<rom><name>${game}</name><more></more></rom>`).join('');
+    if (verRom) list.appendChild(verRom);
+
+    const fragment = document.createDocumentFragment();
+    games.forEach(game => {
+        const rom = document.createElement('rom');
+        rom.innerHTML = `<name>${game}</name><more></more>`;
+        fragment.appendChild(rom);
+    });
+    list.appendChild(fragment);
+
     list.querySelectorAll('name').forEach(element => element.onclick = () => loadGame(element.textContent));
     list.querySelectorAll('more').forEach(button => button.onclick = () => {
         const name = button.parentElement.querySelector('name').textContent;
@@ -49,7 +92,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
     }
-    ver.textContent = gameVer;
+    initVerAnimation();
     switch0.textContent = local('render') || 'WGPU';
     setTimeout(() => {listGame(); verticalSetting();}, 2000);
     romInput.onchange = event => inputGame(event);

@@ -1,4 +1,4 @@
-let revision = 'EmuX_4.40';
+let revision = 'EmuX_4.42';
 var urlsToCache = [
     './',
     './index.html',
@@ -18,11 +18,11 @@ var urlsToCache = [
     'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/arcade.zip',
     'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/nds2021.zip',
     'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/ps1.zip',
-    './src/core/bios/neogeo.zip',
-    './src/core/bios/scph5501.bin',
-    './src/core/bios/bios7.bin',
-    './src/core/bios/bios9.bin',
-    './src/core/bios/firmware.bin',
+    './src/lib/neogeo.zip',
+    './src/lib/scph5501.bin',
+    './src/lib/bios7.bin',
+    './src/lib/bios9.bin',
+    './src/lib/firmware.bin',
     './src/lib/zip.js',
     './src/lib/peer.js',
     './src/scripts/loader.js',
