@@ -5,10 +5,14 @@ var connection = null;
 var isHost = false;
 var remoteInputs = {0: 0, 1: 0};
 var netplayInterval = null;
+var stats = {receivedPackets: 0};
+var statsInterval = null;
+
 // ===== generateShortId =====
 function generateShortId() {
   return Math.random().toString(36).substring(2, 6).toUpperCase();
 }
+
 // ===== initNetplay =====
 function initNetplay(isClient = false) {
   if (typeof Peer === "undefined") return console.warn("[Netplay] PeerJS missing"), false;
@@ -17,6 +21,7 @@ function initNetplay(isClient = false) {
   window.isRunning = true;
   return true;
 }
+
 // ===== getCoreState =====
 function getCoreState() {
   const size = window.Module._retro_serialize_size();
@@ -28,46 +33,104 @@ function getCoreState() {
     size,
   ).slice();
   window.Module._free(buffer);
+  console.log("[Netplay] Capturing state:", size, "bytes");
   return state;
 }
+
 // ===== setCoreState =====
 function setCoreState(state) {
-  if (!state || state.length === 0 || !window.Module || !window.Module._malloc) return;
-  const buffer = window.Module._malloc(state.length);
-  window.Module.HEAPU8.set(state, buffer);
-  window.Module._retro_unserialize(buffer, state.length);
+  if (!state || !window.Module || !window.Module._malloc) return;
+
+  let data;
+  if (state instanceof Uint8Array) data = state;
+  else if (state instanceof ArrayBuffer) data = new Uint8Array(state);
+  else if (state.buffer && state.buffer instanceof ArrayBuffer) data = new Uint8Array(state.buffer, state.byteOffset, state.length || state.byteLength);
+  else data = new Uint8Array(state);
+
+  console.log("[Netplay] Applying state:", data.length, "bytes");
+  const buffer = window.Module._malloc(data.length);
+  window.Module.HEAPU8.set(data, buffer);
+  const result = window.Module._retro_unserialize(buffer, data.length);
   window.Module._free(buffer);
-  for (let i = 0; i < 3; i++) window.Module._retro_run();
+
+  console.log("[Netplay] Sync result:", result ? "OK ✅" : "FAILED ❌");
+  if (result && window.startLoop) window.startLoop();
 }
+
+// ===== Packet Types =====
+const PKT_INPUT = 1;
+const PKT_HOST_UPDATE = 2;
+
+let lastSentMask = -1;
+
+// ===== sendInputImmediate =====
+function sendInputImmediate() {
+  if (!connection || !connection.open) return;
+  const mask = window.getGamepadMask();
+  if (mask === lastSentMask) return;
+
+  if (isHost) {
+    const hMask = mask;
+    const cMask = remoteInputs[1] || 0;
+    const buf = new Uint8Array(5);
+    buf[0] = PKT_HOST_UPDATE;
+    buf[1] = (hMask >> 8) & 0xFF; buf[2] = hMask & 0xFF;
+    buf[3] = (cMask >> 8) & 0xFF; buf[4] = cMask & 0xFF;
+    connection.send(buf);
+    stats.sentPackets++;
+  } else {
+    const buf = new Uint8Array(3);
+    buf[0] = PKT_INPUT;
+    buf[1] = (mask >> 8) & 0xFF; buf[2] = mask & 0xFF;
+    connection.send(buf);
+    stats.sentPackets++;
+  }
+  lastSentMask = mask;
+}
+
 // ===== startNetplayHost =====
 async function startNetplayHost() {
   if (!initNetplay()) return;
   const shortId = generateShortId();
   peer = new Peer(shortId);
   isHost = true;
+
   peer.on("open", (id) => {
     idString = id.toString().toUpperCase();
     console.log("[Netplay] Room ID:", idString);
-    title1.textContent = `[${idString}]_${gameName}`;
+    if (window.title1) title1.textContent = `[${idString}]_${gameName}`;
   });
-  peer.on("error", (err) => {
-    if (err.type === "unavailable-id") {
-      startNetplayHost();
-    }
-  });
+
   peer.on("connection", (conn) => {
     if (connection) connection.close();
     if (netplayInterval) clearInterval(netplayInterval);
     connection = conn;
     message("Friend Connected!");
+
     connection.on("open", () => {
+      lastSentMask = -1;
+      stats.sentPackets = 0;
+      stats.receivedPackets = 0;
+      if (statsInterval) clearInterval(statsInterval);
+      statsInterval = setInterval(() => {
+        console.log(`[Netplay Stats] Sent: ${stats.sentPackets} | Received: ${stats.receivedPackets}`);
+      }, 5000);
+
       if (window.currentRomFile) {
         connection.send({type: "rom-info", romName: window.currentRomFile.name});
       }
+
       connection.on("data", async (data) => {
-        if (data.type === "input") {
-          remoteInputs[1] = data.mask;
-        } else if (data.type === "request-sync") {
+        if (data instanceof Uint8Array || data instanceof ArrayBuffer) {
+          const view = new Uint8Array(data instanceof ArrayBuffer ? data : data.buffer);
+          if (view[0] === PKT_INPUT) {
+            remoteInputs[1] = (view[1] << 8) | view[2];
+            stats.receivedPackets++;
+          }
+          return;
+        }
+
+        if (data.type === "request-sync") {
           connection.send({type: "sync-state", state: getCoreState()});
         } else if (data.type === "client-ready") {
           connection.send({type: "sync-state", state: getCoreState()});
@@ -75,17 +138,11 @@ async function startNetplayHost() {
           const romData = await emuxDB(window.currentRomFile.name);
           const chunkSize = 65536;
           const totalChunks = Math.ceil(romData.byteLength / chunkSize);
-          const dc = connection.dataChannel;
           connection.send({type: "rom-start", romName: window.currentRomFile.name, totalChunks});
+
           let currentChunk = 0;
           const stream = () => {
-            if (currentChunk >= totalChunks) {
-              return;
-            }
-            if (dc && dc.bufferedAmount > 512 * 1024) {
-              setTimeout(stream, 20);
-              return;
-            }
+            if (currentChunk >= totalChunks) return;
             const start = currentChunk * chunkSize;
             const end = Math.min(start + chunkSize, romData.byteLength);
             connection.send(romData.slice(start, end));
@@ -98,71 +155,83 @@ async function startNetplayHost() {
 
       netplayInterval = setInterval(() => {
         if (connection && connection.open) {
-          const hostInput = window.getGamepadMask();
-          connection.send({
-            type: "host-update",
-            hMask: hostInput,
-            cMask: remoteInputs[1] || 0,
-          });
+          const hMask = window.getGamepadMask();
+          const cMask = remoteInputs[1] || 0;
+          const buf = new Uint8Array(5);
+          buf[0] = PKT_HOST_UPDATE;
+          buf[1] = (hMask >> 8) & 0xFF; buf[2] = hMask & 0xFF;
+          buf[3] = (cMask >> 8) & 0xFF; buf[4] = cMask & 0xFF;
+          connection.send(buf);
+          stats.sentPackets++;
+          lastSentMask = hMask;
         } else {
           clearInterval(netplayInterval);
         }
-      }, 16);
+      }, 33);
     });
   });
 }
+
 // ===== startNetplayClient =====
 async function startNetplayClient() {
   if (!initNetplay(true)) return;
   const hostId = prompt("Enter Host ID:");
   if (!hostId) return;
+
   peer = new Peer();
   isHost = false;
+
   peer.on("open", () => {
+    // Quay lại reliable: true
     connection = peer.connect(hostId, {reliable: true});
+
     connection.on("open", () => {
+      lastSentMask = -1;
+      stats.sentPackets = 0;
+      stats.receivedPackets = 0;
+      if (statsInterval) clearInterval(statsInterval);
+      statsInterval = setInterval(() => {
+        console.log(`[Netplay Stats] Sent: ${stats.sentPackets} | Received: ${stats.receivedPackets}`);
+      }, 5000);
+
       if (netplayInterval) clearInterval(netplayInterval);
       let romChunks = [];
       let receivedChunks = 0;
       let targetChunks = 0;
-      connection.on("data", async (data) => {
-        if (data instanceof ArrayBuffer || (data.buffer && data.buffer instanceof ArrayBuffer)) {
-          const buffer = data instanceof ArrayBuffer ? data : data.buffer;
-          romChunks.push(buffer);
-          receivedChunks++;
 
-          if (receivedChunks % 5 === 0 || receivedChunks === targetChunks) {
+      connection.on("data", async (data) => {
+        if (data instanceof Uint8Array || data instanceof ArrayBuffer || (data.buffer && data.buffer instanceof ArrayBuffer)) {
+          const raw = data.buffer || data;
+          const view = new Uint8Array(raw);
+
+          if (view[0] === PKT_HOST_UPDATE && view.length === 5) {
+            remoteInputs[0] = (view[1] << 8) | view[2];
+            stats.receivedPackets++;
+            return;
+          }
+
+          romChunks.push(raw);
+          receivedChunks++;
+          if (receivedChunks % 10 === 0 || receivedChunks === targetChunks) {
             const progress = Math.round((receivedChunks / targetChunks) * 100);
-            const elapsed = ((Date.now() - (window.downloadStartTime || Date.now())) / 1000).toFixed(1);
-            console.log(`[Netplay] Download: ${progress}% (${receivedChunks}/${targetChunks}) | ${elapsed}s`);
-            showNotification(" pa", "use.", "", ` download from host.|${progress}|`);
+            showNotification(" pa", "use.", "", ` download: ${progress}%`);
           }
           if (receivedChunks === targetChunks) {
-            const finalTime = ((Date.now() - (window.downloadStartTime || Date.now())) / 1000).toFixed(2);
-            console.log(`[Netplay] Download Complete in ${finalTime}s!`);
             const finalBlob = new Blob(romChunks);
             const arrayBuffer = await finalBlob.arrayBuffer();
             const romFile = new File([arrayBuffer], window.pendingRomName || "game.bin");
-
-            console.log("[Netplay]", "Success! Starting game...");
             await emuxDB(arrayBuffer, romFile.name);
             await window.initCore(romFile);
-            console.log("[Netplay] Game settled, requesting sync...");
             connection.send({type: "client-ready"});
-            romChunks = []; receivedChunks = 0;
+            romChunks = [];
           }
           return;
         }
 
-        if (data.type === "host-update") {
-          remoteInputs[0] = data.hMask;
-        } else if (data.type === "rom-info") {
-          console.log("[Netplay] Host plays:", data.romName);
+        if (data.type === "rom-info") {
           const hasRom = await emuxDB(data.romName);
           if (hasRom) {
-            showNotification(" pa", "use.", "", " Game found! Loading...");
             await window.loadGame(data.romName);
-            console.log("[Netplay] Game loaded, requesting sync...");
             connection.send({type: "client-ready"});
           } else {
             connection.send({type: "request-rom"});
@@ -170,44 +239,56 @@ async function startNetplayClient() {
         } else if (data.type === "rom-start") {
           window.pendingRomName = data.romName;
           targetChunks = data.totalChunks;
-          romChunks = [];
-          receivedChunks = 0;
-          window.downloadStartTime = Date.now();
-          console.log(`[Netplay] Starting download: ${data.romName} (${targetChunks} chunks)`);
+          romChunks = []; receivedChunks = 0;
         } else if (data.type === "sync-state") {
-          console.log("[Netplay] Syncing state from host");
           setCoreState(data.state);
-          if (window.startLoop) window.startLoop();
         }
       });
+
       netplayInterval = setInterval(() => {
         if (connection && connection.open) {
-          connection.send({type: "input", mask: window.getGamepadMask()});
+          const mask = window.getGamepadMask();
+          const buf = new Uint8Array(3);
+          buf[0] = PKT_INPUT;
+          buf[1] = (mask >> 8) & 0xFF;
+          buf[2] = mask & 0xFF;
+          connection.send(buf);
+          stats.sentPackets++;
+          lastSentMask = mask;
         } else {
           clearInterval(netplayInterval);
-          console.log("[Netplay Status] DISCONNECTED");
         }
-      }, 16);
+      }, 33);
     });
   });
 }
+
+// ===== window.triggerInputSync =====
+window.triggerInputSync = () => {
+  if (window.isNetplaying) sendInputImmediate();
+};
+
 // ===== window.getNetplayInput =====
 window.getNetplayInput = (port) => {
   if (!window.isNetplaying) return null;
-  if (isHost) {
-    return port === 0 ? window.getGamepadMask() : remoteInputs[1] || 0;
-  } else {
-    return port === 0 ? remoteInputs[0] || 0 : window.getGamepadMask();
-  }
+  return isHost ? (port === 0 ? window.getGamepadMask() : remoteInputs[1] || 0)
+    : (port === 0 ? remoteInputs[0] || 0 : window.getGamepadMask());
 };
+
 // ===== Event Binding =====
+document.addEventListener("DOMContentLoaded", () => {
+  const menuBtn = document.getElementById("menu");
+  if (menuBtn) {
+    menuBtn.onpointerdown = (e) => {
+      if (connection && connection.open) {
+        if (isHost) connection.send({type: "sync-state", state: getCoreState()});
+        else connection.send({type: "request-sync"});
+        message("Syncing state...");
+      }
+    };
+  }
+});
+
 document.addEventListener("click", (e) => {
-  if (e.target && e.target.id === "joinHost") {
-    startNetplayClient();
-  }
-  if (e.target && e.target.id === "canvas") {
-    if (isHost && connection) connection.send({type: "sync-state", state: getCoreState()});
-    else if (connection) connection.send({type: "request-sync"});
-    message("Syncing state...");
-  }
+  if (e.target && e.target.id === "joinHost") startNetplayClient();
 });

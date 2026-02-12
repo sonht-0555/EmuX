@@ -20,6 +20,7 @@ const updateTouchInput = (buttonName, isPressed) => {
     } else {
         touchInputMask &= ~(1 << buttonId);
     }
+    if (typeof triggerInputSync === 'function') triggerInputSync();
 };
 window.buttonPress = (buttonName) => updateTouchInput(buttonName, true);
 window.buttonUnpress = (buttonName) => updateTouchInput(buttonName, false);
@@ -101,6 +102,7 @@ window.addEventListener('keydown', (event) => {
                 audioContext?.resume();
                 window.resetAudioSync?.();
             }
+            if (typeof triggerInputSync === 'function') triggerInputSync();
         }
     }
 });
@@ -108,6 +110,9 @@ window.addEventListener('keyup', (event) => {
     const mappedButton = keyboardMapping[event.key] || keyboardMapping[event.code];
     if (mappedButton) {
         const buttonId = buttonMapping[mappedButton];
-        if (buttonId !== undefined) keyboardInputMask &= ~(1 << buttonId);
+        if (buttonId !== undefined) {
+            keyboardInputMask &= ~(1 << buttonId);
+            if (typeof triggerInputSync === 'function') triggerInputSync();
+        }
     }
 });

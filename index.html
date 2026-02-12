@@ -1,137 +1,122 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
+
     <head>
-        <meta charset="UTF-8">
-        <title>Clone Test (PeerJS 1.3.1 - Cue System Style)</title>
-        <!-- Sử dụng đúng phiên bản 1.3.1 từ CDN giống Cue System -->
-        <script src="https://cdn.jsdelivr.net/npm/peerjs@1.3.1/dist/peerjs.min.js"></script>
-        <style>
-            body {
-                font-family: sans-serif;
-                background: #121212;
-                color: #00ff00;
-                padding: 20px;
-            }
-
-            #log {
-                background: #000;
-                border: 1px solid #00ff00;
-                padding: 10px;
-                height: 400px;
-                overflow-y: scroll;
-                font-family: monospace;
-            }
-
-            .box {
-                border: 1px dashed #00ff00;
-                padding: 15px;
-                margin-bottom: 20px;
-            }
-
-            input {
-                background: #000;
-                color: #00ff00;
-                border: 1px solid #00ff00;
-                padding: 5px;
-            }
-
-            button {
-                background: #00ff00;
-                color: #000;
-                border: none;
-                padding: 5px 15px;
-                cursor: pointer;
-                font-weight: bold;
-            }
-        </style>
+        <title>EmuX</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1, width=device-width, height=device-height" />
+        <link rel="icon" href="/src/assets/img/icon.png" type="image/png" />
+        <link rel="stylesheet" type="text/css" href="./src/assets/style/main.css" />
+        <link rel="manifest" href="/manifest.json" />
     </head>
-    <body>
-        <div class="box">
-            <h3>1. Khởi tạo (Clone 1.3.1)</h3>
-            <p>My Peer ID: <strong id="display-id">...đang chờ...</strong></p>
-        </div>
+    <script> let gameVer = 'EmuX_4.60'; </script>
 
-        <div class="box">
-            <h3>2. Kết nối đến Host</h3>
-            <input type="text" id="host-id" placeholder="Nhập ID máy kia">
-            <button id="connect-btn">CONNECT (Host)</button>
-        </div>
-
-        <div id="log"></div>
-
-        <script>
-            const logEl = document.getElementById('log');
-            const idEl = document.getElementById('display-id');
-
-            function addLog(msg) {
-                const time = new Date().toLocaleTimeString();
-                logEl.innerHTML += `<div>[${time}] ${msg}</div>`;
-                logEl.scrollTop = logEl.scrollHeight;
-                console.log(msg);
-            }
-
-            // KHỞI TẠO ZERO-CONFIG GIỐNG HỆT CUE SYSTEM
-            // Không truyền config, không truyền iceServers
-            const peer = new Peer({debug: 3});
-
-            peer.on('open', (id) => {
-                idEl.textContent = id;
-                addLog(">>> Peer đã mở thành công. ID: " + id);
-            });
-
-            peer.on('connection', (conn) => {
-                addLog(">>> Nhận kết nối từ: " + conn.peer);
-                setupConn(conn);
-            });
-
-            peer.on('error', (err) => {
-                addLog("!!! LỖI PEER: " + err.type);
-            });
-
-            document.getElementById('connect-btn').onclick = () => {
-                const target = document.getElementById('host-id').value;
-                if (!target) return alert("Nhập ID đi bạn!");
-
-                addLog("Đang thử kết nối tới: " + target);
-                // Cue System dùng mặc định, reliable: true
-                const conn = peer.connect(target, {reliable: true});
-                setupConn(conn);
-            };
-
-            function setupConn(conn) {
-                // Chờ PeerConnection được tạo để intercept log ICE
-                const checkPC = setInterval(() => {
-                    if (conn.peerConnection) {
-                        clearInterval(checkPC);
-                        const pc = conn.peerConnection;
-                        addLog("--- Bắt đầu theo dõi WebRTC Candidates ---");
-
-                        pc.onicecandidate = (event) => {
-                            if (event.candidate) {
-                                addLog(`Found: ${event.candidate.type} | ${event.candidate.address || 'mDNS'}`);
-                                if (event.candidate.type === 'relay') {
-                                    addLog("🎯 PHÁT HIỆN RELAY! (Thành công giống Chidokun)");
-                                }
-                            } else {
-                                addLog("✅ Quét xong ICE Candidates.");
-                            }
-                        };
-
-                        pc.oniceconnectionstatechange = () => {
-                            addLog("ICE State changed: " + pc.iceConnectionState);
-                        };
-                    }
-                }, 100);
-
-                conn.on('open', () => {
-                    addLog("🚀 KẾT NỐI DỮ LIỆU ĐÃ MỞ!");
-                    conn.send("Hello từ Clone Test 1.3.1");
-                });
-
-                conn.on('data', (data) => {
-                    addLog("📩 NHẬN DỮ LIỆU: " + data);
-                });
-            }
-        </script>
+    <body hide>
+        <page00 hidden>
+            <divide></divide>
+            <title0 green="" gray="" white=""></title0>
+            <message0></message0>
+            <switch0 hidden>EmuX</switch0>
+        </page00>
+        <page01>
+            <list02 hidden>
+                <cont>
+                    <opti>Cloud</opti>
+                    <opti>Restore</opti>
+                    <opti>Backup</opti>
+                </cont>
+                <titl>Dropbox Cloud.</titl>
+                <cont>
+                    <opti>Lated</opti>
+                    <opti>New</opti>
+                    <opti>Old</opti>
+                </cont>
+                <titl>Core setting.</titl>
+            </list02>
+            <list01 hidden></list01>
+            <list>
+                <rom>
+                    <ver op4 id="joinHost">_</ver>
+                </rom>
+            </list>
+            <cta>
+                <logo green="em">ux</logo>
+                <setting></setting>
+                <vertical>
+                    <svg width="50" height="50" viewBox="0 0 50 50" fill="none">
+                        <path id="k5" d="M22 19H28" stroke="var(--profile-4)" stroke-width="2" />
+                        <path id="k80" d="M22 25H28" stroke="var(--profile-4)" stroke-width="2" />
+                        <path id="k160" d="M22 31H28" stroke="var(--profile-4)" stroke-width="2" />
+                    </svg>
+                </vertical>
+                <input type="file" id="romInput" hidden />
+                <label for="romInput" id="fileInputLable"></label>
+            </cta>
+        </page01>
+        <page02 hidden>
+            <display>
+                <screen><canvas fil id="canvas"></canvas></screen>
+                <notification>
+                    <title1>...</title1>
+                    <status1>
+                        <skip1>...</skip1>
+                        <time1>0h00.00</time1>
+                    </status1>
+                </notification>
+            </display>
+            <divide></divide>
+            <gamepad>
+                <btn-l data="func-l"> bl.</btn-l>
+                <btn-r data="func-r"> br.</btn-r>
+                <btn-menu id="menu">-</btn-menu>
+                <sec-dpad id="dpad">
+                    <svg width="100%" height="100%" viewBox="0 0 100 100" fill-opacity="0">
+                        <polygon points="50 50, 100 100, 100 0" fill="transparent" data="btn-right" />
+                        <polygon points="0 0, 0 100, 50 50" fill="transparent" data="btn-left" />
+                        <polygon points="0 0, 100 0, 50 50" fill="transparent" data="btn-up" />
+                        <polygon points="0 100, 100 100, 50 50" fill="transparent" data="btn-down" />
+                        <polygon points="0 0, 25 0, 0 25" fill="transparent" data="btn-up-left" />
+                        <polygon points="75 0, 100 0, 100 25" fill="transparent" data="btn-up-right" />
+                        <polygon points="0 75, 25 100, 0 100" fill="transparent" data="btn-down-left" />
+                        <polygon points="100 75, 100 100, 75 100" fill="transparent" data="btn-down-right" />
+                    </svg>
+                </sec-dpad>
+                <sec-12>
+                    <btn-1 data="func-1"></btn-1>
+                    <btn-2 data="func-2"></btn-2>
+                </sec-12>
+                <sec-34>
+                    <btn-3 data="func-3"></btn-3>
+                    <btn-4 data="func-4"></btn-4>
+                </sec-34>
+                <btn-select data="func-select"> sc.</btn-select>
+                <btn-start data="func-start"> st.</btn-start>
+            </gamepad>
+            <divide></divide>
+            <joypad>
+                <canvas fil style="display:none" id="canvas-bottom"></canvas>
+                <svg id="joy" style="height:auto; width:auto" viewBox="0 0 100 100" fill-opacity="0">
+                    <polygon points="50 50, 100 100, 100 0" fill="transparent" data="btn-right" />
+                    <polygon points="0 0, 0 100, 50 50" fill="transparent" data="btn-left" />
+                    <polygon points="0 0, 100 0, 50 50" fill="transparent" data="btn-up" />
+                    <polygon points="0 100, 100 100, 50 50" fill="transparent" data="btn-down" />
+                </svg>
+            </joypad>
+            <invis></invis>
+        </page02>
     </body>
+    <script src="./src/lib/zip.js"></script>
+    <script src="./src/lib/peer.js"></script>
+    <script src="./src/utils/perf.js"></script>
+    <script src="./src/utils/storage.js"></script>
+    <script src="./src/scripts/gamepad.js"></script>
+    <script src="./src/scripts/audio.js"></script>
+    <script src="./src/scripts/video.js"></script>
+    <script src="./src/scripts/main.js"></script>
+    <script src="./src/scripts/loader.js"></script>
+    <script src="./src/scripts/netplay.js"></script>
+    <script src="./src/interface/global.js"></script>
+    <script src="./src/interface/page01.js"></script>
+    <script src="./src/interface/page02.js"></script>
+
 </html>
