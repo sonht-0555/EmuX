@@ -20,11 +20,12 @@ function tryRunFrame() {
     const fId = window.currentFrame;
 
     if (!localInputBuffer.has(fId)) {
-        stats.stalls++;
-        if (stats.stalls % 120 === 0) {
-            console.warn(`[Netplay] 🛑 Stall @ ${fId} | Buf: ${remoteInputBuffer.size} | Ping: ${stats.ping}ms`);
-        }
-        return false;
+        // EMERGENCY RESCUE: Force generate local input if missing!
+        // This prevents sticky stalls when delay changes cause gaps.
+        const mask = window.getGamepadMask ? window.getGamepadMask() : 0;
+        localInputBuffer.set(fId, mask);
+        sendInput(fId, mask);
+        // console.warn(`[Netplay] ⚠️ Rescued missing local input ${fId}`);
     }
 
     const myMask = localInputBuffer.get(fId);
