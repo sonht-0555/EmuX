@@ -2,1562 +2,269 @@
 <html lang="en">
     <head>
         <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes, viewport-fit=cover">
-        <title>📡 GroupChat · Smooth screen + audio · Quality control</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <title>EmuX Debug 1.5 (PeerJS 1.5.4)</title>
         <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
         <style>
-            /* ---------- 🎨 WhatsApp/Telegram inspired, clean & finger-friendly ---------- */
+            :root {
+                --primary: #00d2ff;
+                --bg: #0b1c26;
+                --surface: #142e3a;
+                --text: #e6f7ff;
+            }
+
             * {
                 box-sizing: border-box;
-                margin: 0;
-                padding: 0;
+                -webkit-tap-highlight-color: transparent;
             }
 
             body {
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-                background: #0b1c26;
-                background: radial-gradient(circle at 20% 30%, #1e3a4e, #0e1e26);
-                min-height: 100vh;
+                font-family: -apple-system, system-ui, sans-serif;
+                background: var(--bg);
+                color: var(--text);
+                margin: 0;
+                padding: 15px;
                 display: flex;
-                justify-content: center;
+                flex-direction: column;
                 align-items: center;
-                padding: 8px;
+                min-height: 100vh;
             }
 
             .app {
-                max-width: 1100px;
                 width: 100%;
-                background: #0e1e26;
-                backdrop-filter: blur(30px);
-                border-radius: 32px;
-                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
-                padding: 20px 16px;
-                border: 1px solid rgba(80, 140, 180, 0.3);
+                max-width: 400px;
             }
 
             .header {
-                margin-bottom: 16px;
-            }
-
-            h1 {
-                font-size: 1.9rem;
-                font-weight: 700;
-                color: #e6f7ff;
                 display: flex;
-                align-items: center;
-                gap: 6px;
-            }
-
-            /* --- username panel --- */
-            .username-panel {
-                background: #142e3a;
-                border-radius: 60px;
-                padding: 12px 20px;
-                margin-bottom: 20px;
-                display: flex;
-                flex-wrap: wrap;
-                align-items: center;
-                gap: 12px;
-                border: 1px solid #2e6b7c;
-            }
-
-            .username-panel label {
-                font-weight: 700;
-                color: #cae9ff;
-                font-size: 1.1rem;
-            }
-
-            #usernameInput {
-                flex: 1;
-                min-width: 200px;
-                padding: 14px 22px;
-                border: none;
-                border-radius: 50px;
-                font-size: 1.1rem;
-                background: #1d3e4c;
-                color: white;
-                outline: none;
-                border: 1.5px solid transparent;
-            }
-
-            #usernameInput:focus {
-                border-color: #4ab0d0;
-                background: #15323d;
-            }
-
-            /* --- pre‑chat: only room generation --- */
-            .section {
-                background: #112e38cc;
-                backdrop-filter: blur(8px);
-                border-radius: 36px;
-                padding: 24px 20px;
-                margin-bottom: 20px;
-                border: 1px solid #3c798b;
-            }
-
-            .flex-row {
-                display: flex;
-                flex-wrap: wrap;
-                align-items: center;
-                gap: 16px;
-            }
-
-            .btn {
-                background: #256579;
-                border: none;
-                color: white;
-                padding: 14px 28px;
-                border-radius: 60px;
-                font-weight: 700;
-                font-size: 1.1rem;
-                display: inline-flex;
-                align-items: center;
-                gap: 10px;
-                cursor: pointer;
-                border: 1px solid #80d0e0;
-                box-shadow: 0 8px 16px #00000040;
-            }
-
-            .btn:hover {
-                background: #34879c;
-                transform: scale(0.97);
-            }
-
-            .btn:disabled {
-                opacity: 0.4;
-                pointer-events: none;
-            }
-
-            .link-box {
-                background: #0d303b;
-                padding: 16px 22px;
-                border-radius: 60px;
-                word-break: break-all;
-                font-size: 1rem;
-                border: 1px solid #4f9db2;
-                display: flex;
-                align-items: center;
                 justify-content: space-between;
-                margin-top: 16px;
-                color: #dbf2ff;
-            }
-
-            #customSessionId {
-                flex: 1;
-                padding: 16px 24px;
-                border-radius: 60px;
-                border: none;
-                background: #1b4957;
-                color: white;
-                font-size: 1.1rem;
-                border: 1px solid #30809b;
-            }
-
-            /* --- TOP BAR: name+status on LEFT, 3-dot on RIGHT --- */
-            .chat-top-bar {
-                display: flex;
                 align-items: center;
-                justify-content: space-between;
-                margin-bottom: 16px;
-                background: #0f2e38;
-                border-radius: 60px;
-                padding: 8px 20px;
-                border: 1px solid #358197;
-            }
-
-            .left-status {
-                display: flex;
-                align-items: center;
-                gap: 12px;
-                background: #10333e;
-                padding: 6px 18px;
-                border-radius: 40px;
-                border: 1px solid #3e98ab;
-                color: #d2f0fc;
-                font-size: 0.95rem;
-            }
-
-            .my-name-small {
-                font-size: 0.95rem;
-                font-weight: 600;
-                color: #c2ecff;
-                max-width: 140px;
-                overflow: hidden;
-                text-overflow: ellipsis;
-            }
-
-            .dot {
-                width: 12px;
-                height: 12px;
-                border-radius: 50%;
-                background: #708e96;
-                display: inline-block;
-            }
-
-            .dot.active {
-                background: #3ae03a;
-                box-shadow: 0 0 18px #26e626;
-            }
-
-            .three-dot-btn {
-                background: #1f5768;
-                border: none;
-                color: white;
-                font-size: 1.8rem;
-                line-height: 1;
-                padding: 0 12px;
-                border-radius: 40px;
-                cursor: pointer;
-                border: 1px solid #6ab5c9;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                height: 48px;
-            }
-
-            /* --- INFO PANEL (hidden by default) — all extra controls --- */
-            .info-panel {
-                background: #0f2f39;
-                border-radius: 28px;
-                padding: 22px;
-                margin-bottom: 20px;
-                border: 1px solid #3b98ad;
-                display: none;
-                flex-direction: column;
-                gap: 16px;
-                backdrop-filter: blur(8px);
-            }
-
-            .info-row {
-                display: flex;
-                flex-wrap: wrap;
-                align-items: center;
-                justify-content: space-between;
-                background: #10333e;
-                padding: 12px 18px;
-                border-radius: 60px;
-                color: #e2f3ff;
-            }
-
-            .info-label {
-                font-weight: 600;
-                color: #aae1f0;
-                margin-right: 12px;
-            }
-
-            .room-link-copy {
-                background: #1b5768;
-                padding: 8px 22px;
-                border-radius: 40px;
-                color: white;
-                border: none;
-                font-weight: 600;
-                cursor: pointer;
-            }
-
-            #iceProfileSelectInfo {
-                background: #1f5768;
-                color: white;
-                border: none;
-                padding: 12px 24px;
-                border-radius: 50px;
-                font-size: 0.95rem;
-                border: 1px solid #6ac8e0;
-                flex: 1;
-                min-width: 180px;
-            }
-
-            #retryManualBtnInfo {
-                background: #2e7285;
-                border: none;
-                color: white;
-                padding: 10px 24px;
-                border-radius: 40px;
-                font-weight: 600;
-                cursor: pointer;
-                margin-left: 8px;
-            }
-
-            /* Quality selector */
-            #qualitySelectInfo {
-                background: #1f5768;
-                color: white;
-                border: none;
-                padding: 12px 24px;
-                border-radius: 50px;
-                font-size: 0.95rem;
-                border: 1px solid #6ac8e0;
-                flex: 1;
-                min-width: 180px;
-            }
-
-            /* --- CHAT MESSAGES – TALL like WhatsApp --- */
-            .chat-container {
-                background: #0a232b;
-                border-radius: 36px;
-                padding: 20px;
-                margin-top: 8px;
-                border: 1px solid #2d7488;
-            }
-
-            .messages {
-                background: #0b1c22;
-                border-radius: 28px;
-                padding: 22px 16px;
-                height: 600px;
-                /* big history view */
-                overflow-y: auto;
-                display: flex;
-                flex-direction: column;
-                gap: 14px;
-                margin-bottom: 18px;
-                border: 1px solid #275f6b;
-                box-shadow: inset 0 6px 12px #00000030;
-            }
-
-            .message {
-                background: #1e424b;
-                padding: 14px 20px;
-                border-radius: 24px 24px 24px 8px;
-                max-width: 85%;
-                word-break: break-word;
-                align-self: flex-start;
-                border: 1px solid #4895a8;
-                color: #f0fafc;
-                font-size: 1.05rem;
-                line-height: 1.45;
-                box-shadow: 0 2px 6px #00000030;
-            }
-
-            .message.self {
-                background: #1f5d6b;
-                color: white;
-                align-self: flex-end;
-                border-radius: 24px 24px 8px 24px;
-                border: 1px solid #83d1e0;
-            }
-
-            .message.system {
-                background: transparent;
-                color: #b7e1ed;
-                align-self: center;
-                font-size: 0.95rem;
-                border: 1px dashed #519faf;
-                max-width: 98%;
-            }
-
-            .file-attachment {
-                background: #0f313a;
-                border-radius: 18px;
-                padding: 12px 16px;
-                margin-top: 8px;
-                display: flex;
-                align-items: center;
-                gap: 14px;
-                border: 1px solid #5ba9b9;
-            }
-
-            .file-name {
-                font-weight: 700;
-                color: #daf0ff;
-            }
-
-            .download-link {
-                background: #1d6b7c;
-                padding: 8px 18px;
-                border-radius: 40px;
-                color: white;
-                text-decoration: none;
-                font-weight: 600;
-            }
-
-            .message img {
-                max-width: 200px;
-                max-height: 200px;
-                border-radius: 20px;
-                border: 2px solid #519faf;
-            }
-
-            /* --- INPUT ROW – compact, longer, with small 3-dot button on right --- */
-            .input-row {
-                display: flex;
-                flex-wrap: wrap;
-                align-items: center;
-                gap: 8px;
-                background: #0b2c35;
-                padding: 8px 12px;
-                /* narrower row */
-                border-radius: 60px;
-                border: 1px solid #328296;
-                position: relative;
-            }
-
-            #messageInput {
-                flex: 1 1 180px;
-                /* take available space */
-                min-width: 160px;
-                padding: 12px 18px;
-                /* reduced vertical padding */
-                border: none;
-                border-radius: 50px;
-                font-size: 1rem;
-                /* slightly smaller */
-                background: #163f49;
-                color: white;
-                outline: none;
-                border: 1.5px solid transparent;
-            }
-
-            #messageInput:focus {
-                border-color: #71d0e3;
-                background: #10333b;
-            }
-
-            #messageInput::placeholder {
-                font-size: 0.95rem;
-                color: #b8e5ee;
-            }
-
-            /* small three-dot button – replaces plus */
-            #menuBtn {
-                background: #1b5768;
-                border: none;
-                color: white;
-                font-size: 1.8rem;
-                line-height: 1;
-                padding: 0 12px;
-                border-radius: 40px;
-                cursor: pointer;
-                border: 1px solid #86d6e6;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                height: 48px;
-                min-width: 48px;
-            }
-
-            #menuBtn:hover {
-                background: #2c7e91;
-            }
-
-            #shareMenu {
-                display: none;
-                position: absolute;
-                bottom: 70px;
-                right: 10px;
-                background: #0e2f38;
-                border-radius: 28px;
-                padding: 14px;
-                border: 1.5px solid #4ba6b9;
-                z-index: 200;
-                flex-direction: column;
-                gap: 12px;
-                backdrop-filter: blur(12px);
-            }
-
-            #shareMenu .file-label,
-            #shareMenu .screen-share-btn {
-                padding: 14px 28px;
-                font-size: 1.2rem;
-                border-radius: 50px;
-                background: #1b6577;
-                color: white;
-                border: 1px solid #7ed1e0;
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                white-space: nowrap;
-            }
-
-            /* --- SCREEN SHARE – disappears completely when stopped --- */
-            .screen-video-container {
-                background: #001116;
-                border-radius: 28px;
-                padding: 16px;
-                margin-bottom: 16px;
-                border: 2px solid #00c8ff;
-                display: none;
-                flex-wrap: wrap;
-                align-items: center;
-                gap: 16px;
-            }
-
-            .screen-video-container video {
                 width: 100%;
-                max-height: 260px;
-                border-radius: 24px;
-                border: 2px solid #3fa5b5;
+                margin-bottom: 20px;
             }
 
-            .stop-share-btn {
-                background: #c24343;
-                padding: 12px 24px;
-                border-radius: 50px;
+            .box {
+                background: var(--surface);
+                border-radius: 16px;
+                padding: 15px;
+                margin-bottom: 12px;
+                border: 1px solid rgba(0, 210, 255, 0.2);
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            }
+
+            .id-display {
+                font-family: monospace;
+                font-size: 1.8rem;
                 font-weight: bold;
-                color: white;
+                color: var(--primary);
+                letter-spacing: 2px;
             }
 
-            .fullscreen-btn {
-                background: #256579;
-                padding: 12px 24px;
-                border-radius: 50px;
-                font-weight: 600;
-                border: 1px solid #a0e3ff;
+            .status-bar {
+                display: flex;
+                gap: 8px;
+                margin-top: 10px;
+            }
+
+            .stat {
+                font-size: 0.6rem;
+                padding: 3px 8px;
+                border-radius: 10px;
+                background: #333;
+                color: #888;
+                border: 1px solid #444;
+                transition: 0.3s;
+            }
+
+            .stat.active {
+                background: #004400;
+                color: #00ff00;
+                border-color: #00ff00;
+                box-shadow: 0 0 8px #00ff00;
+            }
+
+            .input-group {
+                display: flex;
+                gap: 8px;
+                margin-top: 5px;
+            }
+
+            input {
+                flex: 1;
+                background: #081218;
+                border: 1px solid #30809b;
+                border-radius: 10px;
+                color: white;
+                padding: 12px;
+                font-size: 1.1rem;
+                outline: none;
+                text-transform: uppercase;
+                font-weight: bold;
+            }
+
+            button {
+                background: var(--primary);
+                color: #000;
+                border: none;
+                border-radius: 10px;
+                padding: 12px 20px;
+                font-weight: bold;
                 cursor: pointer;
-                color: white;
             }
 
-            .audio-hint {
-                background: #1b5768;
-                color: white;
-                padding: 8px 16px;
-                border-radius: 40px;
-                font-size: 0.85rem;
-                display: inline-block;
-                margin-left: 8px;
+            #log {
+                background: #000;
+                border-radius: 12px;
+                padding: 10px;
+                height: 350px;
+                overflow-y: auto;
+                font-family: monospace;
+                font-size: 0.75rem;
+                border: 1px solid #1a3a4a;
+                white-space: pre-wrap;
+                line-height: 1.4;
             }
 
-            .hidden {
-                display: none !important;
+            .sys {
+                color: #888;
+                font-style: italic;
             }
 
-            #currentSessionSpan {
-                display: none;
+            .ice {
+                color: #ffa500;
             }
 
-            /* mobile fine-tuning */
-            @media (max-width: 600px) {
-                .input-row {
-                    padding: 6px 10px;
-                }
+            .success {
+                color: #00ff00;
+                font-weight: bold;
+            }
 
-                #messageInput {
-                    padding: 10px 16px;
-                    font-size: 1rem;
-                }
-
-                #menuBtn {
-                    font-size: 1.8rem;
-                    padding: 0 10px;
-                    height: 44px;
-                    min-width: 44px;
-                }
-
-                .messages {
-                    height: 500px;
-                }
+            .error {
+                color: #ff4444;
             }
         </style>
     </head>
     <body>
         <div class="app">
-            <!-- header -->
             <div class="header">
-                <h1>💬 Share<span style="color:#b3ecff;">Chat</span></h1>
+                <span style="font-weight: bold; opacity: 0.8;">EmuX Node 1.5</span>
+                <button onclick="location.reload()" style="padding: 5px 10px; font-size: 0.7rem; background: #222; color: #888;">RELOAD</button>
             </div>
 
-            <!-- username edit -->
-            <div class="username-panel">
-                <label>👤 Name</label>
-                <input type="text" id="usernameInput" placeholder="Your nickname" value="Guest" autocomplete="off">
-            </div>
-
-            <!-- ========== PRE‑CHAT: room generation ========= -->
-            <div id="preChatSection">
-                <div id="generatorView" class="section">
-                    <div style="margin-bottom: 16px; font-weight: 700; color: #c3ecff; font-size:1.2rem;">🚀 New room</div>
-                    <div class="flex-row">
-                        <input type="text" id="customSessionId" placeholder="room name (optional)">
-                        <button id="generateBtn" class="btn">🔗 Generate link</button>
-                    </div>
-                    <div id="linkOutput" style="display: none;" class="link-box">
-                        <span id="shareableLink"></span>
-                        <button id="copyLinkBtn" style="background: transparent; border: none; font-size: 1.8rem; color:white;">📋</button>
-                    </div>
-                    <div style="margin-top: 24px;">
-                        <button id="hostChatBtn" class="btn" style="background: #1c7c8c;">🎤 Host this room</button>
-                    </div>
+            <div class="box">
+                <div style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 5px;">MY ID (4 CHARS):</div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span class="id-display" id="my-id">....</span>
+                    <button onclick="copyId()" id="copy-btn" style="background: transparent; color: var(--primary); font-size: 0.8rem;">COPY</button>
+                </div>
+                <div class="status-bar">
+                    <span id="st-socket" class="stat">SIGNAL</span>
+                    <span id="st-ice" class="stat">ICE</span>
+                    <span id="st-data" class="stat">DATA</span>
                 </div>
             </div>
 
-            <!-- ========== CHAT INTERFACE ========= -->
-            <div id="chatInterface" class="hidden">
-                <!-- top bar: name+status left, 3-dot right -->
-                <div class="chat-top-bar">
-                    <div class="left-status">
-                        <span class="my-name-small" id="topBarUsername">Guest</span>
-                        <span class="dot" id="stateDot"></span>
-                    </div>
-                    <button id="infoToggleBtn" class="three-dot-btn">⋮</button>
-                </div>
-
-                <!-- SCREEN SHARE VIDEO CONTAINER -->
-                <div id="screenVideoContainer" class="screen-video-container">
-                    <video id="remoteScreenVideo" autoplay playsinline muted="false"></video>
-                    <div style="display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
-                        <span style="color:white; font-weight:700;" id="screenShareLabel">🖥️ SCREEN SHARE</span>
-                        <button id="stopScreenShareBtn" class="stop-share-btn" style="display:none;">⏹️ Stop sharing</button>
-                        <button id="fullscreenBtn" class="fullscreen-btn" style="display:none;">⛶ Fullscreen</button>
-                        <span id="audioHint" class="audio-hint" style="display:none;">🔊 Tap video for audio</span>
-                    </div>
-                </div>
-
-                <!-- ℹ️ INFO PANEL — all extra settings + QUALITY CONTROL -->
-                <div id="infoPanel" class="info-panel">
-                    <div class="info-row">
-                        <span class="info-label">🔗 Room link</span>
-                        <span id="roomLinkDisplayInfo" style="word-break: break-all; color:#c7f0ff;"></span>
-                        <button id="copyRoomLinkInfoBtn" class="room-link-copy">📋 Copy</button>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">🧊 ICE profile</span>
-                        <select id="iceProfileSelectInfo"></select>
-                        <button id="retryManualBtnInfo" title="Retry with selected profile">🔁 Retry</button>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">📡 Current ICE</span>
-                        <span id="currentIceProfileInfo">⚙️ -</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">👥 Active clients</span>
-                        <span id="peerCountDisplayInfo">👤 1</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">🆔 My Peer ID</span>
-                        <span id="myPeerIdInfo">-</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">📶 ICE state</span>
-                        <span id="iceStateInfo">new</span>
-                    </div>
-                    <!-- 🎚️ QUALITY SELECTOR (client controlled) -->
-                    <div class="info-row">
-                        <span class="info-label">🎮 Video quality</span>
-                        <select id="qualitySelectInfo">
-                            <option value="low">Low (480p, 10fps, 300kbps)</option>
-                            <option value="medium" selected>Medium (720p, 15fps, 500kbps)</option>
-                            <option value="high">High (1080p, 30fps, 1mbps)</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- CHAT MESSAGES – TALL -->
-                <div class="chat-container">
-                    <div class="messages" id="messageLog">
-                        <div class="message system">🟢 Connected. Tap video to hear audio on mobile. Adjust quality in Info.</div>
-                    </div>
-
-                    <!-- INPUT ROW – compact, with small three-dot menu button on right -->
-                    <div class="input-row">
-                        <input type="text" id="messageInput" placeholder="Type a message..." autocomplete="off" disabled>
-                        <input type="file" id="documentUpload" accept="*/*" style="display:none;">
-                        <button id="menuBtn">⋮</button>
-                        <div id="shareMenu">
-                            <label for="documentUpload" class="file-label">📎 File</label>
-                            <button id="screenShareBtn" class="screen-share-btn">🖥️ Screen</button>
-                        </div>
-                    </div>
+            <div class="box">
+                <div class="input-group">
+                    <input type="text" id="host-id" placeholder="ID MÁY KIA" maxlength="4" autocomplete="off" oninput="this.value=this.value.toUpperCase()">
+                    <button id="connect-btn">CONNECT</button>
                 </div>
             </div>
-            <!-- hidden room id storage -->
-            <span id="currentSessionSpan" style="display:none;"></span>
+
+            <div id="log"></div>
         </div>
 
         <script>
-            (function () {
-                "use strict";
+            const logEl = document.getElementById('log');
+            const stSocket = document.getElementById('st-socket');
+            const stIce = document.getElementById('st-ice');
+            const stData = document.getElementById('st-data');
 
-                // ---------- 🌍 ICE SERVER PROFILES ----------
-                const SERVER_PROFILES = [
-                    {name: "1. Google STUN only", config: {iceServers: [{urls: 'stun:stun.l.google.com:19302'}]}},
-                    {name: "2. OpenRelay TURN (UDP)", config: {iceServers: [{urls: 'turn:openrelayproject.org:3478', username: 'openrelayproject', credential: 'openrelayproject'}]}},
-                    {name: "3. OpenRelay TURN (TCP)", config: {iceServers: [{urls: 'turn:openrelayproject.org:3478?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject'}]}},
-                    {name: "4. AnyFirewall TURN (TCP/443)", config: {iceServers: [{urls: 'turn:turn.anyfirewall.com:443?transport=tcp', username: 'webrtc', credential: 'webrtc'}]}},
-                    {name: "5. numb.viagenie.ca TURN", config: {iceServers: [{urls: 'turn:numb.viagenie.ca:3478', username: 'letmein', credential: 'letmein'}]}},
-                    {name: "6. Google STUN + OpenRelay", config: {iceServers: [{urls: 'stun:stun.l.google.com:19302'}, {urls: 'turn:openrelayproject.org:3478', username: 'openrelayproject', credential: 'openrelayproject'}]}},
-                    {name: "7. Google STUN + AnyFirewall", config: {iceServers: [{urls: 'stun:stun.l.google.com:19302'}, {urls: 'turn:turn.anyfirewall.com:443?transport=tcp', username: 'webrtc', credential: 'webrtc'}]}},
-                    {name: "8. Full combo", config: {iceServers: [{urls: 'stun:stun.l.google.com:19302'}, {urls: 'turn:openrelayproject.org:3478', username: 'openrelayproject', credential: 'openrelayproject'}, {urls: 'turn:turn.anyfirewall.com:443?transport=tcp', username: 'webrtc', credential: 'webrtc'}]}}
-                ];
+            function addLog(msg, type = '') {
+                const div = document.createElement('div');
+                div.className = type;
+                div.textContent = `[${new Date().toLocaleTimeString('en-GB', {hour12: false})}] ${msg}`;
+                logEl.appendChild(div);
+                logEl.scrollTop = logEl.scrollHeight;
+            }
 
-                // ---------- QUALITY PRESETS ----------
-                const QUALITY_PRESETS = {
-                    low: {
-                        video: {width: {ideal: 854, max: 854}, height: {ideal: 480, max: 480}, frameRate: {ideal: 10, max: 15}},
-                        bitrate: 300000
-                    },
-                    medium: {
-                        video: {width: {ideal: 1280, max: 1280}, height: {ideal: 720, max: 720}, frameRate: {ideal: 15, max: 30}},
-                        bitrate: 500000
-                    },
-                    high: {
-                        video: {width: {ideal: 1920, max: 1920}, height: {ideal: 1080, max: 1080}, frameRate: {ideal: 30, max: 30}},
-                        bitrate: 1000000
-                    }
-                };
+            function copyId() {
+                const id = document.getElementById('my-id').innerText;
+                navigator.clipboard.writeText(id);
+                const btn = document.getElementById('copy-btn');
+                btn.innerText = "COPIED!";
+                setTimeout(() => btn.innerText = "COPY", 2000);
+            }
 
-                // ---------- GLOBAL STATE ----------
-                let sessionId = null, isHost = false, myPeerId = null, myUsername = 'Guest';
-                let peer = null;
-                let hostConnections = new Map();        // peerId -> DataConnection
-                let clientConn = null;                 // client's connection to host
+            // FULL COMBO ICE CONFIG (Từ bản chat)
+            const iceConfig = {
+                'iceServers': [
+                    {urls: 'stun:stun.l.google.com:19302'},
+                    {urls: 'turn:openrelayproject.org:3478', username: 'openrelayproject', credential: 'openrelayproject'},
+                    {urls: 'turn:turn.anyfirewall.com:443?transport=tcp', username: 'webrtc', credential: 'webrtc'}
+                ]
+            };
 
-                // Screen share
-                let activeScreenSharperId = null;
-                let localScreenShareStream = null;
-                let isViewingScreen = false;
-                let screenShareCalls = [];
+            const shortId = Math.random().toString(36).substring(2, 6).toUpperCase();
+            document.getElementById('my-id').innerText = shortId;
 
-                // Retry state (client only)
-                let isConnecting = false;
-                let currentProfileIndex = 0;
-                let connectionAttemptTimeout = null, iceNewTimeout = null;
-                let retryCount = 0, manualRetry = false;
+            const peer = new Peer(shortId, {
+                config: iceConfig,
+                debug: 1
+            });
 
-                // Message storage & ack (host)
-                let messageStore = [];
-                let receivedMsgIds = new Set();
-                let hostMessageMap = new Map();        // msgId -> { msg, acks: Set<peerId> }
-                let clientAcks = new Map();            // peerId -> Set<msgId>
+            peer.on('open', (id) => {
+                stSocket.classList.add('active');
+                addLog(`>>> ID: ${id} READY`, 'success');
+            });
 
-                // ---------- UI ELEMENTS ----------
-                const preChatSection = document.getElementById('preChatSection');
-                const chatInterface = document.getElementById('chatInterface');
-                const usernameInput = document.getElementById('usernameInput');
-                const messageLog = document.getElementById('messageLog');
-                const messageInput = document.getElementById('messageInput');
-                const documentUpload = document.getElementById('documentUpload');
-                const currentSessionSpan = document.getElementById('currentSessionSpan');
-                const topBarUsername = document.getElementById('topBarUsername');
+            peer.on('connection', (conn) => {
+                addLog(`>>> INCOMING: ${conn.peer}`, 'ice');
+                setupConnection(conn);
+            });
 
-                const iceProfileSelectInfo = document.getElementById('iceProfileSelectInfo');
-                const retryManualBtnInfo = document.getElementById('retryManualBtnInfo');
-                const qualitySelectInfo = document.getElementById('qualitySelectInfo');
+            document.getElementById('connect-btn').onclick = () => {
+                const target = document.getElementById('host-id').value;
+                if (!target) return;
+                addLog(`>>> CONNECTING TO: ${target}...`, 'sys');
+                const conn = peer.connect(target, {reliable: true});
+                setupConnection(conn);
+            };
 
-                const infoToggleBtn = document.getElementById('infoToggleBtn');
-                const infoPanel = document.getElementById('infoPanel');
-                const roomLinkDisplayInfo = document.getElementById('roomLinkDisplayInfo');
-                const copyRoomLinkInfoBtn = document.getElementById('copyRoomLinkInfoBtn');
-                const currentIceProfileInfo = document.getElementById('currentIceProfileInfo');
-                const peerCountDisplayInfo = document.getElementById('peerCountDisplayInfo');
-                const iceStateInfo = document.getElementById('iceStateInfo');
-                const myPeerIdInfo = document.getElementById('myPeerIdInfo');
-                const stateDot = document.getElementById('stateDot');
-
-                const screenShareBtn = document.getElementById('screenShareBtn');
-                const screenVideoContainer = document.getElementById('screenVideoContainer');
-                const remoteScreenVideo = document.getElementById('remoteScreenVideo');
-                const stopScreenShareBtn = document.getElementById('stopScreenShareBtn');
-                const screenShareLabel = document.getElementById('screenShareLabel');
-                const fullscreenBtn = document.getElementById('fullscreenBtn');
-                const audioHint = document.getElementById('audioHint');
-
-                const menuBtn = document.getElementById('menuBtn');
-                const shareMenu = document.getElementById('shareMenu');
-
-                // ---------- POPULATE ICE DROPDOWN ----------
-                function populateIceSelect() {
-                    iceProfileSelectInfo.innerHTML = '';
-                    SERVER_PROFILES.forEach((profile, idx) => {
-                        const opt = document.createElement('option');
-                        opt.value = idx;
-                        opt.textContent = profile.name;
-                        iceProfileSelectInfo.appendChild(opt);
-                    });
-                    iceProfileSelectInfo.value = SERVER_PROFILES.length - 1; // default full combo
-                }
-                populateIceSelect();
-
-                // ---------- HELPERS ----------
-                function generateUUID() {return Date.now() + '-' + Math.random().toString(36).substring(2, 10);}
-                function getUrlParam(p) {return new URLSearchParams(window.location.search).get(p);}
-                function buildSessionUrl(s) {const url = new URL(window.location.href); url.searchParams.set('session', s); return url.toString();}
-
-                // ---------- DISPLAY MESSAGE ----------
-                function displayMessage(msg, isSelf = false) {
-                    const msgDiv = document.createElement('div');
-                    msgDiv.className = 'message' + (isSelf ? ' self' : '');
-                    msgDiv.dataset.msgId = msg.id;
-                    let senderDisplay = msg.senderName ? msg.senderName : (msg.senderId === myPeerId ? 'You' : 'Peer');
-                    if (isSelf) senderDisplay = 'You';
-                    let contentHtml = '';
-                    if (msg.type === 'file' || msg.type === 'image') {
-                        if (msg.fileInfo) {
-                            const file = msg.fileInfo;
-                            const isImage = file.type.startsWith('image/');
-                            if (isImage) {
-                                contentHtml = `<strong>${senderDisplay}:</strong><br><img src="${msg.content}" alt="image" style="max-width:200px;">`;
-                            } else {
-                                contentHtml = `<strong>${senderDisplay}:</strong> 
-                                <div class="file-attachment">
-                                    <span style="font-size:2.2rem;">📄</span>
-                                    <div class="file-info">
-                                        <span class="file-name">${file.name || 'document'}</span>
-                                        <span style="color:#aad3df; font-size:0.85rem;">${file.size ? (file.size / 1024).toFixed(1) + ' KB' : ''}</span>
-                                    </div>
-                                    <a href="${msg.content}" download="${file.name}" class="download-link">⬇️ Download</a>
-                                </div>`;
+            function setupConnection(conn) {
+                const checkPC = setInterval(() => {
+                    if (conn.peerConnection) {
+                        clearInterval(checkPC);
+                        const pc = conn.peerConnection;
+                        pc.oniceconnectionstatechange = () => {
+                            addLog(`ICE: ${pc.iceConnectionState}`, 'ice');
+                            if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+                                stIce.classList.add('active');
                             }
-                        } else {
-                            contentHtml = `<strong>${senderDisplay}:</strong><br><img src="${msg.content}" style="max-width:180px;">`;
-                        }
-                    } else {
-                        contentHtml = `<strong>${senderDisplay}:</strong> ${msg.content}`;
-                    }
-                    msgDiv.innerHTML = contentHtml;
-                    messageLog.appendChild(msgDiv);
-                    messageLog.scrollTop = messageLog.scrollHeight;
-                }
-
-                function addMessageToStore(msg, isSelf = false) {
-                    if (!msg.id) msg.id = generateUUID();
-                    if (receivedMsgIds.has(msg.id)) return false;
-                    receivedMsgIds.add(msg.id);
-                    messageStore.push(msg);
-                    displayMessage(msg, isSelf);
-                    return true;
-                }
-
-                // ---------- INFINITE RETRY (client) ----------
-                function startClientConnection() {
-                    if (isHost) return;
-                    currentProfileIndex = parseInt(iceProfileSelectInfo.value, 10) || 0;
-                    retryCount = 0;
-                    attemptConnection();
-                }
-
-                function attemptConnection() {
-                    if (isHost) return;
-                    clearTimeouts();
-                    if (currentProfileIndex >= SERVER_PROFILES.length) currentProfileIndex = 0;
-                    const profile = SERVER_PROFILES[currentProfileIndex];
-                    retryCount++;
-                    isConnecting = true;
-                    manualRetry = false;
-                    currentIceProfileInfo.innerText = `⏳ ${profile.name}`;
-                    iceStateInfo.innerText = 'new';
-                    stateDot.className = 'dot';
-
-                    if (peer) {peer.destroy(); peer = null;}
-                    clientConn = null;
-
-                    peer = new Peer({config: profile.config, debug: 1});
-
-                    let iceLeftNew = false;
-                    iceNewTimeout = setTimeout(() => {
-                        if (isConnecting && !iceLeftNew && !manualRetry) {
-                            appendSystemMessage(`⏳ ICE stuck in 'new' – switching`);
-                            moveToNextProfileAndRetry();
-                        }
-                    }, 10000);
-
-                    peer.on('iceconnectionstatechange', () => {
-                        const state = peer.iceConnectionState || 'new';
-                        iceStateInfo.innerText = state;
-                        if (state === 'connected' || state === 'completed') {
-                            iceLeftNew = true; clearTimeout(iceNewTimeout);
-                            stateDot.className = 'dot active';
-                        } else stateDot.className = 'dot';
-                        if ((state === 'failed' || state === 'disconnected' || state === 'closed') && isConnecting && !manualRetry) {
-                            moveToNextProfileAndRetry();
-                        }
-                    });
-
-                    peer.on('call', handleIncomingScreenShareCall);
-
-                    peer.on('open', (id) => {
-                        if (!isConnecting) return;
-                        myPeerId = id;
-                        myPeerIdInfo.innerText = id;
-                        topBarUsername.innerText = myUsername;
-                        connectionAttemptTimeout = setTimeout(() => {
-                            if (isConnecting && !manualRetry) {
-                                appendSystemMessage(`⏳ Connection timeout – retry`);
-                                moveToNextProfileAndRetry();
-                            }
-                        }, 20000);
-                        const conn = peer.connect(sessionId, {reliable: true});
-                        clientConn = conn;
-                        setupClientConnection(conn);
-                    });
-
-                    peer.on('error', (err) => {
-                        console.error('Peer error:', err);
-                        if (isConnecting && !manualRetry) {
-                            appendSystemMessage(`⚠️ Peer error: ${err.type} – retry`);
-                            moveToNextProfileAndRetry();
-                        }
-                    });
-                }
-
-                function moveToNextProfileAndRetry() {
-                    if (isHost) return;
-                    clearTimeouts();
-                    currentProfileIndex++;
-                    if (currentProfileIndex >= SERVER_PROFILES.length) currentProfileIndex = 0;
-                    setTimeout(() => {
-                        if (!manualRetry && isConnecting) attemptConnection();
-                    }, 3000);
-                }
-
-                function clearTimeouts() {
-                    if (connectionAttemptTimeout) clearTimeout(connectionAttemptTimeout);
-                    if (iceNewTimeout) clearTimeout(iceNewTimeout);
-                    connectionAttemptTimeout = null; iceNewTimeout = null;
-                }
-
-                // ---------- CLIENT DATA CONNECTION ----------
-                function setupClientConnection(conn) {
-                    const connOpenTimeout = setTimeout(() => {
-                        if (!conn.open && isConnecting && !manualRetry) {
-                            appendSystemMessage('⏳ Data connection not opening – retry');
-                            moveToNextProfileAndRetry();
-                        }
-                    }, 15000);
-
-                    conn.on('open', () => {
-                        clearTimeout(connOpenTimeout);
-                        clearTimeouts();
-                        if (!isConnecting) return;
-                        isConnecting = false;
-                        stateDot.className = 'dot active';
-                        currentIceProfileInfo.innerText = `✅ ${SERVER_PROFILES[currentProfileIndex].name}`;
-                        iceStateInfo.innerText = 'connected';
-                        enableChat(true);
-                        screenShareBtn.style.display = 'inline-flex';
-                        conn.send({type: 'setUsername', username: myUsername, peerId: myPeerId});
-                        appendSystemMessage('✅ Joined as ' + myUsername);
-                    });
-
-                    conn.on('data', handleClientData);
-                    conn.on('close', () => {
-                        stateDot.className = 'dot';
-                        enableChat(false);
-                        screenShareBtn.style.display = 'none';
-                        if (!manualRetry) {
-                            appendSystemMessage('⚠️ Disconnected – reconnecting...');
-                            startClientConnection();
-                        }
-                    });
-                    conn.on('error', (e) => {
-                        console.error('Data connection error:', e);
-                        if (isConnecting && !manualRetry) moveToNextProfileAndRetry();
-                    });
-                }
-
-                // ---------- 🎮 QUALITY CONTROL ----------
-                async function applyQualityToSender(sender, quality) {
-                    if (!sender) return;
-                    const preset = QUALITY_PRESETS[quality] || QUALITY_PRESETS.medium;
-                    if (sender.track && sender.track.kind === 'video') {
-                        try {
-                            await sender.track.applyConstraints(preset.video);
-                        } catch (e) {
-                            console.warn('Could not apply video constraints', e);
-                        }
-                    }
-                    try {
-                        const params = sender.getParameters();
-                        if (!params.encodings) params.encodings = [{}];
-                        params.encodings[0].maxBitrate = preset.bitrate;
-                        await sender.setParameters(params);
-                    } catch (e) {
-                        console.warn('Could not set bitrate', e);
-                    }
-                }
-
-                function applyQualityToCall(call, quality) {
-                    setTimeout(() => {
-                        try {
-                            const pc = call._pc;
-                            if (pc && pc.getSenders) {
-                                const videoSender = pc.getSenders().find(s => s.track?.kind === 'video');
-                                applyQualityToSender(videoSender, quality);
-                                const audioSender = pc.getSenders().find(s => s.track?.kind === 'audio');
-                                if (audioSender) {
-                                    try {
-                                        const params = audioSender.getParameters();
-                                        if (!params.encodings) params.encodings = [{}];
-                                        params.encodings[0].maxBitrate = 64000;
-                                        audioSender.setParameters(params);
-                                    } catch (e) { }
-                                }
-                            }
-                        } catch (e) {
-                            console.warn('Could not apply quality to call', e);
-                        }
-                    }, 500);
-                }
-
-                async function applyQualityToLocalStream(quality) {
-                    if (!localScreenShareStream) return;
-                    const preset = QUALITY_PRESETS[quality] || QUALITY_PRESETS.medium;
-                    const videoTrack = localScreenShareStream.getVideoTracks()[0];
-                    if (videoTrack) {
-                        try {
-                            await videoTrack.applyConstraints(preset.video);
-                            appendSystemMessage(`🎮 Video quality set to ${quality} (local)`);
-                        } catch (e) {
-                            console.warn('Could not apply local constraints', e);
-                        }
-                    }
-                    screenShareCalls.forEach(call => applyQualityToCall(call, quality));
-                }
-
-                function requestQualityChange(quality) {
-                    if (localScreenShareStream) {
-                        applyQualityToLocalStream(quality);
-                        return;
-                    }
-                    if (activeScreenSharperId && clientConn?.open) {
-                        clientConn.send({
-                            type: 'qualityRequest',
-                            sharerId: activeScreenSharperId,
-                            quality: quality
-                        });
-                        appendSystemMessage(`🎮 Requested ${quality} quality from sharer`);
-                    } else {
-                        appendSystemMessage('⚠️ No active screen share to control');
-                    }
-                }
-
-                // ---------- 🎧 MOBILE AUDIO FIX ----------
-                function enableAudioOnMobile(videoElement) {
-                    audioHint.style.display = 'inline-block';
-                    const container = screenVideoContainer;
-                    const enableAudio = async () => {
-                        if (window.audioContext && window.audioContext.state === 'suspended') {
-                            await window.audioContext.resume();
-                        }
-                        if (videoElement.paused) {
-                            videoElement.play().catch(e => console.warn('play failed', e));
-                        }
-                        audioHint.style.display = 'none';
-                        container.removeEventListener('click', enableAudio);
-                    };
-                    container.addEventListener('click', enableAudio, {once: true});
-                }
-
-                // ---------- INCOMING SCREEN SHARE (viewer side) ----------
-                function handleIncomingScreenShareCall(call) {
-                    if (localScreenShareStream) {
-                        call.answer(localScreenShareStream);
-                    } else {
-                        call.answer();
-                        call.on('stream', (remoteStream) => {
-                            screenVideoContainer.style.display = 'flex';
-                            remoteScreenVideo.srcObject = remoteStream;
-                            isViewingScreen = true;
-                            screenShareLabel.innerText = `🖥️ ${call.peer.substring(0, 6)}'s screen`;
-                            fullscreenBtn.style.display = 'inline-flex';
-                            appendSystemMessage(`📺 Viewing screen from ${call.peer.substring(0, 6)}`);
-                            enableAudioOnMobile(remoteScreenVideo);
-                        });
-                        call.on('close', () => {
-                            if (isViewingScreen) {
-                                screenVideoContainer.style.display = 'none';
-                                remoteScreenVideo.srcObject = null;
-                                isViewingScreen = false;
-                                fullscreenBtn.style.display = 'none';
-                                audioHint.style.display = 'none';
-                            }
-                        });
-                    }
-                }
-
-                // ---------- STOP MY SCREEN SHARE ----------
-                function stopMyScreenShare(localOnly = false) {
-                    if (localScreenShareStream) {
-                        localScreenShareStream.getTracks().forEach(t => t.stop());
-                        localScreenShareStream = null;
-                    }
-                    screenShareCalls.forEach(call => call.close());
-                    screenShareCalls = [];
-                    stopScreenShareBtn.style.display = 'none';
-                    fullscreenBtn.style.display = 'none';
-                    screenVideoContainer.style.display = 'none';
-                    remoteScreenVideo.srcObject = null;
-                    isViewingScreen = false;
-                    if (!isHost && clientConn?.open) clientConn.send({type: 'screenShareStop'});
-                    else if (isHost) hostBroadcastScreenShareStop();
-                }
-
-                // ---------- 🚀 START SCREEN SHARE – SMOOTH + AUDIO ----------
-                async function startScreenShare() {
-                    if (!peer) return;
-                    try {
-                        if (localScreenShareStream) stopMyScreenShare(true);
-
-                        const preset = QUALITY_PRESETS.medium;
-                        const stream = await navigator.mediaDevices.getDisplayMedia({
-                            video: preset.video,
-                            audio: true
-                        });
-
-                        localScreenShareStream = stream;
-                        stopScreenShareBtn.style.display = 'inline-block';
-                        screenShareLabel.innerText = '🖥️ You are sharing (audio)';
-                        screenVideoContainer.style.display = 'flex';
-                        remoteScreenVideo.srcObject = stream;
-                        fullscreenBtn.style.display = 'inline-flex';
-
-                        if (isHost) {
-                            hostHandleNewScreenShare(myPeerId);
-                        } else if (clientConn?.open) {
-                            clientConn.send({type: 'screenShareStart', sharerPeerId: myPeerId});
-                        }
-
-                        const originalCall = peer.call;
-                        peer.call = function (peerId, stream, options) {
-                            const call = originalCall.call(this, peerId, stream, options);
-                            const currentQuality = qualitySelectInfo.value;
-                            applyQualityToCall(call, currentQuality);
-                            screenShareCalls.push(call);
-                            call.on('close', () => {
-                                screenShareCalls = screenShareCalls.filter(c => c !== call);
-                            });
-                            return call;
                         };
-
-                        screenShareCalls.forEach(call => applyQualityToCall(call, qualitySelectInfo.value));
-
-                        stream.getVideoTracks()[0].onended = () => stopMyScreenShare();
-                    } catch (err) {
-                        appendSystemMessage('❌ Screen share failed: ' + err.message);
+                        pc.onicecandidate = (e) => {
+                            if (e.candidate) addLog(`📍 Candidate: ${e.candidate.type}`, 'sys');
+                        };
                     }
-                }
+                }, 100);
 
-                // ---------- HOST HANDLERS (screen share) ----------
-                function hostHandleNewScreenShare(sharerPeerId) {
-                    if (activeScreenSharperId && activeScreenSharperId !== sharerPeerId) hostBroadcastScreenShareStop();
-                    activeScreenSharperId = sharerPeerId;
-                    const viewers = [];
-                    hostConnections.forEach((_, pid) => {if (pid !== sharerPeerId) viewers.push(pid);});
-                    if (isHost && sharerPeerId !== myPeerId) viewers.push(myPeerId);
-
-                    if (sharerPeerId === myPeerId) {
-                        hostAsSharerCallViewers(viewers);
-                    } else {
-                        const sharerConn = hostConnections.get(sharerPeerId);
-                        if (sharerConn?.open) sharerConn.send({type: 'screenShareInitiate', viewers});
-                    }
-                    const startMsg = {type: 'screenShareStart', sharerPeerId};
-                    hostConnections.forEach((conn, pid) => {if (pid !== sharerPeerId && conn.open) conn.send(startMsg);});
-                    if (sharerPeerId !== myPeerId) appendSystemMessage(`📺 ${sharerPeerId.substring(0, 6)} started screen share (audio)`);
-                }
-
-                function hostAsSharerCallViewers(viewerIds) {
-                    if (!localScreenShareStream) return;
-                    viewerIds.forEach(viewerId => {
-                        try {
-                            const call = peer.call(viewerId, localScreenShareStream);
-                            screenShareCalls.push(call);
-                            call.on('close', () => screenShareCalls = screenShareCalls.filter(c => c !== call));
-                        } catch (err) { }
-                    });
-                }
-
-                function hostBroadcastScreenShareStop() {
-                    const msg = {type: 'screenShareStop'};
-                    hostConnections.forEach(conn => {if (conn.open) conn.send(msg);});
-                    screenVideoContainer.style.display = 'none';
-                    remoteScreenVideo.srcObject = null;
-                    isViewingScreen = false;
-                    if (activeScreenSharperId === myPeerId) stopMyScreenShare(true);
-                    activeScreenSharperId = null;
-                    fullscreenBtn.style.display = 'none';
-                }
-
-                function hostNotifyNewPeerToSharer(newPeerId) {
-                    if (activeScreenSharperId) {
-                        if (activeScreenSharperId === myPeerId) {
-                            if (localScreenShareStream) {
-                                try {
-                                    const call = peer.call(newPeerId, localScreenShareStream);
-                                    screenShareCalls.push(call);
-                                    call.on('close', () => screenShareCalls = screenShareCalls.filter(c => c !== call));
-                                } catch { }
-                            }
-                        } else {
-                            const sharerConn = hostConnections.get(activeScreenSharperId);
-                            if (sharerConn?.open) sharerConn.send({type: 'screenShareAddViewer', viewerId: newPeerId});
-                        }
-                    }
-                }
-
-                // ---------- HOST SESSION ----------
-                function hostSession() {
-                    if (!sessionId) {alert('Generate a link first'); return;}
-                    isHost = true;
-                    myUsername = usernameInput.value.trim() || 'Host';
-                    preChatSection.classList.add('hidden');
-                    chatInterface.classList.remove('hidden');
-                    currentSessionSpan.innerText = sessionId;
-                    const fullLink = buildSessionUrl(sessionId);
-                    roomLinkDisplayInfo.innerText = fullLink;
-                    topBarUsername.innerText = myUsername;
-
-                    const profileIndex = parseInt(iceProfileSelectInfo.value, 10) || 0;
-                    const profile = SERVER_PROFILES[profileIndex];
-                    currentIceProfileInfo.innerText = `🎤 host: ${profile.name}`;
-
-                    peer = new Peer(sessionId, {config: profile.config, debug: 1});
-                    monitorIceState(peer);
-                    peer.on('call', handleIncomingScreenShareCall);
-
-                    peer.on('open', (id) => {
-                        myPeerId = id;
-                        myPeerIdInfo.innerText = id;
-                        topBarUsername.innerText = myUsername;
-                        iceStateInfo.innerText = 'listening';
-                        stateDot.className = 'dot active';
-                        enableChat(true);
-                        screenShareBtn.style.display = 'inline-flex';
-                        updatePeerCountUI();
-                        if (!clientAcks.has(myPeerId)) clientAcks.set(myPeerId, new Set());
-                    });
-
-                    peer.on('connection', (conn) => {
-                        const remotePeerId = conn.peer;
-                        hostConnections.set(remotePeerId, conn);
-                        if (!clientAcks.has(remotePeerId)) clientAcks.set(remotePeerId, new Set());
-                        updatePeerCountUI();
-                        hostNotifyNewPeerToSharer(remotePeerId);
-                        conn.on('data', (data) => handleHostData(remotePeerId, data));
-                        conn.on('close', () => {
-                            hostRemovePeer(remotePeerId);
-                            if (activeScreenSharperId === remotePeerId) hostBroadcastScreenShareStop();
-                        });
-                        hostSendFilteredHistory(conn, remotePeerId);
-                    });
-
-                    peer.on('error', (err) => {
-                        console.error('Host peer error:', err);
-                        if (err.type === 'unavailable-id') alert('❌ Room name taken. Use another.');
-                        else appendSystemMessage('Host error: ' + err.type);
-                    });
-                }
-
-                // ---------- HOST: filtered history ----------
-                function hostSendFilteredHistory(conn, peerId) {
-                    const clientAckSet = clientAcks.get(peerId) || new Set();
-                    const messagesToSend = [];
-                    hostMessageMap.forEach((value, msgId) => {
-                        if (!clientAckSet.has(msgId)) {
-                            messagesToSend.push(value.msg);
-                        }
-                    });
-                    if (messagesToSend.length) {
-                        conn.send({type: 'history', messages: messagesToSend});
-                    }
-                }
-
-                // ---------- HOST: process incoming data ----------
-                function handleHostData(peerId, data) {
-                    switch (data.type) {
-                        case 'chat':
-                            hostProcessNewMessage(peerId, data.senderName, 'chat', data.content, null, data.msgId);
-                            break;
-                        case 'file':
-                            hostProcessNewMessage(peerId, data.senderName, 'file', data.content, data.fileInfo, data.msgId);
-                            break;
-                        case 'ack':
-                            if (data.msgId) hostProcessAck(peerId, data.msgId);
-                            break;
-                        case 'screenShareStart':
-                            hostHandleNewScreenShare(peerId);
-                            break;
-                        case 'screenShareStop':
-                            if (activeScreenSharperId === peerId) hostBroadcastScreenShareStop();
-                            break;
-                        case 'qualityRequest':
-                            if (data.sharerId && data.quality) {
-                                const sharerConn = hostConnections.get(data.sharerId);
-                                if (sharerConn?.open) {
-                                    sharerConn.send({type: 'applyQuality', quality: data.quality});
-                                }
-                            }
-                            break;
-                    }
-                }
-
-                // ---------- HOST: new message ----------
-                function hostProcessNewMessage(senderPeerId, senderName, type, content, fileInfo, providedMsgId) {
-                    if (!myPeerId) return;
-                    const msgId = providedMsgId || generateUUID();
-                    const msg = {id: msgId, senderId: senderPeerId, senderName: senderName || 'unknown', type, content, timestamp: Date.now()};
-                    if (fileInfo) msg.fileInfo = fileInfo;
-
-                    const ackSet = new Set([senderPeerId, myPeerId]);
-                    hostMessageMap.set(msgId, {msg, acks: ackSet});
-
-                    if (!clientAcks.has(senderPeerId)) clientAcks.set(senderPeerId, new Set());
-                    clientAcks.get(senderPeerId).add(msgId);
-                    if (!clientAcks.has(myPeerId)) clientAcks.set(myPeerId, new Set());
-                    clientAcks.get(myPeerId).add(msgId);
-
-                    addMessageToStore(msg, senderPeerId === myPeerId);
-
-                    const broadcastMsg = {type: 'broadcast', msg: msg};
-                    hostConnections.forEach((conn, pid) => {
-                        if (pid !== senderPeerId && conn.open) conn.send(broadcastMsg);
-                    });
-                }
-
-                // ---------- HOST: process ack ----------
-                function hostProcessAck(peerId, msgId) {
-                    if (!hostMessageMap.has(msgId)) return;
-                    const entry = hostMessageMap.get(msgId);
-                    entry.acks.add(peerId);
-                    if (!clientAcks.has(peerId)) clientAcks.set(peerId, new Set());
-                    clientAcks.get(peerId).add(msgId);
-
-                    const totalParticipants = hostConnections.size + 1;
-                    if (entry.acks.size >= totalParticipants) {
-                        hostMessageMap.delete(msgId);
-                        clientAcks.forEach((set) => set.delete(msgId));
-                    }
-                }
-
-                // ---------- HOST: remove disconnected peer ----------
-                function hostRemovePeer(peerId) {
-                    hostConnections.delete(peerId);
-                    hostMessageMap.forEach((entry) => {
-                        entry.acks.delete(peerId);
-                    });
-                    updatePeerCountUI();
-                    const totalParticipants = hostConnections.size + 1;
-                    hostMessageMap.forEach((entry, msgId) => {
-                        if (entry.acks.size >= totalParticipants) {
-                            hostMessageMap.delete(msgId);
-                            clientAcks.forEach((set) => set.delete(msgId));
-                        }
-                    });
-                }
-
-                // ---------- CLIENT DATA HANDLER ----------
-                function handleClientData(data) {
-                    if (!data.type) return;
-                    switch (data.type) {
-                        case 'broadcast':
-                            if (data.msg && addMessageToStore(data.msg, data.msg.senderId === myPeerId)) {
-                                if (clientConn?.open) clientConn.send({type: 'ack', msgId: data.msg.id});
-                            }
-                            break;
-                        case 'history':
-                            if (data.messages) {
-                                data.messages.forEach(msg => {
-                                    if (!receivedMsgIds.has(msg.id)) {
-                                        addMessageToStore(msg, msg.senderId === myPeerId);
-                                        if (clientConn?.open) clientConn.send({type: 'ack', msgId: msg.id});
-                                    }
-                                });
-                                appendSystemMessage(`📦 loaded ${data.messages.length} messages`);
-                            }
-                            break;
-                        case 'screenShareStop':
-                            if (isViewingScreen) {
-                                screenVideoContainer.style.display = 'none';
-                                remoteScreenVideo.srcObject = null;
-                                isViewingScreen = false;
-                                fullscreenBtn.style.display = 'none';
-                                audioHint.style.display = 'none';
-                            }
-                            break;
-                        case 'screenShareInitiate':
-                            if (data.viewers && Array.isArray(data.viewers) && localScreenShareStream) {
-                                data.viewers.forEach(viewerId => {
-                                    try {
-                                        const call = peer.call(viewerId, localScreenShareStream);
-                                        screenShareCalls.push(call);
-                                        call.on('close', () => screenShareCalls = screenShareCalls.filter(c => c !== call));
-                                        applyQualityToCall(call, qualitySelectInfo.value);
-                                    } catch (err) { }
-                                });
-                            }
-                            break;
-                        case 'screenShareAddViewer':
-                            if (data.viewerId && localScreenShareStream) {
-                                try {
-                                    const call = peer.call(data.viewerId, localScreenShareStream);
-                                    screenShareCalls.push(call);
-                                    call.on('close', () => screenShareCalls = screenShareCalls.filter(c => c !== call));
-                                    applyQualityToCall(call, qualitySelectInfo.value);
-                                } catch (err) { }
-                            }
-                            break;
-                        case 'applyQuality':
-                            if (localScreenShareStream) {
-                                applyQualityToLocalStream(data.quality);
-                            }
-                            break;
-                    }
-                }
-
-                // ---------- SEND MESSAGE / FILE ----------
-                function sendChatMessage(text) {
-                    if (!text.trim()) return;
-                    const senderName = usernameInput.value.trim() || 'Anonymous';
-                    const msgId = generateUUID();
-                    if (isHost) {
-                        hostProcessNewMessage(myPeerId, senderName, 'chat', text, null, msgId);
-                    } else if (clientConn?.open) {
-                        clientConn.send({type: 'chat', content: text, senderName, msgId});
-                        const tempMsg = {id: msgId, senderId: myPeerId, senderName, type: 'chat', content: text};
-                        addMessageToStore(tempMsg, true);
-                    }
-                }
-
-                function sendFile(file, base64Data) {
-                    const senderName = usernameInput.value.trim() || 'Anonymous';
-                    const msgId = generateUUID();
-                    const fileInfo = {name: file.name, size: file.size, type: file.type || 'application/octet-stream'};
-                    if (isHost) {
-                        hostProcessNewMessage(myPeerId, senderName, 'file', base64Data, fileInfo, msgId);
-                    } else if (clientConn?.open) {
-                        clientConn.send({type: 'file', content: base64Data, senderName, fileInfo, msgId});
-                        const tempMsg = {id: msgId, senderId: myPeerId, senderName, type: 'file', content: base64Data, fileInfo};
-                        addMessageToStore(tempMsg, true);
-                    }
-                }
-
-                // ---------- UI HELPERS ----------
-                function enableChat(enable) {
-                    messageInput.disabled = !enable;
-                    documentUpload.disabled = !enable;
-                    if (enable) messageInput.focus();
-                }
-                function appendSystemMessage(text) {
-                    const d = document.createElement('div'); d.className = 'message system'; d.innerText = '🔹 ' + text;
-                    messageLog.appendChild(d); messageLog.scrollTop = messageLog.scrollHeight;
-                }
-                function monitorIceState(p) {
-                    p.on('iceconnectionstatechange', () => {
-                        const s = p.iceConnectionState || 'new';
-                        iceStateInfo.innerText = s;
-                        if (s === 'connected' || s === 'completed') stateDot.className = 'dot active';
-                        else stateDot.className = 'dot';
-                    });
-                }
-                function updatePeerCountUI() {
-                    if (isHost) {
-                        const count = hostConnections.size + 1;
-                        peerCountDisplayInfo.innerText = `👥 ${count}`;
-                    } else {
-                        peerCountDisplayInfo.innerText = '👤 1';
-                    }
-                }
-                function toggleFullScreen() {
-                    const video = remoteScreenVideo;
-                    if (!document.fullscreenElement && !video.webkitDisplayingFullscreen) {
-                        if (video.requestFullscreen) {
-                            video.requestFullscreen();
-                        } else if (video.webkitEnterFullscreen) {
-                            video.webkitEnterFullscreen();
-                        } else if (video.webkitRequestFullscreen) {
-                            video.webkitRequestFullscreen();
-                        }
-                    } else {
-                        if (document.exitFullscreen) {
-                            document.exitFullscreen();
-                        } else if (video.webkitExitFullscreen) {
-                            video.webkitExitFullscreen();
-                        }
-                    }
-                }
-
-                // ---------- EVENT LISTENERS ----------
-                usernameInput.addEventListener('input', function (e) {
-                    myUsername = e.target.value.trim() || 'Guest';
-                    topBarUsername.innerText = myUsername;
+                conn.on('open', () => {
+                    stData.classList.add('active');
+                    addLog("🚀 DATA CHANNEL OPEN!", "success");
+                    conn.send("PING_TEST");
                 });
 
-                document.getElementById('generateBtn').addEventListener('click', function () {
-                    let custom = document.getElementById('customSessionId').value.trim();
-                    let finalId = custom ? custom.replace(/\s+/g, '-').toLowerCase() : ('room-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 6));
-                    sessionId = finalId;
-                    const link = buildSessionUrl(finalId);
-                    document.getElementById('shareableLink').innerText = link;
-                    document.getElementById('linkOutput').style.display = 'flex';
-                    currentSessionSpan.innerText = finalId;
-                    roomLinkDisplayInfo.innerText = link;
-                });
-                document.getElementById('copyLinkBtn').addEventListener('click', () => navigator.clipboard.writeText(document.getElementById('shareableLink').innerText).then(() => alert('Copied')));
-                document.getElementById('hostChatBtn').addEventListener('click', hostSession);
-                copyRoomLinkInfoBtn.addEventListener('click', () => navigator.clipboard.writeText(roomLinkDisplayInfo.innerText).then(() => alert('Room link copied')));
-
-                documentUpload.addEventListener('change', function (e) {
-                    const file = e.target.files[0];
-                    if (!file) return;
-                    const reader = new FileReader();
-                    reader.onload = (ev) => {sendFile(file, ev.target.result); documentUpload.value = '';};
-                    reader.readAsDataURL(file);
-                    shareMenu.style.display = 'none';
+                conn.on('data', (data) => {
+                    addLog(`📩 DATA: ${data}`);
+                    if (data === "PING_TEST") conn.send("PONG_TEST");
                 });
 
-                screenShareBtn.addEventListener('click', function () {startScreenShare(); shareMenu.style.display = 'none';});
-                stopScreenShareBtn.addEventListener('click', stopMyScreenShare);
-                fullscreenBtn.addEventListener('click', toggleFullScreen);
-
-                messageInput.addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter' && !messageInput.disabled) {sendChatMessage(messageInput.value); messageInput.value = '';}
+                conn.on('error', (err) => addLog(`!!! ERR: ${err}`, 'error'));
+                conn.on('close', () => {
+                    stData.classList.remove('active');
+                    addLog(">>> CLOSED", 'error');
                 });
-
-                retryManualBtnInfo.addEventListener('click', function () {
-                    if (isHost) {
-                        if (peer) peer.destroy();
-                        hostConnections.clear();
-                        clientAcks.clear();
-                        hostMessageMap.clear();
-                        hostSession();
-                    } else {
-                        manualRetry = true; isConnecting = false; clearTimeouts();
-                        if (peer) peer.destroy(); clientConn = null;
-                        currentProfileIndex = parseInt(iceProfileSelectInfo.value, 10) || 0;
-                        retryCount = 0;
-                        attemptConnection();
-                    }
-                });
-
-                qualitySelectInfo.addEventListener('change', function (e) {
-                    requestQualityChange(e.target.value);
-                });
-
-                // Menu button toggles share menu
-                menuBtn.addEventListener('click', function (e) {
-                    e.stopPropagation();
-                    shareMenu.style.display = shareMenu.style.display === 'flex' ? 'none' : 'flex';
-                });
-                document.addEventListener('click', function (e) {
-                    if (!menuBtn.contains(e.target) && !shareMenu.contains(e.target)) {
-                        shareMenu.style.display = 'none';
-                    }
-                });
-
-                infoToggleBtn.addEventListener('click', function () {
-                    infoPanel.style.display = infoPanel.style.display === 'flex' ? 'none' : 'flex';
-                });
-
-                // ---------- URL INIT ----------
-                function initFromUrl() {
-                    const urlSession = getUrlParam('session');
-                    if (urlSession) {
-                        sessionId = urlSession;
-                        preChatSection.classList.add('hidden');
-                        chatInterface.classList.remove('hidden');
-                        currentSessionSpan.innerText = sessionId;
-                        roomLinkDisplayInfo.innerText = buildSessionUrl(sessionId);
-                        usernameInput.value = 'Guest_' + Math.random().toString(36).substring(2, 6);
-                        myUsername = usernameInput.value;
-                        topBarUsername.innerText = myUsername;
-                        startClientConnection();
-                    } else {
-                        preChatSection.classList.remove('hidden');
-                        chatInterface.classList.add('hidden');
-                    }
-                }
-                initFromUrl();
-                setInterval(() => {if (isHost) updatePeerCountUI();}, 1000);
-            })();
+            }
         </script>
     </body>
 </html>
