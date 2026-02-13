@@ -1,5 +1,5 @@
 /**
- * EmuX Netplay - Networking & Connectivity (v6.17)
+ * EmuX Netplay - Networking & Connectivity (v6.25)
  */
 
 let idString = "?";
@@ -20,7 +20,6 @@ let stats = {
   stalls: 0,
   ping: 0,
   lastPingTime: 0,
-  jitter: 0,
   lastRecvTime: 0,
   pps_sent: 0,
   pps_recv: 0,
