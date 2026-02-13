@@ -31,30 +31,7 @@ function tryRunFrame() {
                 state: coreState,
                 frame: window.currentFrame
             });
-
-            // CRITICAL: Resend our recent inputs (Survivor -> Dead)
-            // The opponent missed these packets while sleeping/loading.
-            const startFrame = window.currentFrame;
-            const endFrame = window.currentFrame + window.INPUT_DELAY;
-
-            for (let f = startFrame; f <= endFrame; f++) {
-                if (localInputBuffer.has(f)) {
-                    try {
-                        connection.send({type: 'input', f: f, k: localInputBuffer.get(f)});
-                    } catch (e) { }
-                }
-            }
-            // SUPER CRITICAL: Self-Rollback to Sync Point!
-            // To ensure visual sync, WE must also go back to the state we just sent.
-            // Otherwise we are ahead of the dead player by a few frames.
-            if (window.setCoreState) {
-                window.setCoreState(coreState);
-                window.accumulator = 0;
-                window.lastTime = performance.now();
-                window.isJustSynced = true; // Wait like the dead player
-            }
         }
-        remoteInputBuffer.clear(); // Important: Discard the "wake-up" packet (it's old/stale) and wait for fresh input.
         stats.stalls = 0; // Reset counter
         window.needsStateSync = false;
     }
@@ -152,17 +129,13 @@ function netplayLoop() {
     }
     requestAnimationFrame(netplayLoop);
 
-    // Sync Wait: Pause until buffer refills to target delay!
+    // Sync Wait: Pause until at least ONE packet arrives (Kickstart!)
     if (window.isJustSynced) {
-        // DEADLOCK FIX: Don't wait for full delay (because we can't generate future inputs while paused!)
-        // Just wait for at least ONE packet to kickstart the loop.
-        if (remoteInputBuffer.size === 0) {
-            return; // Wait for at least 1 packet...
-        }
-        window.isJustSynced = false; // Buffer ready!
-        window.lastTime = performance.now(); // Reset clock
+        if (remoteInputBuffer.size === 0) return; // Wait...
+        window.isJustSynced = false;
+        window.lastTime = performance.now();
         window.accumulator = 0;
-        window.syncGraceFrames = 300; // Lock speed for 5s to stabilize rhythm
+        window.syncGraceFrames = 300; // Lock speed for 5s
         console.log("%c[Netplay] 🟢 Buffer Kickstarted! Resuming game...", "color: lime");
     }
 
@@ -178,7 +151,7 @@ function netplayLoop() {
     // Spike: Pause correction (Absorb)
     // Excessive Lag (>20f): Aggressive Catch-up (Force 5% speed)
     if (window.syncGraceFrames > 0) {
-        timeScale = 1.0; // Force strict 1.0x speed during grace period
+        timeScale = 1.0; // Force strict 1.0x speed during Grace Period
         window.syncGraceFrames--;
     } else if (drift > 20) {
         timeScale = 1.05; // Force fast forward to reduce input lag!
