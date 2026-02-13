@@ -20,7 +20,9 @@ const updateTouchInput = (buttonName, isPressed) => {
     } else {
         touchInputMask &= ~(1 << buttonId);
     }
-    if (typeof triggerInputSync === 'function') triggerInputSync();
+    if (window.netplayMode === 'netplay') {
+        window.recordLocalInput?.(window.getGamepadMask());
+    }
 };
 window.buttonPress = (buttonName) => updateTouchInput(buttonName, true);
 window.buttonUnpress = (buttonName) => updateTouchInput(buttonName, false);
@@ -102,7 +104,9 @@ window.addEventListener('keydown', (event) => {
                 audioContext?.resume();
                 window.resetAudioSync?.();
             }
-            if (typeof triggerInputSync === 'function') triggerInputSync();
+            if (window.netplayMode === 'netplay') {
+                window.recordLocalInput?.(window.getGamepadMask());
+            }
         }
     }
 });
@@ -112,7 +116,9 @@ window.addEventListener('keyup', (event) => {
         const buttonId = buttonMapping[mappedButton];
         if (buttonId !== undefined) {
             keyboardInputMask &= ~(1 << buttonId);
-            if (typeof triggerInputSync === 'function') triggerInputSync();
+            if (window.netplayMode === 'netplay') {
+                window.recordLocalInput?.(window.getGamepadMask());
+            }
         }
     }
 });
