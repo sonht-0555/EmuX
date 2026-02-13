@@ -42,11 +42,20 @@ function tryRunFrame() {
             // Buffer EMPTY: Use prediction, BUT limit consecutive frames!
             window.consecutivePredictions = (window.consecutivePredictions || 0) + 1;
 
-            if (window.consecutivePredictions > 5) {
+            // Dynamic Prediction Limit based on Network Health (PPS)
+            // Healthy (PPS > 50): Strict Lockstep (1 frame)
+            // Lag/Packet Loss (PPS 10-50): Allow smoothing (6 frames)
+            // Dead Connection (PPS < 10): Instant Freeze (1 frame)
+            let maxPred = 1;
+            if (stats.pps_recv >= 50) maxPred = 1;
+            else if (stats.pps_recv >= 10) maxPred = 6;
+            else maxPred = 1;
+
+            if (window.consecutivePredictions > maxPred) {
                 // Too many predictions! Stop and wait for opponent.
                 stats.stalls++;
                 if (stats.stalls % 60 === 0) {
-                    console.warn(`[Netplay] 🛑 Waiting for P2... (Pred limit reached)`);
+                    console.warn(`[Netplay] 🛑 Waiting for P2... (PPS: ${stats.pps_recv}, Limit: ${maxPred})`);
                 }
                 return false; // STALL GAME
             }
