@@ -42,14 +42,11 @@ function tryRunFrame() {
             // Buffer EMPTY: Use prediction, BUT limit consecutive frames!
             window.consecutivePredictions = (window.consecutivePredictions || 0) + 1;
 
-            // Dynamic Prediction Limit based on Network Health (PPS)
-            // Healthy (PPS > 50): Strict Lockstep (1 frame)
-            // Lag/Packet Loss (PPS 10-50): Allow smoothing (6 frames)
-            // Dead Connection (PPS < 10): Instant Freeze (1 frame)
-            let maxPred = 1;
+            // Dynamic Prediction Limit (v2)
+            // Healthy (PPS >= 50) -> Strict Lockstep (1 frame)
+            // Lag/Start/Disconnect (PPS < 50) -> Smooth (8 frames = 133ms)
+            let maxPred = 8;
             if (stats.pps_recv >= 50) maxPred = 1;
-            else if (stats.pps_recv >= 10) maxPred = 6;
-            else maxPred = 1;
 
             if (window.consecutivePredictions > maxPred) {
                 // Too many predictions! Stop and wait for opponent.
