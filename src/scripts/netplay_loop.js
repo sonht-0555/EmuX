@@ -1,5 +1,5 @@
 /**
- * EmuX Netplay Engine (v6.25) - Deterministic Sync & Stability
+ * EmuX Netplay Engine (v6.20) - Panic Mode & Jitter Absorber
  */
 
 window.INPUT_DELAY = 4;
@@ -19,14 +19,9 @@ function tryRunFrame() {
 
     const fId = window.currentFrame;
 
-    // 🧹 Zombie Sweeper: Clear old frames from buffer (Essential for Jump/Sync stability)
-    if (remoteInputBuffer.size > 10) { // Only sweep if buffer is getting crowded
-        for (const k of remoteInputBuffer.keys()) {
-            if (k < fId) remoteInputBuffer.delete(k);
-        }
-    }
-
-    // 🚑 Rescue Logic (Survivor saves the Dead)
+    // Panic Rescue Logic: "Survivor saves the Dead"
+    // If we waited > 2s (120 frames) and suddenly receive input (Buffer > 0)...
+    // Must be checked BEFORE consuming buffer!
     if (stats.stalls > 120 && remoteInputBuffer.size > 0) {
         console.log("%c[Netplay] 🚑 Opponent recovered! Sending State Rescue...", "color: orange; font-weight: bold");
         const coreState = window.getCoreState ? window.getCoreState() : null;
@@ -34,70 +29,103 @@ function tryRunFrame() {
             connection.send({
                 type: 'sync-state',
                 state: coreState,
-                frame: fId
+                frame: window.currentFrame
             });
 
-            // Pulse Send: Priming the peer's pipe
-            const startF = fId;
-            const endF = fId + window.INPUT_DELAY;
-            for (let f = startF; f <= endF; f++) {
+            // CRITICAL: Resend our recent inputs (Survivor -> Dead)
+            // The opponent missed these packets while sleeping/loading.
+            const startFrame = window.currentFrame;
+            const endFrame = window.currentFrame + window.INPUT_DELAY;
+
+            for (let f = startFrame; f <= endFrame; f++) {
                 if (localInputBuffer.has(f)) {
                     try {
                         connection.send({type: 'input', f: f, k: localInputBuffer.get(f)});
                     } catch (e) { }
                 }
             }
-
-            // Self-Alignment: Rollback survivor to match the state sent
+            // SUPER CRITICAL: Self-Rollback to Sync Point!
+            // To ensure visual sync, WE must also go back to the state we just sent.
+            // Otherwise we are ahead of the dead player by a few frames.
             if (window.setCoreState) {
                 window.setCoreState(coreState);
                 window.accumulator = 0;
                 window.lastTime = performance.now();
-                window.isJustSynced = true;
+                window.isJustSynced = true; // Wait like the dead player
             }
         }
-        remoteInputBuffer.clear();
-        stats.stalls = 0;
+        remoteInputBuffer.clear(); // Important: Discard the "wake-up" packet (it's old/stale) and wait for fresh input.
+        stats.stalls = 0; // Reset counter
         window.needsStateSync = false;
     }
 
-    // Local Input Backfill
     if (!localInputBuffer.has(fId)) {
+        // EMERGENCY RESCUE: Force generate local input if missing!
+        // This prevents sticky stalls when delay changes cause gaps.
         const mask = window.getGamepadMask ? window.getGamepadMask() : 0;
         localInputBuffer.set(fId, mask);
         sendInput(fId, mask);
+        // console.warn(`[Netplay] ⚠️ Rescued missing local input ${fId}`);
     }
 
     const myMask = localInputBuffer.get(fId);
-    let rMask;
+    let rMask; // Input Prediction Variable
 
-    // 🎯 Input Mapping & Deterministic Prediction
-    if (remoteInputBuffer.has(fId)) {
-        rMask = remoteInputBuffer.get(fId);
-        window.lastRemoteInput = rMask;
-        window.consecutivePredictions = 0;
-    } else {
-        // CATCH-UP JUMP: If we are stuck but buffer has future data, JUMP forward!
+    if (!remoteInputBuffer.has(fId)) {
         if (remoteInputBuffer.size > 0) {
-            const oldestF = Math.min(...remoteInputBuffer.keys());
-            if (oldestF > fId) {
-                console.warn(`[Netplay] ⏩ Behind! Jumping from ${fId} to ${oldestF}`);
-                window.currentFrame = oldestF;
-                return false;
-            }
-        }
+            // DESYNC DETECTED: Consume oldest available input to catch up.
+            const oldestFrame = Math.min(...remoteInputBuffer.keys());
+            rMask = remoteInputBuffer.get(oldestFrame);
+            remoteInputBuffer.delete(oldestFrame);
+            window.consecutivePredictions = 0; // Reset counter
+        } else {
+            // Buffer EMPTY: Use prediction, BUT limit consecutive frames!
+            window.consecutivePredictions = (window.consecutivePredictions || 0) + 1;
 
-        window.consecutivePredictions = (window.consecutivePredictions || 0) + 1;
-        if (window.consecutivePredictions > 1) { // Strict Lockstep
-            stats.stalls++;
-            if (stats.stalls % 60 === 0) {
-                console.warn(`[Netplay] 🛑 Waiting for P2... (PPS: ${stats.pps_recv})`);
+            // Strict Lockstep (Limit 1) - As requested for safety
+            // If screen/network sleeps, game FREEZES.
+            // On wake up, we should ideally resync state.
+            let maxPred = 1;
+
+            // Wake-up Detector:
+            // If game stalled for > 2 seconds (120 frames), mark for Resync
+            // Panic Rescue Logic: "Survivor saves the Dead"
+            // If we waited > 2s (120 frames) and suddenly receive input (Buffer > 0)...
+            if (stats.stalls > 120 && remoteInputBuffer.size > 0) {
+                console.log("%c[Netplay] 🚑 Opponent recovered! Sending State Rescue...", "color: orange; font-weight: bold");
+                // Send current state to force-sync the opponent to us
+                const coreState = window.getCoreState ? window.getCoreState() : null;
+                if (coreState) {
+                    connection.send({
+                        type: 'sync-state',
+                        state: coreState,
+                        frame: window.currentFrame
+                    });
+                }
+                stats.stalls = 0; // Reset counter
+                window.needsStateSync = false;
+            } else if (stats.stalls > 120) {
+                // Just mark flag
+                window.needsStateSync = true;
             }
-            return false;
+
+            if (window.consecutivePredictions > maxPred) {
+                // Too many predictions! Stop and wait for opponent.
+                stats.stalls++;
+                if (stats.stalls % 60 === 0) {
+                    console.warn(`[Netplay] 🛑 Waiting for P2... (PPS: ${stats.pps_recv}, Limit: ${maxPred})`);
+                }
+                return false; // STALL GAME
+            }
+
+            rMask = remoteInputBuffer.get(fId - 1) || 0;
+            stats.predictions = (stats.predictions || 0) + 1;
         }
-        rMask = window.lastRemoteInput || 0;
-        stats.predictions = (stats.predictions || 0) + 1;
+    } else {
+        rMask = remoteInputBuffer.get(fId);
+        window.consecutivePredictions = 0; // Reset counter
     }
+
     remoteInputs[0] = isHost ? myMask : rMask;
     remoteInputs[1] = isHost ? rMask : myMask;
 
@@ -142,8 +170,7 @@ function netplayLoop() {
     let delta = now - window.lastTime;
     window.lastTime = now;
 
-    // 🎯 Accurate Drift: High-precision frame distance calculation
-    const drift = (stats.remoteFrameHead - window.currentFrame) - window.INPUT_DELAY;
+    const drift = remoteInputBuffer.size - window.INPUT_DELAY;
     let timeScale = 1.0;
 
     // 3. Jitter Spike Absorber logic
@@ -154,9 +181,7 @@ function netplayLoop() {
         timeScale = 1.0; // Force strict 1.0x speed during grace period
         window.syncGraceFrames--;
     } else if (drift > 20) {
-        timeScale = 1.02; // Heavy catch-up (limited to 2% for stability)
-    } else if (drift < -10) {
-        timeScale = 0.98; // Heavy slow-down to rebuild buffer
+        timeScale = 1.05; // Force fast forward to reduce input lag!
     } else if (!window.isJitterSpike) {
         if (drift > 0) timeScale = 1.005;
         else if (drift < 0) timeScale = 0.995;
@@ -223,22 +248,26 @@ async function startNetplayLoop() {
 
             const now = performance.now();
             const dt = (now - stats.lastPPSReset) / 1000;
+            const sent_rate = Math.round(stats.pps_sent / dt);
+            const recv_rate = Math.round(stats.pps_recv / dt);
             stats.pps_sent = 0; stats.pps_recv = 0; stats.lastPPSReset = now;
 
-            // --- Stability Engine (v6.25) ---
+            // --- Advanced Features (v6.20) ---
             window.pingHistory.push(stats.ping);
-            if (window.pingHistory.length > 20) window.pingHistory.shift();
+            if (window.pingHistory.length > 20) window.pingHistory.shift(); // Capture more history
             const avgPing = window.pingHistory.reduce((a, b) => a + b, 0) / window.pingHistory.length;
+            const jitter = Math.max(...window.pingHistory) - Math.min(...window.pingHistory);
 
             // 1. Panic Mode (Buffer Safety Margin Auto)
             if (stats.stalls - (window.lastStallCheck || 0) > 20) {
                 if (window.INPUT_DELAY < 8) {
                     const oldDelay = window.INPUT_DELAY;
-                    window.INPUT_DELAY = 8;
+                    window.INPUT_DELAY = 8; // MAX SAFETY
                     window.lastDelayAdjust = now;
                     connection.send({type: 'delay-sync', delay: window.INPUT_DELAY});
                     console.warn(`%c[Netplay] 🚨 PANIC MODE ACTIVATED! Delay set to 8`, "color: #ff0000; font-weight: bold; background: yellow;");
 
+                    // CRITICAL FIX: Backfill missing frames when increasing delay!
                     for (let i = oldDelay + 1; i <= window.INPUT_DELAY; i++) {
                         const frame = window.currentFrame + i;
                         if (!localInputBuffer.has(frame)) {
@@ -260,6 +289,7 @@ async function startNetplayLoop() {
                     connection.send({type: 'delay-sync', delay: window.INPUT_DELAY});
                     console.log(`%c[Netplay] 🐌 Delay increased to ${window.INPUT_DELAY}`, "color: #ffaa00");
 
+                    // CRITICAL FIX: Backfill missing frames when increasing delay!
                     for (let i = oldDelay + 1; i <= window.INPUT_DELAY; i++) {
                         const frame = window.currentFrame + i;
                         if (!localInputBuffer.has(frame)) {
@@ -268,7 +298,7 @@ async function startNetplayLoop() {
                             sendInput(frame, mask);
                         }
                     }
-                } else if (avgPing < window.INPUT_DELAY * 8 && window.INPUT_DELAY > 3) {
+                } else if (avgPing < window.INPUT_DELAY * 8 && window.INPUT_DELAY > 3 && jitter < 30) {
                     window.INPUT_DELAY--;
                     window.lastDelayAdjust = now;
                     connection.send({type: 'delay-sync', delay: window.INPUT_DELAY});
@@ -276,33 +306,18 @@ async function startNetplayLoop() {
                 }
             }
 
-            // 3. Jitter Spike Absorber
-            window.isJitterSpike = (stats.ping > avgPing * 1.8 && stats.ping > 50);
-
-            // 4. Accuracy Pulse: Force periodic sync (Every 40s if predictions occurred)
-            if (isHost && stats.predictions > 0 && (now - (stats.lastPulseTime || 0)) > 40000) {
-                console.log("%c[Netplay] 💓 Accuracy Pulse: Periodically sync-ing state...", "color: #ff00ff; font-weight: bold");
-                const currentState = window.getCoreState ? window.getCoreState() : null;
-                if (currentState) {
-                    connection.send({
-                        type: 'sync-state',
-                        state: currentState,
-                        frame: window.currentFrame
-                    });
-                    stats.predictions = 0;
-                    stats.lastPulseTime = now;
-                }
-            }
+            // 3. Jitter Spike Absorber logic passed to netplayLoop via global flag
+            window.isJitterSpike = (stats.ping > avgPing * 2.0 && stats.ping > 50);
 
             const bufSize = remoteInputBuffer.size;
             const target = window.INPUT_DELAY;
-            const driftF = stats.remoteFrameHead - window.currentFrame; // Vital for UI
             const bufferStatus = bufSize >= target ? "HEALTHY" : (bufSize >= target - 1 ? "STABLE" : "CRITICAL");
             const bufferColor = bufferStatus === "HEALTHY" ? "#00ff00" : (bufferStatus === "STABLE" ? "#ffff00" : "#ff4444");
+            const frameLead = stats.remoteFrameHead - window.currentFrame;
             const mode = window.isJitterSpike ? "ABSORBING" : "NORMAL";
 
             console.log(
-                `%c[Netplay] Ping: ${stats.ping}ms | Buf: ${bufSize}/${target} | Dist: ${driftF}f | Mode: ${mode} | Stalls: ${stats.stalls} | Pred: ${stats.predictions || 0}`,
+                `%c[Netplay] Ping: ${stats.ping}ms | Buf: ${bufSize}/${target} [${bufferStatus}] | Drift: ${frameLead}f | Mode: ${mode} | Stalls: ${stats.stalls} | Pred: ${stats.predictions || 0}`,
                 `color: ${bufferColor}; font-weight: bold`
             );
         } else {
