@@ -133,7 +133,7 @@ function startNetplayLoop() {
     if (connection?.open) {
       stats.lastPingTime = performance.now();
       connection.send({type: 'ping', t: stats.lastPingTime});
-      debug(`Stats -> Ping: ${stats.ping}ms | Sent: ${stats.sent} | Recv: ${stats.received} | Stalls: ${stats.stalls}`, "#ffcc00");
+      console.log(`%c[Engine] Mode: NETPLAY (Sync-Lockstep) | Ping: ${stats.ping}ms | Stalls: ${stats.stalls}`, "color: #ffcc00; font-weight: bold");
     }
   }, 3000);
 }
@@ -164,8 +164,8 @@ window.triggerInputSync = () => { }; // Replaced by high-frequency heartbeat loo
 // --- Host Logic ---
 async function startNetplayHost() {
   if (typeof Peer === 'undefined') return;
-  window.isNetplaying = true;
-  peer = new Peer(Math.random().toString(36).substring(2, 6).toUpperCase());
+  const shortId = Math.random().toString(36).substring(2, 6).toUpperCase();
+  peer = new Peer(shortId);
   isHost = true;
 
   peer.on('open', id => {
@@ -175,10 +175,12 @@ async function startNetplayHost() {
   });
 
   peer.on('connection', conn => {
-    debug("New Peer connecting...");
     if (connection) connection.close();
     connection = conn;
+    debug("Incoming Connection request...", "#ffa500");
+
     connection.on('open', () => {
+      window.isNetplaying = true;
       message("Success: Peer Connected!");
       window.currentFrame = 0;
       localInputBuffer.clear(); remoteInputBuffer.clear();
@@ -192,12 +194,17 @@ async function startNetplayHost() {
           else if (data.type === 'pong') stats.ping = Math.round(performance.now() - data.t);
           else if (data.type === 'request-rom') streamRom();
           else if (data.type === 'client-ready') {
-            debug("Handshake complete. Syncing state...", "#ffaaff");
+            debug("Syncing state...", "#ffaaff");
             connection.send({type: 'sync-state', state: getCoreState()});
             setTimeout(startNetplayLoop, 500);
           }
         }
       });
+    });
+
+    connection.on('close', () => {
+      window.isNetplaying = false;
+      message("Peer Disconnected");
     });
   });
 }
@@ -206,13 +213,14 @@ async function startNetplayHost() {
 async function startNetplayClient() {
   const hostId = prompt("Enter Host ID:");
   if (!hostId) return;
-  window.isNetplaying = true;
   peer = new Peer();
   isHost = false;
 
   peer.on('open', () => {
     connection = peer.connect(hostId, {reliable: true});
+
     connection.on('open', () => {
+      window.isNetplaying = true;
       message("Success: Linked to Host!");
       window.currentFrame = 0;
       localInputBuffer.clear(); remoteInputBuffer.clear();
@@ -252,6 +260,11 @@ async function startNetplayClient() {
           }
         }
       });
+    });
+
+    connection.on('close', () => {
+      window.isNetplaying = false;
+      message("Disconnected from Host");
     });
   });
 }
