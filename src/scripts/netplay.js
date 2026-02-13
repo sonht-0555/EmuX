@@ -98,13 +98,20 @@ function netplayLoop() {
   let delta = now - lastTime;
   lastTime = now;
 
-  // Drift Correction: Dynamically adjust simulation speed
-  // Target buffer size is INPUT_DELAY. If we have more, we can run faster.
+  // Drift Correction v6.07: Granular & Proactive
+  // Mục tiêu: Giữ remoteInputBuffer.size luôn bám sát INPUT_DELAY
+  // Nếu buffer < target → máy mình đang chạy NHANH hơn máy kia → phải CHẬM lại
+  // Nếu buffer > target → máy mình đang chạy CHẬM hơn máy kia → phải NHANH lên
   const drift = remoteInputBuffer.size - INPUT_DELAY;
   let timeScale = 1.0;
 
-  if (drift > 2) timeScale = 1.05; // Run 5% faster to catch up
-  else if (drift < -1) timeScale = 0.95; // Slow down 5% to wait for packets
+  if (drift > 5) timeScale = 1.08;  // Buffer quá đầy: nhanh 8%
+  else if (drift > 2) timeScale = 1.03;  // Hơi đầy: nhanh 3%
+  else if (drift > 0) timeScale = 1.01;  // Chớm đầy: nhanh 1%
+  else if (drift === 0) timeScale = 1.0;  // Cân bằng hoàn hảo
+  else if (drift >= -1) timeScale = 0.98; // Chớm thiếu: chậm 2% (CHỦ ĐỘNG)
+  else if (drift >= -3) timeScale = 0.95; // Thiếu: chậm 5%
+  else timeScale = 0.90; // Cạn kiệt: chậm 10% (khẩn cấp)
 
   accumulator += (delta * timeScale);
   if (accumulator > 100) accumulator = 100;
