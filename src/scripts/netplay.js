@@ -118,6 +118,22 @@ async function handleData(data) {
       window.lastTime = performance.now();
       window.isJitterSpike = false;
       stats.stalls = 0;
+      window.isJustSynced = true; // Flag to force buffer refill before running
+      if (window.resetAudioSync) window.resetAudioSync();
+
+      // CRITICAL: Burst send inputs to prime the pipe!
+      // Survivor is waiting for data at 'currentFrame', so we must send it NOW.
+      const startFrame = window.currentFrame;
+      const endFrame = window.currentFrame + window.INPUT_DELAY;
+      const defaultMask = window.getGamepadMask ? window.getGamepadMask() : 0;
+
+      for (let f = startFrame; f <= endFrame; f++) {
+        if (!localInputBuffer.has(f)) {
+          localInputBuffer.set(f, defaultMask);
+          // Peer connection might throw if not ready, but we try anyway
+          try {connection.send({type: 'input', f: f, k: defaultMask});} catch (e) { }
+        }
+      }
 
       console.log(`%c[Netplay] ✅ State Synced! Frame: ${window.currentFrame} (Size: ${data.state.byteLength})`, "color: #00ff00; font-weight: bold");
       setTimeout(startNetplayLoop, 200);
