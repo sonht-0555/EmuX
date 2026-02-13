@@ -1,18 +1,14 @@
 /**
- * EmuX Netplay Engine (v6.12) - Simulation Loop & Drift Correction
- * Chứa logic vòng lặp cao tần và điều khiển đồng bộ.
+ * EmuX Netplay Engine (v6.17) - Simulation Loop & Drift Correction
  */
 
-// Simulation Variables
 window.INPUT_DELAY = 4;
 window.lastTime = performance.now();
 window.accumulator = 0;
 window.loopActive = false;
+
 const FRAME_TIME = 1000 / 60;
 
-/**
- * Thử chạy một frame giả lập
- */
 function tryRunFrame() {
     const core = window.Module;
     if (!core?._retro_run) return false;
@@ -21,8 +17,8 @@ function tryRunFrame() {
 
     if (!localInputBuffer.has(fId) || !remoteInputBuffer.has(fId)) {
         stats.stalls++;
-        if (stats.stalls % 60 === 0) {
-            console.warn(`[Netplay] 🛑 STALL @ Frame ${fId} | Buffer: ${remoteInputBuffer.size} | Ping: ${stats.ping}ms`);
+        if (stats.stalls % 120 === 0) {
+            console.warn(`[Netplay] 🛑 Stall @ ${fId} | Buf: ${remoteInputBuffer.size} | Ping: ${stats.ping}ms`);
         }
         return false;
     }
@@ -41,12 +37,10 @@ function tryRunFrame() {
     localInputBuffer.delete(fId);
     remoteInputBuffer.delete(fId);
     window.currentFrame++;
+
     return true;
 }
 
-/**
- * Vòng lặp chính với Drift Correction 2%
- */
 function netplayLoop() {
     if (!window.isNetplaying || !connection?.open) {
         loopActive = false;
@@ -55,26 +49,26 @@ function netplayLoop() {
     requestAnimationFrame(netplayLoop);
 
     const now = performance.now();
-    let delta = now - lastTime;
-    lastTime = now;
+    let delta = now - window.lastTime;
+    window.lastTime = now;
 
     const drift = remoteInputBuffer.size - window.INPUT_DELAY;
     let timeScale = 1.0;
 
-    if (drift > 0) timeScale = 1.01;      // Hơi dư -> nhanh hơn 1%
-    else if (drift < 0) timeScale = 0.99; // Hơi thiếu -> chậm lại 1%
+    if (drift > 0) timeScale = 1.01;
+    else if (drift < 0) timeScale = 0.99;
 
-    accumulator += (delta * timeScale);
-    if (accumulator > 100) accumulator = 100;
+    window.accumulator += (delta * timeScale);
+    if (window.accumulator > 100) window.accumulator = 100;
 
     let steps = 0;
-    const MAX_STEPS = 2; // FIX #4: Giới hạn frame burst
+    const MAX_STEPS = 2;
 
-    while (accumulator >= FRAME_TIME && steps < MAX_STEPS) {
-        accumulator -= FRAME_TIME;
+    while (window.accumulator >= FRAME_TIME && steps < MAX_STEPS) {
+        window.accumulator -= FRAME_TIME;
         steps++;
 
-        const targetFrame = window.currentFrame + INPUT_DELAY;
+        const targetFrame = window.currentFrame + window.INPUT_DELAY;
         if (!localInputBuffer.has(targetFrame)) {
             const mask = window.getGamepadMask ? window.getGamepadMask() : 0;
             localInputBuffer.set(targetFrame, mask);
@@ -82,9 +76,8 @@ function netplayLoop() {
         }
 
         if (!tryRunFrame()) {
-            accumulator += FRAME_TIME;
-            // FIX #5: Stall Guard
-            if (stats.stalls % 60 === 0 && window.resetAudioSync) {
+            window.accumulator += FRAME_TIME;
+            if (stats.stalls % 120 === 0 && window.resetAudioSync) {
                 window.resetAudioSync();
             }
             break;
@@ -92,35 +85,33 @@ function netplayLoop() {
     }
 }
 
-/**
- * Khởi động vòng lặp và đo Ping
- */
 async function startNetplayLoop() {
-    if (loopActive) return;
+    if (window.loopActive) return;
 
     const calibratedDelay = await calibrateDelay();
     window.INPUT_DELAY = calibratedDelay;
     window._calHandler = null;
 
-    connection.send({type: 'delay-sync', delay: INPUT_DELAY});
-    console.log(`%c[Netplay] Engine Activated (Delay: ${INPUT_DELAY})`, "color: #00ff00; font-weight: bold;");
+    connection.send({type: 'delay-sync', delay: window.INPUT_DELAY});
+    console.log(`%c[Netplay] Engine Activated (Delay: ${window.INPUT_DELAY})`, "color: #00ff00; font-weight: bold;");
 
-    stats.sent = 0; stats.received = 0; stats.stalls = 0;
+    stats.sent = 0;
+    stats.received = 0;
+    stats.stalls = 0;
     if (window.resetAudioSync) window.resetAudioSync();
 
-    for (let i = 0; i <= INPUT_DELAY; i++) {
+    for (let i = 0; i <= window.INPUT_DELAY; i++) {
         if (!localInputBuffer.has(i)) {
             localInputBuffer.set(i, 0);
             sendInput(i, 0);
         }
     }
 
-    lastTime = performance.now();
-    accumulator = 0;
-    loopActive = true;
+    window.lastTime = performance.now();
+    window.accumulator = 0;
+    window.loopActive = true;
     requestAnimationFrame(netplayLoop);
 
-    // DashBoard Telemetry
     if (window._monitorId) clearInterval(window._monitorId);
     window._monitorId = setInterval(() => {
         if (connection?.open) {
@@ -131,7 +122,9 @@ async function startNetplayLoop() {
             const dt = (now - stats.lastPPSReset) / 1000;
             const sent_rate = Math.round(stats.pps_sent / dt);
             const recv_rate = Math.round(stats.pps_recv / dt);
-            stats.pps_sent = 0; stats.pps_recv = 0; stats.lastPPSReset = now;
+            stats.pps_sent = 0;
+            stats.pps_recv = 0;
+            stats.lastPPSReset = now;
 
             const bufSize = remoteInputBuffer.size;
             const target = window.INPUT_DELAY;
@@ -140,13 +133,11 @@ async function startNetplayLoop() {
             const frameLead = stats.remoteFrameHead - window.currentFrame;
 
             console.log(
-                `%c[Telemetry] Ping: ${stats.ping}ms | Buffer: ${remoteInputBuffer.size}/${INPUT_DELAY} [${bufferStatus}] | Drift: ${frameLead}f\n` +
-                `%c[Traffic] PPS: ${sent_rate}↑ ${recv_rate}↓ | Stalls: ${stats.stalls} | Frame: ${window.currentFrame}`,
-                `color: ${bufferColor}; font-weight: bold`,
-                `color: #aaaaaa; font-size: 10px;`
+                `%c[Netplay] Ping: ${stats.ping}ms | Buf: ${bufSize}/${target} [${bufferStatus}] | Drift: ${frameLead}f | Traffic: ${sent_rate}↑ ${recv_rate}↓ | Stalls: ${stats.stalls}`,
+                `color: ${bufferColor}; font-weight: bold`
             );
         } else {
             clearInterval(window._monitorId);
         }
-    }, 1000);
+    }, 2000);
 }
