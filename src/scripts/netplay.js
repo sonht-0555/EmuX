@@ -47,18 +47,17 @@ function debug(msg, color = "#00ff00") {
  */
 function tryRunFrame() {
   const core = window.Module;
-  if (!core?._retro_run) return;
+  if (!core?._retro_run) return false;
 
   const fId = window.currentFrame;
 
   // Strict Lockstep: Stall if any input is missing
   if (!localInputBuffer.has(fId) || !remoteInputBuffer.has(fId)) {
     stats.stalls++;
-    // Log every 30 stalls to avoid flooding, but show precise frame info
     if (stats.stalls % 30 === 0) {
       console.warn(`[Netplay] 🛑 STALL @ Frame ${fId} | Waiting for Remote | Buffer: ${remoteInputBuffer.size} | Ping: ${stats.ping}ms`);
     }
-    return;
+    return false; // BÁO CHO VÒNG LẶP BIẾT: KHÔNG CHẠY ĐƯỢC
   }
 
   // Prepare inputs for the core
@@ -77,7 +76,7 @@ function tryRunFrame() {
   localInputBuffer.delete(fId);
   remoteInputBuffer.delete(fId);
   window.currentFrame++;
-  window._runCount = (window._runCount || 0) + 1;
+  return true; // CHẠY THÀNH CÔNG
 }
 
 /**
@@ -126,7 +125,11 @@ function netplayLoop() {
       sendInput(targetFrame, mask);
     }
 
-    tryRunFrame();
+    if (!tryRunFrame()) {
+      // STALL: Trả lại thời gian đã trừ để không mất frame khi hồi phục
+      accumulator += FRAME_TIME;
+      break; // Dừng vòng lặp, chờ frame tiếp theo
+    }
   }
 }
 
@@ -138,6 +141,9 @@ function startNetplayLoop() {
   debug("🟢 NETPLAY ENGINE ACTIVATED", "#00ff00");
 
   stats.sent = 0; stats.received = 0; stats.stalls = 0;
+
+  // RESET AUDIO SYNC: Xóa sạch backlog cũ từ Single Player
+  if (window.resetAudioSync) window.resetAudioSync();
 
   // Prime initial frames to kickstart simulation
   for (let i = 0; i <= INPUT_DELAY; i++) {
@@ -196,7 +202,7 @@ function handleInputPacket(buf) {
   const now = performance.now();
   if (stats.lastRecvTime > 0) {
     const currentJitter = Math.abs((now - stats.lastRecvTime) - FRAME_TIME);
-    stats.jitter = stats.jitter * 0.9 + currentJitter * 0.1; // Smooth jitter
+    stats.jitter = stats.jitter * 0.9 + currentJitter * 0.1;
   }
   stats.lastRecvTime = now;
 
@@ -207,6 +213,12 @@ function handleInputPacket(buf) {
     stats.remoteFrameHead = Math.max(stats.remoteFrameHead, remoteFrame);
     stats.received++;
     stats.pps_recv++;
+  } else {
+    // ROM chunk data
+    if (!window._romChunks) window._romChunks = [];
+    window._romChunks.push(buf);
+    window._recd = (window._recd || 0) + 1;
+    if (window._recd === window._totalChunks) processRomChunks();
   }
 }
 
@@ -322,32 +334,7 @@ async function handleData(data) {
   }
 }
 
-// Update binary rom reception
-function handleInputPacket(buf) {
-  const now = performance.now();
-  if (stats.lastRecvTime > 0) {
-    const currentJitter = Math.abs((now - stats.lastRecvTime) - FRAME_TIME);
-    stats.jitter = stats.jitter * 0.9 + currentJitter * 0.1;
-  }
-  stats.lastRecvTime = now;
-
-  const view = new DataView(buf);
-  if (view.byteLength === 6) {
-    const remoteFrame = view.getUint32(0);
-    remoteInputBuffer.set(remoteFrame, view.getUint16(4));
-    stats.remoteFrameHead = Math.max(stats.remoteFrameHead, remoteFrame);
-    stats.received++;
-    stats.pps_recv++;
-  } else {
-    // It's a ROM chunk
-    if (!window._romChunks) window._romChunks = [];
-    window._romChunks.push(buf);
-    window._recd = (window._recd || 0) + 1;
-    if (window._recd === window._totalChunks) {
-      processRomChunks();
-    }
-  }
-}
+// (Đã gộp vào handleInputPacket ở trên — xóa bản trùng lặp)
 
 async function processRomChunks() {
   debug("ROM Received. Booting...");
