@@ -91,7 +91,7 @@ async function handleData(data) {
       streamRom();
       break;
     case 'client-ready':
-      connection.send({type: 'sync-state', state: getCoreState(), frame: window.currentFrame});
+      connection.send({type: 'sync-state', state: getCoreState()});
       setTimeout(startNetplayLoop, 500);
       break;
     case 'rom-info':
@@ -109,37 +109,11 @@ async function handleData(data) {
       window.pendingRomName = data.romName;
       break;
     case 'sync-state':
-      if (data.frame) window.currentFrame = data.frame;
       setCoreState(data.state);
-
-      // Hard Reset Netplay Variables (Critical for Sync)
-      remoteInputBuffer.clear();
-      window.accumulator = 0;
-      window.lastTime = performance.now();
-      window.isJitterSpike = false;
-      stats.stalls = 0;
-      window.isJustSynced = true; // Flag to force buffer refill before running
-      if (window.resetAudioSync) window.resetAudioSync();
-
-      // CRITICAL: Burst send inputs to prime the pipe!
-      // Survivor is waiting for data at 'currentFrame', so we must send it NOW.
-      const startFrame = window.currentFrame;
-      const endFrame = window.currentFrame + window.INPUT_DELAY;
-      const defaultMask = window.getGamepadMask ? window.getGamepadMask() : 0;
-
-      for (let f = startFrame; f <= endFrame; f++) {
-        if (!localInputBuffer.has(f)) {
-          localInputBuffer.set(f, defaultMask);
-          // Peer connection might throw if not ready, but we try anyway
-          try {connection.send({type: 'input', f: f, k: defaultMask});} catch (e) { }
-        }
-      }
-
-      console.log(`%c[Netplay] ✅ State Synced! Frame: ${window.currentFrame} (Size: ${data.state.byteLength})`, "color: #00ff00; font-weight: bold");
       setTimeout(startNetplayLoop, 200);
       break;
     case 'request-sync':
-      if (isHost) connection.send({type: 'sync-state', state: getCoreState(), frame: window.currentFrame});
+      if (isHost) connection.send({type: 'sync-state', state: getCoreState()});
       break;
   }
 }
@@ -287,7 +261,6 @@ function setCoreState(state) {
 }
 
 window.getNetplayInput = (port) => remoteInputs[port] || 0;
-window.getCoreState = getCoreState;
 
 document.addEventListener('click', e => {
   if (e.target.id === 'joinHost') startNetplayClient();
