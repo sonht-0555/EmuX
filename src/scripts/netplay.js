@@ -207,113 +207,150 @@ function handleInputPacket(buf) {
 window.getNetplayInput = (port) => remoteInputs[port] || 0;
 window.triggerInputSync = () => { }; // Replaced by high-frequency heartbeat loop
 
+// --- Network Configuration (THE GOLD STACK) ---
+const iceConfig = {
+  'iceServers': [
+    {urls: 'stun:stun.l.google.com:19302'},
+    {urls: 'turn:openrelayproject.org:3478', username: 'openrelayproject', credential: 'openrelayproject'},
+    {urls: 'turn:turn.anyfirewall.com:443?transport=tcp', username: 'webrtc', credential: 'webrtc'}
+  ]
+};
+
 // --- Host Logic ---
 async function startNetplayHost() {
   if (typeof Peer === 'undefined') return;
   const shortId = Math.random().toString(36).substring(2, 6).toUpperCase();
-  peer = new Peer(shortId);
+  peer = new Peer(shortId, {config: iceConfig, debug: 1});
   isHost = true;
 
   peer.on('open', id => {
     idString = id;
     debug(`ROOM CREATED: ${id}`, "#00ffff");
-    if (window.title1) title1.textContent = `[${id}]_${gameName}`;
+    if (window.title1) title1.textContent = `[${id}]_${window.gameName || 'Room'}`;
   });
 
-  peer.on('connection', conn => {
-    if (connection) connection.close();
-    connection = conn;
-    debug("Incoming Connection request...", "#ffa500");
-
-    connection.on('open', () => {
-      window.isNetplaying = true;
-      message("Success: Peer Connected!");
-      window.currentFrame = 0;
-      localInputBuffer.clear(); remoteInputBuffer.clear();
-      if (window.currentRomFile) connection.send({type: 'rom-info', romName: window.currentRomFile.name});
-
-      connection.on('data', async data => {
-        if (data instanceof Uint8Array || data instanceof ArrayBuffer) {
-          handleInputPacket(data instanceof Uint8Array ? data.buffer : data);
-        } else {
-          if (data.type === 'ping') connection.send({type: 'pong', t: data.t});
-          else if (data.type === 'pong') stats.ping = Math.round(performance.now() - data.t);
-          else if (data.type === 'request-rom') streamRom();
-          else if (data.type === 'client-ready') {
-            debug("Syncing state...", "#ffaaff");
-            connection.send({type: 'sync-state', state: getCoreState()});
-            setTimeout(startNetplayLoop, 500);
-          }
-        }
-      });
-    });
-
-    connection.on('close', () => {
-      window.isNetplaying = false;
-      message("Peer Disconnected");
-    });
-  });
+  peer.on('connection', setupConnection);
+  peer.on('error', err => debug(`Peer Error: ${err.type}`, "#ff4444"));
 }
 
 // --- Client Logic ---
 async function startNetplayClient() {
-  const hostId = prompt("Enter Host ID:");
+  const hostId = prompt("Enter 4-Character Host ID:");
   if (!hostId) return;
-  peer = new Peer();
+  peer = new Peer({config: iceConfig, debug: 1});
   isHost = false;
 
   peer.on('open', () => {
-    connection = peer.connect(hostId, {reliable: true});
-
-    connection.on('open', () => {
-      window.isNetplaying = true;
-      message("Success: Linked to Host!");
-      window.currentFrame = 0;
-      localInputBuffer.clear(); remoteInputBuffer.clear();
-
-      let romChunks = [], recd = 0, total = 0;
-      connection.on('data', async data => {
-        const isBinary = (data instanceof Uint8Array || data instanceof ArrayBuffer);
-        if (isBinary) {
-          const raw = data instanceof Uint8Array ? data.buffer : data;
-          if (raw.byteLength === 6) {
-            handleInputPacket(raw);
-          } else {
-            romChunks.push(raw); recd++;
-            if (recd === total) {
-              debug("ROM Transfer complete. Initializing Core...");
-              const b = await new Blob(romChunks).arrayBuffer();
-              const f = new File([b], window.pendingRomName || "game.bin");
-              await emuxDB(b, f.name); await window.initCore(f);
-              connection.send({type: 'client-ready'});
-              romChunks = [];
-            }
-          }
-        } else {
-          if (data.type === 'ping') connection.send({type: 'pong', t: data.t});
-          else if (data.type === 'pong') stats.ping = Math.round(performance.now() - data.t);
-          else if (data.type === 'rom-info') {
-            if (await emuxDB(data.romName)) {
-              await window.loadGame(data.romName);
-              connection.send({type: 'client-ready'});
-            } else connection.send({type: 'request-rom'});
-          } else if (data.type === 'rom-start') {
-            total = data.totalChunks; romChunks = []; recd = 0;
-          } else if (data.type === 'sync-state') {
-            debug("Receiving game state...", "#ffaa00");
-            setCoreState(data.state);
-            setTimeout(startNetplayLoop, 200);
-          }
-        }
-      });
-    });
-
-    connection.on('close', () => {
-      window.isNetplaying = false;
-      message("Disconnected from Host");
-    });
+    const conn = peer.connect(hostId.toUpperCase(), {reliable: true});
+    setupConnection(conn);
   });
+
+  peer.on('error', err => debug(`Peer Error: ${err.type}`, "#ff4444"));
 }
+
+function setupConnection(conn) {
+  if (connection) connection.close();
+  connection = conn;
+  debug(`>>> Connecting with: ${conn.peer}...`, "#ffa500");
+
+  const checkPC = setInterval(() => {
+    if (conn.peerConnection) {
+      clearInterval(checkPC);
+      const pc = conn.peerConnection;
+      pc.oniceconnectionstatechange = () => {
+        debug(`ICE: ${pc.iceConnectionState}`, "#ffff00");
+      };
+      pc.onicecandidate = (e) => {
+        if (e.candidate) debug(`📍 Found Candidate: ${e.candidate.type}`, "#888");
+      };
+    }
+  }, 100);
+
+  conn.on('open', () => {
+    window.isNetplaying = true;
+    message(isHost ? "Friend Joined!" : "Linked to Host!");
+    window.currentFrame = 0;
+    localInputBuffer.clear(); remoteInputBuffer.clear();
+
+    if (isHost && window.currentRomFile) {
+      connection.send({type: 'rom-info', romName: window.currentRomFile.name});
+    }
+  });
+
+  conn.on('data', handleData);
+  conn.on('close', () => {
+    window.isNetplaying = false;
+    message("Disconnected");
+  });
+  conn.on('error', err => debug(`Connection Error: ${err}`, "#ff4444"));
+}
+
+async function handleData(data) {
+  const isBinary = (data instanceof Uint8Array || data instanceof ArrayBuffer);
+  if (isBinary) {
+    handleInputPacket(data instanceof Uint8Array ? data.buffer : data);
+  } else {
+    // Handling non-input packets
+    if (data.type === 'ping') connection.send({type: 'pong', t: data.t});
+    else if (data.type === 'pong') stats.ping = Math.round(performance.now() - data.t);
+    else if (data.type === 'request-rom') streamRom();
+    else if (data.type === 'client-ready') {
+      debug("Syncing...", "#ffaaff");
+      connection.send({type: 'sync-state', state: getCoreState()});
+      setTimeout(startNetplayLoop, 500);
+    } else if (data.type === 'rom-info') {
+      if (await emuxDB(data.romName)) {
+        await window.loadGame(data.romName);
+        connection.send({type: 'client-ready'});
+      } else connection.send({type: 'request-rom'});
+    } else if (data.type === 'rom-start') {
+      window._totalChunks = data.totalChunks; window._romChunks = []; window._recd = 0;
+      window.pendingRomName = data.romName;
+    } else if (data.type === 'sync-state') {
+      setCoreState(data.state);
+      setTimeout(startNetplayLoop, 200);
+    } else if (data.type === 'request-sync') {
+      if (isHost) connection.send({type: 'sync-state', state: getCoreState()});
+    }
+  }
+}
+
+// Update binary rom reception
+function handleInputPacket(buf) {
+  const now = performance.now();
+  if (stats.lastRecvTime > 0) {
+    const currentJitter = Math.abs((now - stats.lastRecvTime) - FRAME_TIME);
+    stats.jitter = stats.jitter * 0.9 + currentJitter * 0.1;
+  }
+  stats.lastRecvTime = now;
+
+  const view = new DataView(buf);
+  if (view.byteLength === 6) {
+    const remoteFrame = view.getUint32(0);
+    remoteInputBuffer.set(remoteFrame, view.getUint16(4));
+    stats.remoteFrameHead = Math.max(stats.remoteFrameHead, remoteFrame);
+    stats.received++;
+    stats.pps_recv++;
+  } else {
+    // It's a ROM chunk
+    if (!window._romChunks) window._romChunks = [];
+    window._romChunks.push(buf);
+    window._recd = (window._recd || 0) + 1;
+    if (window._recd === window._totalChunks) {
+      processRomChunks();
+    }
+  }
+}
+
+async function processRomChunks() {
+  debug("ROM Received. Booting...");
+  const b = await new Blob(window._romChunks).arrayBuffer();
+  const f = new File([b], window.pendingRomName || "game.bin");
+  await emuxDB(b, f.name); await window.initCore(f);
+  connection.send({type: 'client-ready'});
+  window._romChunks = [];
+}
+
 
 // --- Serialization & Streaming ---
 function streamRom() {

@@ -1,270 +1,121 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
     <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-        <title>EmuX Debug 1.5 (PeerJS 1.5.4)</title>
-        <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-        <style>
-            :root {
-                --primary: #00d2ff;
-                --bg: #0b1c26;
-                --surface: #142e3a;
-                --text: #e6f7ff;
-            }
-
-            * {
-                box-sizing: border-box;
-                -webkit-tap-highlight-color: transparent;
-            }
-
-            body {
-                font-family: -apple-system, system-ui, sans-serif;
-                background: var(--bg);
-                color: var(--text);
-                margin: 0;
-                padding: 15px;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                min-height: 100vh;
-            }
-
-            .app {
-                width: 100%;
-                max-width: 400px;
-            }
-
-            .header {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                width: 100%;
-                margin-bottom: 20px;
-            }
-
-            .box {
-                background: var(--surface);
-                border-radius: 16px;
-                padding: 15px;
-                margin-bottom: 12px;
-                border: 1px solid rgba(0, 210, 255, 0.2);
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-            }
-
-            .id-display {
-                font-family: monospace;
-                font-size: 1.8rem;
-                font-weight: bold;
-                color: var(--primary);
-                letter-spacing: 2px;
-            }
-
-            .status-bar {
-                display: flex;
-                gap: 8px;
-                margin-top: 10px;
-            }
-
-            .stat {
-                font-size: 0.6rem;
-                padding: 3px 8px;
-                border-radius: 10px;
-                background: #333;
-                color: #888;
-                border: 1px solid #444;
-                transition: 0.3s;
-            }
-
-            .stat.active {
-                background: #004400;
-                color: #00ff00;
-                border-color: #00ff00;
-                box-shadow: 0 0 8px #00ff00;
-            }
-
-            .input-group {
-                display: flex;
-                gap: 8px;
-                margin-top: 5px;
-            }
-
-            input {
-                flex: 1;
-                background: #081218;
-                border: 1px solid #30809b;
-                border-radius: 10px;
-                color: white;
-                padding: 12px;
-                font-size: 1.1rem;
-                outline: none;
-                text-transform: uppercase;
-                font-weight: bold;
-            }
-
-            button {
-                background: var(--primary);
-                color: #000;
-                border: none;
-                border-radius: 10px;
-                padding: 12px 20px;
-                font-weight: bold;
-                cursor: pointer;
-            }
-
-            #log {
-                background: #000;
-                border-radius: 12px;
-                padding: 10px;
-                height: 350px;
-                overflow-y: auto;
-                font-family: monospace;
-                font-size: 0.75rem;
-                border: 1px solid #1a3a4a;
-                white-space: pre-wrap;
-                line-height: 1.4;
-            }
-
-            .sys {
-                color: #888;
-                font-style: italic;
-            }
-
-            .ice {
-                color: #ffa500;
-            }
-
-            .success {
-                color: #00ff00;
-                font-weight: bold;
-            }
-
-            .error {
-                color: #ff4444;
-            }
-        </style>
+        <title>EmuX</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1, width=device-width, height=device-height" />
+        <link rel="icon" href="/src/assets/img/icon.png" type="image/png" />
+        <link rel="stylesheet" type="text/css" href="./src/assets/style/main.css" />
+        <link rel="manifest" href="/manifest.json" />
     </head>
-    <body>
-        <div class="app">
-            <div class="header">
-                <span style="font-weight: bold; opacity: 0.8;">EmuX Node 1.5</span>
-                <button onclick="location.reload()" style="padding: 5px 10px; font-size: 0.7rem; background: #222; color: #888;">RELOAD</button>
-            </div>
+    <script> let gameVer = 'EmuX_6.06'; </script>
 
-            <div class="box">
-                <div style="font-size: 0.8rem; opacity: 0.7; margin-bottom: 5px;">MY ID (4 CHARS):</div>
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span class="id-display" id="my-id">....</span>
-                    <button onclick="copyId()" id="copy-btn" style="background: transparent; color: var(--primary); font-size: 0.8rem;">COPY</button>
-                </div>
-                <div class="status-bar">
-                    <span id="st-socket" class="stat">SIGNAL</span>
-                    <span id="st-ice" class="stat">ICE</span>
-                    <span id="st-data" class="stat">DATA</span>
-                </div>
-            </div>
-
-            <div class="box">
-                <div class="input-group">
-                    <input type="text" id="host-id" placeholder="ID MÁY KIA" maxlength="4" autocomplete="off" oninput="this.value=this.value.toUpperCase()">
-                    <button id="connect-btn">CONNECT</button>
-                </div>
-            </div>
-
-            <div id="log"></div>
-        </div>
-
-        <script>
-            const logEl = document.getElementById('log');
-            const stSocket = document.getElementById('st-socket');
-            const stIce = document.getElementById('st-ice');
-            const stData = document.getElementById('st-data');
-
-            function addLog(msg, type = '') {
-                const div = document.createElement('div');
-                div.className = type;
-                div.textContent = `[${new Date().toLocaleTimeString('en-GB', {hour12: false})}] ${msg}`;
-                logEl.appendChild(div);
-                logEl.scrollTop = logEl.scrollHeight;
-            }
-
-            function copyId() {
-                const id = document.getElementById('my-id').innerText;
-                navigator.clipboard.writeText(id);
-                const btn = document.getElementById('copy-btn');
-                btn.innerText = "COPIED!";
-                setTimeout(() => btn.innerText = "COPY", 2000);
-            }
-
-            // FULL COMBO ICE CONFIG (Từ bản chat)
-            const iceConfig = {
-                'iceServers': [
-                    {urls: 'stun:stun.l.google.com:19302'},
-                    {urls: 'turn:openrelayproject.org:3478', username: 'openrelayproject', credential: 'openrelayproject'},
-                    {urls: 'turn:turn.anyfirewall.com:443?transport=tcp', username: 'webrtc', credential: 'webrtc'}
-                ]
-            };
-
-            const shortId = Math.random().toString(36).substring(2, 6).toUpperCase();
-            document.getElementById('my-id').innerText = shortId;
-
-            const peer = new Peer(shortId, {
-                config: iceConfig,
-                debug: 1
-            });
-
-            peer.on('open', (id) => {
-                stSocket.classList.add('active');
-                addLog(`>>> ID: ${id} READY`, 'success');
-            });
-
-            peer.on('connection', (conn) => {
-                addLog(`>>> INCOMING: ${conn.peer}`, 'ice');
-                setupConnection(conn);
-            });
-
-            document.getElementById('connect-btn').onclick = () => {
-                const target = document.getElementById('host-id').value;
-                if (!target) return;
-                addLog(`>>> CONNECTING TO: ${target}...`, 'sys');
-                const conn = peer.connect(target, {reliable: true});
-                setupConnection(conn);
-            };
-
-            function setupConnection(conn) {
-                const checkPC = setInterval(() => {
-                    if (conn.peerConnection) {
-                        clearInterval(checkPC);
-                        const pc = conn.peerConnection;
-                        pc.oniceconnectionstatechange = () => {
-                            addLog(`ICE: ${pc.iceConnectionState}`, 'ice');
-                            if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
-                                stIce.classList.add('active');
-                            }
-                        };
-                        pc.onicecandidate = (e) => {
-                            if (e.candidate) addLog(`📍 Candidate: ${e.candidate.type}`, 'sys');
-                        };
-                    }
-                }, 100);
-
-                conn.on('open', () => {
-                    stData.classList.add('active');
-                    addLog("🚀 DATA CHANNEL OPEN!", "success");
-                    conn.send("PING_TEST");
-                });
-
-                conn.on('data', (data) => {
-                    addLog(`📩 DATA: ${data}`);
-                    if (data === "PING_TEST") conn.send("PONG_TEST");
-                });
-
-                conn.on('error', (err) => addLog(`!!! ERR: ${err}`, 'error'));
-                conn.on('close', () => {
-                    stData.classList.remove('active');
-                    addLog(">>> CLOSED", 'error');
-                });
-            }
-        </script>
+    <body hide>
+        <page00 hidden>
+            <divide></divide>
+            <title0 green="" gray="" white=""></title0>
+            <message0></message0>
+            <switch0 hidden>EmuX</switch0>
+        </page00>
+        <page01>
+            <list02 hidden>
+                <cont>
+                    <opti>Cloud</opti>
+                    <opti>Restore</opti>
+                    <opti>Backup</opti>
+                </cont>
+                <titl>Dropbox Cloud.</titl>
+                <cont>
+                    <opti>Lated</opti>
+                    <opti>New</opti>
+                    <opti>Old</opti>
+                </cont>
+                <titl>Core setting.</titl>
+            </list02>
+            <list01 hidden></list01>
+            <list>
+                <rom>
+                    <ver op4 id="joinHost">_</ver>
+                </rom>
+            </list>
+            <cta>
+                <logo green="em">ux</logo>
+                <setting></setting>
+                <vertical>
+                    <svg width="50" height="50" viewBox="0 0 50 50" fill="none">
+                        <path id="k5" d="M22 19H28" stroke="var(--profile-4)" stroke-width="2" />
+                        <path id="k80" d="M22 25H28" stroke="var(--profile-4)" stroke-width="2" />
+                        <path id="k160" d="M22 31H28" stroke="var(--profile-4)" stroke-width="2" />
+                    </svg>
+                </vertical>
+                <input type="file" id="romInput" hidden />
+                <label for="romInput" id="fileInputLable"></label>
+            </cta>
+        </page01>
+        <page02 hidden>
+            <display>
+                <screen><canvas fil id="canvas"></canvas></screen>
+                <notification>
+                    <title1>...</title1>
+                    <status1>
+                        <skip1>...</skip1>
+                        <time1>0h00.00</time1>
+                    </status1>
+                </notification>
+            </display>
+            <divide></divide>
+            <gamepad>
+                <btn-l data="func-l"> bl.</btn-l>
+                <btn-r data="func-r"> br.</btn-r>
+                <btn-menu id="menu">-</btn-menu>
+                <sec-dpad id="dpad">
+                    <svg width="100%" height="100%" viewBox="0 0 100 100" fill-opacity="0">
+                        <polygon points="50 50, 100 100, 100 0" fill="transparent" data="btn-right" />
+                        <polygon points="0 0, 0 100, 50 50" fill="transparent" data="btn-left" />
+                        <polygon points="0 0, 100 0, 50 50" fill="transparent" data="btn-up" />
+                        <polygon points="0 100, 100 100, 50 50" fill="transparent" data="btn-down" />
+                        <polygon points="0 0, 25 0, 0 25" fill="transparent" data="btn-up-left" />
+                        <polygon points="75 0, 100 0, 100 25" fill="transparent" data="btn-up-right" />
+                        <polygon points="0 75, 25 100, 0 100" fill="transparent" data="btn-down-left" />
+                        <polygon points="100 75, 100 100, 75 100" fill="transparent" data="btn-down-right" />
+                    </svg>
+                </sec-dpad>
+                <sec-12>
+                    <btn-1 data="func-1"></btn-1>
+                    <btn-2 data="func-2"></btn-2>
+                </sec-12>
+                <sec-34>
+                    <btn-3 data="func-3"></btn-3>
+                    <btn-4 data="func-4"></btn-4>
+                </sec-34>
+                <btn-select data="func-select"> sc.</btn-select>
+                <btn-start data="func-start"> st.</btn-start>
+            </gamepad>
+            <divide></divide>
+            <joypad>
+                <canvas fil style="display:none" id="canvas-bottom"></canvas>
+                <svg id="joy" style="height:auto; width:auto" viewBox="0 0 100 100" fill-opacity="0">
+                    <polygon points="50 50, 100 100, 100 0" fill="transparent" data="btn-right" />
+                    <polygon points="0 0, 0 100, 50 50" fill="transparent" data="btn-left" />
+                    <polygon points="0 0, 100 0, 50 50" fill="transparent" data="btn-up" />
+                    <polygon points="0 100, 100 100, 50 50" fill="transparent" data="btn-down" />
+                </svg>
+            </joypad>
+            <invis></invis>
+        </page02>
     </body>
+    <script src="./src/lib/zip.js"></script>
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <script src="./src/utils/perf.js"></script>
+    <script src="./src/utils/storage.js"></script>
+    <script src="./src/scripts/gamepad.js"></script>
+    <script src="./src/scripts/audio.js"></script>
+    <script src="./src/scripts/video.js"></script>
+    <script src="./src/scripts/main.js"></script>
+    <script src="./src/scripts/loader.js"></script>
+    <script src="./src/scripts/netplay.js"></script>
+    <script src="./src/interface/global.js"></script>
+    <script src="./src/interface/page01.js"></script>
+    <script src="./src/interface/page02.js"></script>
+
 </html>
