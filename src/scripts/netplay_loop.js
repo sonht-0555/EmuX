@@ -33,19 +33,30 @@ function tryRunFrame() {
 
     if (!remoteInputBuffer.has(fId)) {
         if (remoteInputBuffer.size > 0) {
-            // DESYNC DETECTED: Buffer has data but not current frame? 
-            // We are likely AHEAD. Consume oldest available input to catch up.
+            // DESYNC DETECTED: Consume oldest available input to catch up.
             const oldestFrame = Math.min(...remoteInputBuffer.keys());
             rMask = remoteInputBuffer.get(oldestFrame);
-            remoteInputBuffer.delete(oldestFrame); // Consume it!
-            // console.warn(`[Netplay] ⚠️ Desync! Frame ${fId} missing, used ${oldestFrame}`);
+            remoteInputBuffer.delete(oldestFrame);
+            window.consecutivePredictions = 0; // Reset counter
         } else {
-            // Buffer EMPTY: Use prediction
+            // Buffer EMPTY: Use prediction, BUT limit consecutive frames!
+            window.consecutivePredictions = (window.consecutivePredictions || 0) + 1;
+
+            if (window.consecutivePredictions > 5) {
+                // Too many predictions! Stop and wait for opponent.
+                stats.stalls++;
+                if (stats.stalls % 60 === 0) {
+                    console.warn(`[Netplay] 🛑 Waiting for P2... (Pred limit reached)`);
+                }
+                return false; // STALL GAME
+            }
+
             rMask = remoteInputBuffer.get(fId - 1) || 0;
             stats.predictions = (stats.predictions || 0) + 1;
         }
     } else {
         rMask = remoteInputBuffer.get(fId);
+        window.consecutivePredictions = 0; // Reset counter
     }
 
     remoteInputs[0] = isHost ? myMask : rMask;
