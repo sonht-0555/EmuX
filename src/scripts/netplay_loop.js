@@ -98,10 +98,15 @@ function netplayLoop() {
     const drift = remoteInputBuffer.size - window.INPUT_DELAY;
     let timeScale = 1.0;
 
-    // 3. Jitter Spike Absorber: Skip drift correction during spikes
-    if (!window.isJitterSpike) {
-        if (drift > 0) timeScale = 1.01;
-        else if (drift < 0) timeScale = 0.99;
+    // 3. Jitter Spike Absorber logic
+    // Normal: Smooth correction (+-0.5%)
+    // Spike: Pause correction (Absorb)
+    // Excessive Lag (>20f): Aggressive Catch-up (Force 5% speed)
+    if (drift > 20) {
+        timeScale = 1.05; // Force fast forward to reduce input lag!
+    } else if (!window.isJitterSpike) {
+        if (drift > 0) timeScale = 1.005;
+        else if (drift < 0) timeScale = 0.995;
     }
 
     window.accumulator += (delta * timeScale);
