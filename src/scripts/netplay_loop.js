@@ -32,6 +32,7 @@ function tryRunFrame() {
                 frame: window.currentFrame
             });
         }
+        remoteInputBuffer.clear(); // Important: Discard the "wake-up" packet (it's old/stale) and wait for fresh input.
         stats.stalls = 0; // Reset counter
         window.needsStateSync = false;
     }
