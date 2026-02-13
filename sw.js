@@ -1,4 +1,4 @@
-let revision = 'EmuX_6.10';
+let revision = 'EmuX_6.11';
 var urlsToCache = [
     './',
     './index.html',
@@ -35,6 +35,7 @@ var urlsToCache = [
     './src/utils/storage.js',
     './src/scripts/main.js',
     './src/scripts/netplay.js',
+    './src/scripts/netplay_loop.js',
     './src/utils/perf.js',
     './src/interface/global.js',
     './src/interface/page01.js',
