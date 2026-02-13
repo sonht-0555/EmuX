@@ -28,7 +28,13 @@ let stats = {
   received: 0,
   stalls: 0,
   ping: 0,
-  lastPingTime: 0
+  lastPingTime: 0,
+  jitter: 0,
+  lastRecvTime: 0,
+  pps_sent: 0,
+  pps_recv: 0,
+  lastPPSReset: performance.now(),
+  remoteFrameHead: 0
 };
 
 // Utilities
@@ -48,8 +54,9 @@ function tryRunFrame() {
   // Strict Lockstep: Stall if any input is missing
   if (!localInputBuffer.has(fId) || !remoteInputBuffer.has(fId)) {
     stats.stalls++;
-    if (fId % 180 === 0) {
-      console.warn(`[Netplay] STALL @ Frame ${fId} | Ping: ${stats.ping}ms | Stall Count: ${stats.stalls}`);
+    // Log every 30 stalls to avoid flooding, but show precise frame info
+    if (stats.stalls % 30 === 0) {
+      console.warn(`[Netplay] 🛑 STALL @ Frame ${fId} | Waiting for Remote | Buffer: ${remoteInputBuffer.size} | Ping: ${stats.ping}ms`);
     }
     return;
   }
@@ -76,6 +83,9 @@ function tryRunFrame() {
 /**
  * Main fixed-timestep loop for Netplay mode.
  */
+/**
+ * Main fixed-timestep loop with Drift Correction for Netplay.
+ */
 function netplayLoop() {
   if (!window.isNetplaying || !connection?.open) {
     loopActive = false;
@@ -88,13 +98,20 @@ function netplayLoop() {
   let delta = now - lastTime;
   lastTime = now;
 
-  accumulator += delta;
-  if (accumulator > 100) accumulator = 100; // Prevent death spiral
+  // Drift Correction: Dynamically adjust simulation speed
+  // Target buffer size is INPUT_DELAY. If we have more, we can run faster.
+  const drift = remoteInputBuffer.size - INPUT_DELAY;
+  let timeScale = 1.0;
+
+  if (drift > 2) timeScale = 1.05; // Run 5% faster to catch up
+  else if (drift < -1) timeScale = 0.95; // Slow down 5% to wait for packets
+
+  accumulator += (delta * timeScale);
+  if (accumulator > 100) accumulator = 100;
 
   while (accumulator >= FRAME_TIME) {
     accumulator -= FRAME_TIME;
 
-    // Heartbeat: Automatic generation of local inputs to prevent stalls
     const targetFrame = window.currentFrame + INPUT_DELAY;
     if (!localInputBuffer.has(targetFrame)) {
       const mask = window.getGamepadMask ? window.getGamepadMask() : 0;
@@ -128,14 +145,32 @@ function startNetplayLoop() {
   loopActive = true;
   requestAnimationFrame(netplayLoop);
 
-  // Performance Monitor
-  setInterval(() => {
+  // Performance Monitor (v5.02 High-Fidelity Dashboard)
+  const monitor = setInterval(() => {
     if (connection?.open) {
       stats.lastPingTime = performance.now();
       connection.send({type: 'ping', t: stats.lastPingTime});
-      console.log(`%c[Engine] Mode: NETPLAY (Sync-Lockstep) | Ping: ${stats.ping}ms | Stalls: ${stats.stalls}`, "color: #ffcc00; font-weight: bold");
+
+      const now = performance.now();
+      const dt = (now - stats.lastPPSReset) / 1000;
+      const sent_rate = Math.round(stats.pps_sent / dt);
+      const recv_rate = Math.round(stats.pps_recv / dt);
+      stats.pps_sent = 0; stats.pps_recv = 0; stats.lastPPSReset = now;
+
+      const bufferStatus = remoteInputBuffer.size > INPUT_DELAY ? "HEALTHY" : "CRITICAL";
+      const bufferColor = bufferStatus === "HEALTHY" ? "#00ff00" : "#ff4444";
+      const frameLead = stats.remoteFrameHead - window.currentFrame;
+
+      console.log(
+        `%c[Telemetry] Ping: ${stats.ping}ms | Jitter: ${stats.jitter.toFixed(2)}ms | Buffer: ${remoteInputBuffer.size} [${bufferStatus}] | Drift: ${frameLead}f\n` +
+        `%c[Traffic] PPS Sent: ${sent_rate} | PPS Recv: ${recv_rate} | Stalls: ${stats.stalls} | LocalFrame: ${window.currentFrame}`,
+        `color: ${bufferColor}; font-weight: bold`,
+        `color: #aaaaaa; font-size: 10px;`
+      );
+    } else {
+      clearInterval(monitor);
     }
-  }, 3000);
+  }, 1000);
 }
 
 // Network Packets (Binary 6-byte)
@@ -147,13 +182,24 @@ function sendInput(frame, mask) {
   view.setUint16(4, mask);
   connection.send(buf);
   stats.sent++;
+  stats.pps_sent++;
 }
 
 function handleInputPacket(buf) {
+  const now = performance.now();
+  if (stats.lastRecvTime > 0) {
+    const currentJitter = Math.abs((now - stats.lastRecvTime) - FRAME_TIME);
+    stats.jitter = stats.jitter * 0.9 + currentJitter * 0.1; // Smooth jitter
+  }
+  stats.lastRecvTime = now;
+
   const view = new DataView(buf);
   if (view.byteLength === 6) {
-    remoteInputBuffer.set(view.getUint32(0), view.getUint16(4));
+    const remoteFrame = view.getUint32(0);
+    remoteInputBuffer.set(remoteFrame, view.getUint16(4));
+    stats.remoteFrameHead = Math.max(stats.remoteFrameHead, remoteFrame);
     stats.received++;
+    stats.pps_recv++;
   }
 }
 
