@@ -42,11 +42,24 @@ function tryRunFrame() {
             // Buffer EMPTY: Use prediction, BUT limit consecutive frames!
             window.consecutivePredictions = (window.consecutivePredictions || 0) + 1;
 
-            // Dynamic Prediction Limit (v2)
-            // Healthy (PPS >= 50) -> Strict Lockstep (1 frame)
-            // Lag/Start/Disconnect (PPS < 50) -> Smooth (8 frames = 133ms)
-            let maxPred = 8;
-            if (stats.pps_recv >= 50) maxPred = 1;
+            // Strict Lockstep (Limit 1) - As requested for safety
+            // If screen/network sleeps, game FREEZES.
+            // On wake up, we should ideally resync state.
+            let maxPred = 1;
+
+            // Wake-up Detector:
+            // If game stalled for > 2 seconds (120 frames), mark for Resync
+            if (stats.stalls > 120) {
+                window.needsStateSync = true;
+            }
+
+            // Sync Trigger (Restores state from Host)
+            if (window.needsStateSync && stats.pps_recv > 0) {
+                console.log("%c[Netplay] 🌅 Wake up detected! Requesting State Sync...", "color: cyan");
+                connection.send({type: 'request-sync'});
+                window.needsStateSync = false;
+                stats.stalls = 0; // Reset stall counter
+            }
 
             if (window.consecutivePredictions > maxPred) {
                 // Too many predictions! Stop and wait for opponent.

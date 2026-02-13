@@ -91,7 +91,7 @@ async function handleData(data) {
       streamRom();
       break;
     case 'client-ready':
-      connection.send({type: 'sync-state', state: getCoreState()});
+      connection.send({type: 'sync-state', state: getCoreState(), frame: window.currentFrame});
       setTimeout(startNetplayLoop, 500);
       break;
     case 'rom-info':
@@ -109,11 +109,12 @@ async function handleData(data) {
       window.pendingRomName = data.romName;
       break;
     case 'sync-state':
+      if (data.frame) window.currentFrame = data.frame;
       setCoreState(data.state);
       setTimeout(startNetplayLoop, 200);
       break;
     case 'request-sync':
-      if (isHost) connection.send({type: 'sync-state', state: getCoreState()});
+      if (isHost) connection.send({type: 'sync-state', state: getCoreState(), frame: window.currentFrame});
       break;
   }
 }
