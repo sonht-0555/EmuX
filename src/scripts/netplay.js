@@ -111,6 +111,8 @@ async function handleData(data) {
     case 'sync-state':
       if (data.frame) window.currentFrame = data.frame;
       setCoreState(data.state);
+      remoteInputBuffer.clear(); // Clear stale inputs to prevents glitches
+      console.log(`%c[Netplay] ✅ State Synced! Frame: ${window.currentFrame} (Size: ${data.state.byteLength})`, "color: #00ff00; font-weight: bold");
       setTimeout(startNetplayLoop, 200);
       break;
     case 'request-sync':
@@ -262,6 +264,7 @@ function setCoreState(state) {
 }
 
 window.getNetplayInput = (port) => remoteInputs[port] || 0;
+window.getCoreState = getCoreState;
 
 document.addEventListener('click', e => {
   if (e.target.id === 'joinHost') startNetplayClient();

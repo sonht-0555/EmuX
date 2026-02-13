@@ -19,6 +19,23 @@ function tryRunFrame() {
 
     const fId = window.currentFrame;
 
+    // Panic Rescue Logic: "Survivor saves the Dead"
+    // If we waited > 2s (120 frames) and suddenly receive input (Buffer > 0)...
+    // Must be checked BEFORE consuming buffer!
+    if (stats.stalls > 120 && remoteInputBuffer.size > 0) {
+        console.log("%c[Netplay] 🚑 Opponent recovered! Sending State Rescue...", "color: orange; font-weight: bold");
+        const coreState = window.getCoreState ? window.getCoreState() : null;
+        if (coreState) {
+            connection.send({
+                type: 'sync-state',
+                state: coreState,
+                frame: window.currentFrame
+            });
+        }
+        stats.stalls = 0; // Reset counter
+        window.needsStateSync = false;
+    }
+
     if (!localInputBuffer.has(fId)) {
         // EMERGENCY RESCUE: Force generate local input if missing!
         // This prevents sticky stalls when delay changes cause gaps.
@@ -49,16 +66,24 @@ function tryRunFrame() {
 
             // Wake-up Detector:
             // If game stalled for > 2 seconds (120 frames), mark for Resync
-            if (stats.stalls > 120) {
-                window.needsStateSync = true;
-            }
-
-            // Sync Trigger (Restores state from Host)
-            if (window.needsStateSync && stats.pps_recv > 0) {
-                console.log("%c[Netplay] 🌅 Wake up detected! Requesting State Sync...", "color: cyan");
-                connection.send({type: 'request-sync'});
+            // Panic Rescue Logic: "Survivor saves the Dead"
+            // If we waited > 2s (120 frames) and suddenly receive input (Buffer > 0)...
+            if (stats.stalls > 120 && remoteInputBuffer.size > 0) {
+                console.log("%c[Netplay] 🚑 Opponent recovered! Sending State Rescue...", "color: orange; font-weight: bold");
+                // Send current state to force-sync the opponent to us
+                const coreState = window.getCoreState ? window.getCoreState() : null;
+                if (coreState) {
+                    connection.send({
+                        type: 'sync-state',
+                        state: coreState,
+                        frame: window.currentFrame
+                    });
+                }
+                stats.stalls = 0; // Reset counter
                 window.needsStateSync = false;
-                stats.stalls = 0; // Reset stall counter
+            } else if (stats.stalls > 120) {
+                // Just mark flag
+                window.needsStateSync = true;
             }
 
             if (window.consecutivePredictions > maxPred) {
