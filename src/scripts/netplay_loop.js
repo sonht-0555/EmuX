@@ -1,11 +1,15 @@
 /**
- * EmuX Netplay Engine (v6.17) - Simulation Loop & Drift Correction
+ * EmuX Netplay Engine (v6.20) - Panic Mode & Jitter Absorber
  */
 
 window.INPUT_DELAY = 4;
 window.lastTime = performance.now();
 window.accumulator = 0;
 window.loopActive = false;
+
+// Adaptive Delay State
+window.pingHistory = [];
+window.lastDelayAdjust = 0;
 
 const FRAME_TIME = 1000 / 60;
 
@@ -15,7 +19,7 @@ function tryRunFrame() {
 
     const fId = window.currentFrame;
 
-    if (!localInputBuffer.has(fId) || !remoteInputBuffer.has(fId)) {
+    if (!localInputBuffer.has(fId)) {
         stats.stalls++;
         if (stats.stalls % 120 === 0) {
             console.warn(`[Netplay] 🛑 Stall @ ${fId} | Buf: ${remoteInputBuffer.size} | Ping: ${stats.ping}ms`);
@@ -24,7 +28,25 @@ function tryRunFrame() {
     }
 
     const myMask = localInputBuffer.get(fId);
-    const rMask = remoteInputBuffer.get(fId);
+    let rMask; // Input Prediction Variable
+
+    if (!remoteInputBuffer.has(fId)) {
+        if (remoteInputBuffer.size > 0) {
+            // DESYNC DETECTED: Buffer has data but not current frame? 
+            // We are likely AHEAD. Consume oldest available input to catch up.
+            const oldestFrame = Math.min(...remoteInputBuffer.keys());
+            rMask = remoteInputBuffer.get(oldestFrame);
+            remoteInputBuffer.delete(oldestFrame); // Consume it!
+            // console.warn(`[Netplay] ⚠️ Desync! Frame ${fId} missing, used ${oldestFrame}`);
+        } else {
+            // Buffer EMPTY: Use prediction
+            rMask = remoteInputBuffer.get(fId - 1) || 0;
+            stats.predictions = (stats.predictions || 0) + 1;
+        }
+    } else {
+        rMask = remoteInputBuffer.get(fId);
+    }
+
     remoteInputs[0] = isHost ? myMask : rMask;
     remoteInputs[1] = isHost ? rMask : myMask;
 
@@ -35,7 +57,10 @@ function tryRunFrame() {
     }
 
     localInputBuffer.delete(fId);
-    remoteInputBuffer.delete(fId);
+    // Only delete remote header if it actually existed (not predicted)
+    if (remoteInputBuffer.has(fId)) {
+        remoteInputBuffer.delete(fId);
+    }
     window.currentFrame++;
 
     return true;
@@ -55,8 +80,11 @@ function netplayLoop() {
     const drift = remoteInputBuffer.size - window.INPUT_DELAY;
     let timeScale = 1.0;
 
-    if (drift > 0) timeScale = 1.01;
-    else if (drift < 0) timeScale = 0.99;
+    // 3. Jitter Spike Absorber: Skip drift correction during spikes
+    if (!window.isJitterSpike) {
+        if (drift > 0) timeScale = 1.01;
+        else if (drift < 0) timeScale = 0.99;
+    }
 
     window.accumulator += (delta * timeScale);
     if (window.accumulator > 100) window.accumulator = 100;
@@ -77,7 +105,8 @@ function netplayLoop() {
 
         if (!tryRunFrame()) {
             window.accumulator += FRAME_TIME;
-            if (stats.stalls % 120 === 0 && window.resetAudioSync) {
+            // Smart Audio Reset (only after 5s stall)
+            if (stats.stalls % 300 === 0 && window.resetAudioSync) {
                 window.resetAudioSync();
             }
             break;
@@ -95,9 +124,7 @@ async function startNetplayLoop() {
     connection.send({type: 'delay-sync', delay: window.INPUT_DELAY});
     console.log(`%c[Netplay] Engine Activated (Delay: ${window.INPUT_DELAY})`, "color: #00ff00; font-weight: bold;");
 
-    stats.sent = 0;
-    stats.received = 0;
-    stats.stalls = 0;
+    stats.sent = 0; stats.received = 0; stats.stalls = 0; stats.predictions = 0;
     if (window.resetAudioSync) window.resetAudioSync();
 
     for (let i = 0; i <= window.INPUT_DELAY; i++) {
@@ -122,18 +149,74 @@ async function startNetplayLoop() {
             const dt = (now - stats.lastPPSReset) / 1000;
             const sent_rate = Math.round(stats.pps_sent / dt);
             const recv_rate = Math.round(stats.pps_recv / dt);
-            stats.pps_sent = 0;
-            stats.pps_recv = 0;
-            stats.lastPPSReset = now;
+            stats.pps_sent = 0; stats.pps_recv = 0; stats.lastPPSReset = now;
+
+            // --- Advanced Features (v6.20) ---
+            window.pingHistory.push(stats.ping);
+            if (window.pingHistory.length > 20) window.pingHistory.shift(); // Capture more history
+            const avgPing = window.pingHistory.reduce((a, b) => a + b, 0) / window.pingHistory.length;
+            const jitter = Math.max(...window.pingHistory) - Math.min(...window.pingHistory);
+
+            // 1. Panic Mode (Buffer Safety Margin Auto)
+            if (stats.stalls - (window.lastStallCheck || 0) > 20) {
+                if (window.INPUT_DELAY < 8) {
+                    const oldDelay = window.INPUT_DELAY;
+                    window.INPUT_DELAY = 8; // MAX SAFETY
+                    window.lastDelayAdjust = now;
+                    connection.send({type: 'delay-sync', delay: window.INPUT_DELAY});
+                    console.warn(`%c[Netplay] 🚨 PANIC MODE ACTIVATED! Delay set to 8`, "color: #ff0000; font-weight: bold; background: yellow;");
+
+                    // CRITICAL FIX: Backfill missing frames when increasing delay!
+                    for (let i = oldDelay + 1; i <= window.INPUT_DELAY; i++) {
+                        const frame = window.currentFrame + i;
+                        if (!localInputBuffer.has(frame)) {
+                            const mask = window.getGamepadMask ? window.getGamepadMask() : 0;
+                            localInputBuffer.set(frame, mask);
+                            sendInput(frame, mask);
+                        }
+                    }
+                }
+            }
+            window.lastStallCheck = stats.stalls;
+
+            // 2. Adaptive Delay (Normal)
+            if ((now - window.lastDelayAdjust) > 5000) {
+                if (avgPing > window.INPUT_DELAY * 18 && window.INPUT_DELAY < 8) {
+                    const oldDelay = window.INPUT_DELAY;
+                    window.INPUT_DELAY++;
+                    window.lastDelayAdjust = now;
+                    connection.send({type: 'delay-sync', delay: window.INPUT_DELAY});
+                    console.log(`%c[Netplay] 🐌 Delay increased to ${window.INPUT_DELAY}`, "color: #ffaa00");
+
+                    // CRITICAL FIX: Backfill missing frames when increasing delay!
+                    for (let i = oldDelay + 1; i <= window.INPUT_DELAY; i++) {
+                        const frame = window.currentFrame + i;
+                        if (!localInputBuffer.has(frame)) {
+                            const mask = window.getGamepadMask ? window.getGamepadMask() : 0;
+                            localInputBuffer.set(frame, mask);
+                            sendInput(frame, mask);
+                        }
+                    }
+                } else if (avgPing < window.INPUT_DELAY * 8 && window.INPUT_DELAY > 3 && jitter < 30) {
+                    window.INPUT_DELAY--;
+                    window.lastDelayAdjust = now;
+                    connection.send({type: 'delay-sync', delay: window.INPUT_DELAY});
+                    console.log(`%c[Netplay] 🚀 Delay decreased to ${window.INPUT_DELAY}`, "color: #00ff00");
+                }
+            }
+
+            // 3. Jitter Spike Absorber logic passed to netplayLoop via global flag
+            window.isJitterSpike = (stats.ping > avgPing * 2.0 && stats.ping > 50);
 
             const bufSize = remoteInputBuffer.size;
             const target = window.INPUT_DELAY;
             const bufferStatus = bufSize >= target ? "HEALTHY" : (bufSize >= target - 1 ? "STABLE" : "CRITICAL");
             const bufferColor = bufferStatus === "HEALTHY" ? "#00ff00" : (bufferStatus === "STABLE" ? "#ffff00" : "#ff4444");
             const frameLead = stats.remoteFrameHead - window.currentFrame;
+            const mode = window.isJitterSpike ? "ABSORBING" : "NORMAL";
 
             console.log(
-                `%c[Netplay] Ping: ${stats.ping}ms | Buf: ${bufSize}/${target} [${bufferStatus}] | Drift: ${frameLead}f | Traffic: ${sent_rate}↑ ${recv_rate}↓ | Stalls: ${stats.stalls}`,
+                `%c[Netplay] Ping: ${stats.ping}ms | Buf: ${bufSize}/${target} [${bufferStatus}] | Drift: ${frameLead}f | Mode: ${mode} | Stalls: ${stats.stalls} | Pred: ${stats.predictions || 0}`,
                 `color: ${bufferColor}; font-weight: bold`
             );
         } else {
