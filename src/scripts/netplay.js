@@ -11,7 +11,7 @@ var isHost = false;
 window.currentFrame = 0;
 
 // Synchronization Buffers
-const INPUT_DELAY = 2; // Fixed delay to handle network jitter
+const INPUT_DELAY = 4; // 67ms buffer - đủ hấp thụ ping spike tới 80ms
 const localInputBuffer = new Map();
 const remoteInputBuffer = new Map();
 const remoteInputs = {0: 0, 1: 0};
