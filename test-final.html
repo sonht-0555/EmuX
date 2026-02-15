@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <title>EmuX Master v6.0 (Survival Edition)</title>
+        <style>
+            :root {
+                --primary: #00ff88;
+                --bg: #050a0f;
+                --surface: #0f2030;
+                --text: #e0f0ff;
+            }
+
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background: var(--bg);
+                color: var(--text);
+                padding: 20px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .app {
+                width: 100%;
+                max-width: 480px;
+            }
+
+            .box {
+                background: var(--surface);
+                border-radius: 20px;
+                padding: 25px;
+                margin-bottom: 20px;
+                border: 1px solid #1a3a50;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+                position: relative;
+                overflow: hidden;
+            }
+
+            .id-val {
+                font-size: 2.8rem;
+                font-weight: 800;
+                color: var(--primary);
+                letter-spacing: 5px;
+                text-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+            }
+
+            .net-type {
+                position: absolute;
+                top: 15px;
+                right: 20px;
+                font-size: 0.65rem;
+                background: #000;
+                padding: 4px 10px;
+                border-radius: 10px;
+                border: 1px solid #333;
+            }
+
+            .ping-val {
+                font-size: 1.2rem;
+                font-weight: bold;
+                color: #ffcc00;
+                margin-top: 10px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .dot {
+                width: 10px;
+                height: 10px;
+                border-radius: 50%;
+                background: #444;
+            }
+
+            .dot.active {
+                background: #00ff88;
+                box-shadow: 0 0 15px #00ff88;
+            }
+
+            input {
+                width: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                border: 2px solid #1a3a50;
+                border-radius: 15px;
+                color: #fff;
+                padding: 18px;
+                font-size: 1.3rem;
+                margin: 15px 0;
+                outline: none;
+                transition: 0.2s;
+                box-sizing: border-box;
+            }
+
+            input:focus {
+                border-color: var(--primary);
+                background: #000;
+            }
+
+            button {
+                width: 100%;
+                background: var(--primary);
+                color: #050a0f;
+                border: none;
+                border-radius: 15px;
+                padding: 18px;
+                font-weight: 800;
+                cursor: pointer;
+                font-size: 1.1rem;
+                box-shadow: 0 5px 15px rgba(0, 255, 136, 0.2);
+                transition: 0.2s;
+            }
+
+            button:active {
+                transform: scale(0.98);
+            }
+
+            #log {
+                background: rgba(0, 0, 0, 0.8);
+                border-radius: 15px;
+                padding: 15px;
+                height: 250px;
+                overflow-y: auto;
+                font-size: 0.75rem;
+                color: #789;
+                border: 1px solid #1a3a50;
+                line-height: 1.5;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="app">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+                <b style="letter-spacing: 1px;">EMUX SURVIVAL v6.2</b>
+                <div id="ws-state" style="font-size: 0.7rem; color: #ff4466;">● OFFLINE</div>
+            </div>
+
+            <div class="box">
+                <div class="net-type" id="conn-mode">STBY</div>
+                <div style="font-size: 0.75rem; color: #6080a0; margin-bottom: 5px;">MY NODE ID</div>
+                <div class="id-val" id="my-id">....</div>
+                <div class="ping-box">
+                    <div class="ping-val">
+                        <div id="status-dot" class="dot"></div>
+                        <span id="rtt">-- ms</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="box">
+                <input type="text" id="target-id" placeholder="ENTER TARGET ID" maxlength="4" oninput="this.value=this.value.toUpperCase()">
+                <button onclick="connect()">CONNECT PLAYER 2</button>
+            </div>
+
+            <div id="log"></div>
+        </div>
+
+        <script>
+            const RELAY_URL = 'wss://emux-relay.fly.dev/ws';
+            const myId = Math.random().toString(36).substring(2, 6).toUpperCase();
+            document.getElementById('my-id').innerText = myId;
+
+            let ws, pc, dc, targetId;
+            let isP2P = false;
+            const logEl = document.getElementById('log');
+
+            function addLog(msg, color = '#789') {
+                const div = document.createElement('div');
+                div.style.color = color;
+                div.innerHTML = `<span style="opacity:0.4">${new Date().toLocaleTimeString('vi-VN')}</span> ${msg}`;
+                logEl.appendChild(div);
+                logEl.scrollTop = logEl.scrollHeight;
+            }
+
+            // 1. WebSocket - Luôn là xương sống + Heartbeat cho Mobile
+            function initWS() {
+                ws = new WebSocket(`${RELAY_URL}?id=${myId}`);
+                ws.binaryType = 'arraybuffer';
+
+                // Heartbeat chống đóng băng mạng trên Mobile
+                const hb = setInterval(() => {
+                    if (ws.readyState === WebSocket.OPEN) {
+                        ws.send(new Uint8Array([0, 0, 0, 0, 0])); // Pack siêu nhỏ 5 bytes
+                    }
+                }, 3000);
+
+                ws.onopen = () => {
+                    document.getElementById('ws-state').innerText = '● SERVER READY';
+                    document.getElementById('ws-state').style.color = '#00ff88';
+                    addLog('✅ RELAY CLOUD CONNECTED', '#00ff88');
+                };
+
+                ws.onmessage = async (e) => {
+                    if (e.data instanceof ArrayBuffer) {
+                        const data = new Uint8Array(e.data);
+                        if (data.length <= 5) return; // Bỏ qua heartbeat
+                        const from = new TextDecoder().decode(data.slice(0, 4));
+                        handleGameData(from, data.slice(4));
+                        return;
+                    }
+                    const msg = JSON.parse(e.data);
+                    if (msg.from && msg.from !== myId) handleSignal(msg);
+                };
+
+                ws.onclose = () => {
+                    clearInterval(hb);
+                    setTimeout(initWS, 2000);
+                };
+            }
+
+            // Tự động hồi sinh kết nối khi Mobile quay lại tab (Focus)
+            window.addEventListener('focus', () => {
+                if (!ws || ws.readyState === WebSocket.CLOSED) {
+                    addLog('🔄 RECOVERING CONNECTION...', '#ffcc00');
+                    initWS();
+                }
+            });
+
+            // 2. Bắt đầu phiên kết nối
+            async function connect() {
+                targetId = document.getElementById('target-id').value.toUpperCase();
+                if (!targetId || targetId === myId) return;
+
+                addLog(`🚀 INITIATING HYBRID PATH TO ${targetId}...`);
+                setupPC();
+
+                dc = pc.createDataChannel('game', {ordered: false, maxRetransmits: 0});
+                setupDC(dc);
+
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                sendSignal({type: 'offer', sdp: offer});
+
+                // Bắt đầu Ping (Vòng lặp vĩnh cửu)
+                startPingLoop();
+            }
+
+            function setupPC() {
+                pc = new RTCPeerConnection({
+                    iceServers: [
+                        {urls: 'stun:stun.viettel.com.vn:3478'},
+                        {urls: 'stun:stun.fpt.net:3478'},
+                        {urls: 'stun:stun.l.google.com:19302'},
+                        // TURN qua TCP cổng 443 - Con át chủ bài để vượt 4G
+                        {urls: 'turn:turn.anyfirewall.com:443?transport=tcp', username: 'anyfirewall', credential: 'anyfirewall'},
+                        {urls: 'turn:openrelayproject.org:3478', username: 'openrelayproject', credential: 'openrelayproject'}
+                    ]
+                });
+
+                pc.onicecandidate = (e) => {
+                    if (e.candidate) {
+                        // Log loại candidate để biết đang dùng đường nào (srflx = P2P, relay = qua server)
+                        const type = e.candidate.candidate.split(' ')[7];
+                        addLog(`📡 ICE Candidate found: ${type}`, '#6080a0');
+                        sendSignal({type: 'candidate', candidate: e.candidate});
+                    }
+                };
+
+                pc.oniceconnectionstatechange = () => {
+                    addLog(`🌐 ICE STATE: ${pc.iceConnectionState}`, '#6080a0');
+                    if (pc.iceConnectionState === 'connected') {
+                        isP2P = true;
+                        document.getElementById('conn-mode').innerText = 'DIRECT P2P';
+                        document.getElementById('conn-mode').style.color = '#00ff88';
+                        document.getElementById('status-dot').classList.add('active');
+                        addLog('⚡ P2P UPGRADED - LOW LATENCY ACTIVE', '#00ff88');
+                    }
+                };
+
+                pc.ondatachannel = (e) => setupDC(e.channel);
+            }
+
+            function setupDC(channel) {
+                dc = channel;
+                dc.binaryType = 'arraybuffer';
+                dc.onmessage = (e) => handleGameData(targetId, new Uint8Array(e.data));
+            }
+
+            // 3. Xử lý dữ liệu (Dù là từ Relay hay P2P)
+            function handleGameData(from, payload) {
+                const type = payload[0];
+                if (type === 1) { // Ping
+                    const pong = new Uint8Array(9);
+                    pong[0] = 2; pong.set(payload.slice(1), 1);
+                    sendData(pong);
+                } else if (type === 2) { // Pong
+                    const sentTime = new DataView(payload.buffer, payload.byteOffset + 1).getFloat64(0);
+                    const rtt = Date.now() - sentTime;
+                    document.getElementById('rtt').innerText = `${Math.floor(rtt)} ms`;
+                }
+            }
+
+            // 4. Gửi dữ liệu (Thông minh)
+            function sendData(payload) {
+                // Ưu tiên P2P, nếu chưa thông thì dùng Relay
+                if (isP2P && dc && dc.readyState === 'open') {
+                    dc.send(payload);
+                } else if (ws && ws.readyState === WebSocket.OPEN) {
+                    // Format Relay: [TargetID(4)][Payload]
+                    const relayMsg = new Uint8Array(4 + payload.length);
+                    relayMsg.set(new TextEncoder().encode(targetId), 0);
+                    relayMsg.set(payload, 4);
+                    ws.send(relayMsg);
+                }
+            }
+
+            function sendSignal(data) {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({target: targetId, from: myId, ...data}));
+                }
+            }
+
+            async function handleSignal(msg) {
+                if (msg.type === 'offer') {
+                    targetId = msg.from;
+                    setupPC();
+                    await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+                    const answer = await pc.createAnswer();
+                    await pc.setLocalDescription(answer);
+                    sendSignal({type: 'answer', sdp: answer});
+                    startPingLoop();
+                } else if (msg.type === 'answer') {
+                    await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+                } else if (msg.type === 'candidate') {
+                    pc.addIceCandidate(new RTCIceCandidate(msg.candidate)).catch(() => { });
+                }
+            }
+
+            let pingStarted = false;
+            function startPingLoop() {
+                if (pingStarted) return;
+                pingStarted = true;
+                setInterval(() => {
+                    if (!targetId) return;
+                    const ping = new Uint8Array(9);
+                    ping[0] = 1;
+                    new DataView(ping.buffer).setFloat64(1, Date.now());
+                    sendData(ping);
+                }, 1000);
+            }
+
+            initWS();
+        </script>
+    </body>
+</html>

@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <title>EmuX Debug 2.1 (Custom Go Relay)</title>
+        <style>
+            :root {
+                --primary: #00ff88;
+                --bg: #050a0f;
+                --surface: #0f1a24;
+                --text: #e0f0ff;
+            }
+
+            * {
+                box-sizing: border-box;
+                -webkit-tap-highlight-color: transparent;
+            }
+
+            body {
+                font-family: 'JetBrains Mono', 'Fira Code', monospace;
+                background: var(--bg);
+                color: var(--text);
+                margin: 0;
+                padding: 20px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                min-height: 100vh;
+            }
+
+            .app {
+                width: 100%;
+                max-width: 500px;
+            }
+
+            .header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 20px;
+                border-bottom: 1px solid #1a3040;
+                padding-bottom: 10px;
+            }
+
+            .status-badge {
+                font-size: 0.7rem;
+                padding: 2px 8px;
+                border-radius: 4px;
+                background: #222;
+                color: #666;
+            }
+
+            .status-badge.online {
+                background: #004422;
+                color: #00ff88;
+            }
+
+            .box {
+                background: var(--surface);
+                border-radius: 12px;
+                padding: 20px;
+                margin-bottom: 15px;
+                border: 1px solid #1a3040;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            }
+
+            .label {
+                font-size: 0.7rem;
+                color: #6080a0;
+                margin-bottom: 8px;
+                text-transform: uppercase;
+            }
+
+            .id-row {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+
+            .id-val {
+                font-size: 2rem;
+                font-weight: 800;
+                color: var(--primary);
+                letter-spacing: 4px;
+            }
+
+            .input-group {
+                display: flex;
+                gap: 10px;
+                margin-top: 10px;
+            }
+
+            input {
+                flex: 1;
+                background: #050a0f;
+                border: 1px solid #1a3040;
+                border-radius: 8px;
+                color: #fff;
+                padding: 12px;
+                font-size: 1.2rem;
+                outline: none;
+                text-transform: uppercase;
+            }
+
+            input:focus {
+                border-color: var(--primary);
+            }
+
+            button {
+                background: var(--primary);
+                color: #050a0f;
+                border: none;
+                border-radius: 8px;
+                padding: 12px 20px;
+                font-weight: bold;
+                cursor: pointer;
+                transition: 0.2s;
+            }
+
+            button:hover {
+                filter: brightness(1.2);
+                transform: translateY(-1px);
+            }
+
+            button:active {
+                transform: translateY(0);
+            }
+
+            #log {
+                background: #000;
+                border-radius: 8px;
+                padding: 15px;
+                height: 380px;
+                overflow-y: auto;
+                font-size: 0.8rem;
+                border: 1px solid #1a3040;
+                white-space: pre-wrap;
+                line-height: 1.5;
+            }
+
+            .sys {
+                color: #6080a0;
+            }
+
+            .success {
+                color: #00ff88;
+            }
+
+            .error {
+                color: #ff4466;
+            }
+
+            .data {
+                color: #cc88ff;
+            }
+
+            .ping {
+                color: #ffcc00;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="app">
+            <div class="header">
+                <span style="font-weight: bold;">EMUX RELAY TEST v2.0</span>
+                <div id="ws-status" class="status-badge">DISCONNECTED</div>
+            </div>
+
+            <div class="box">
+                <div class="label">Your Node ID</div>
+                <div class="id-row">
+                    <span id="my-id" class="id-val">....</span>
+                    <div style="text-align: right;">
+                        <div id="ping-val" style="color: #ffcc00; font-weight: bold; font-size: 0.9rem;">RTT: --ms</div>
+                        <button onclick="copyId()" style="padding: 4px 10px; font-size: 0.6rem; margin-top: 5px;">COPY ID</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="box">
+                <div class="label">Connect to Peer</div>
+                <div class="input-group">
+                    <input type="text" id="target-id" placeholder="PEER ID" maxlength="4" autocomplete="off">
+                    <button onclick="startConnection()">CONNECT</button>
+                </div>
+                <div style="margin-top: 10px; display: flex; gap: 10px;">
+                    <button onclick="sendPing()" style="background: #1a3040; color: #fff; flex: 1; font-size: 0.8rem;">SEND PING</button>
+                </div>
+            </div>
+
+            <div id="log"></div>
+        </div>
+
+        <script>
+            const RELAY_URL = 'wss://emux-relay.fly.dev/ws'; // CHANGE THIS TO YOUR FLY.IO URL
+            const myId = Math.random().toString(36).substring(2, 6).toUpperCase();
+            document.getElementById('my-id').innerText = myId;
+
+            const logEl = document.getElementById('log');
+            const wsStatus = document.getElementById('ws-status');
+            let ws;
+            let targetPeer = null;
+            let pingInterval;
+
+            function addLog(msg, type = '') {
+                const div = document.createElement('div');
+                div.className = type;
+                const time = new Date().toLocaleTimeString('en-GB', {hour12: false});
+                div.textContent = `[${time}] ${msg}`;
+                logEl.appendChild(div);
+                logEl.scrollTop = logEl.scrollHeight;
+            }
+
+            function connectWS() {
+                ws = new WebSocket(`${RELAY_URL}?id=${myId}`);
+
+                ws.onopen = () => {
+                    wsStatus.innerText = 'ONLINE (STABLE)';
+                    wsStatus.classList.add('online');
+                    addLog(`>>> CONNECTED TO RELAY: ${RELAY_URL}`, 'success');
+                };
+
+                ws.onclose = () => {
+                    wsStatus.innerText = 'DISCONNECTED';
+                    wsStatus.classList.remove('online');
+                    addLog('!!! DISCONNECTED FROM RELAY', 'error');
+                    setTimeout(connectWS, 2000);
+                };
+
+                ws.onerror = (e) => {
+                    addLog('!!! WS ERROR', 'error');
+                };
+
+                ws.onmessage = (e) => {
+                    const msg = JSON.parse(e.data);
+                    handleMessage(msg);
+                };
+            }
+
+            function handleMessage(msg) {
+                switch (msg.type) {
+                    case 'ping':
+                        addLog(`📩 PING from ${msg.from}`, 'sys');
+                        sendTo(msg.from, 'pong', {t: msg.payload.t});
+                        break;
+                    case 'pong':
+                        const rtt = Date.now() - msg.payload.t;
+                        document.getElementById('ping-val').innerText = `RTT: ${rtt}ms`;
+                        addLog(`🏓 PONG from ${msg.from} | RTT: ${rtt}ms`, 'ping');
+                        break;
+                    case 'error':
+                        if (msg.payload === "PEER_OFFLINE") {
+                            addLog(`❌ PEER ${msg.target} IS OFFLINE`, 'error');
+                            stopPing();
+                        }
+                        break;
+                    case 'data':
+                        addLog(`📦 DATA from ${msg.from}: ${JSON.stringify(msg.payload)}`, 'data');
+                        break;
+                    default:
+                        addLog(`❓ UNKNOWN from ${msg.from}: ${msg.type}`, 'sys');
+                }
+            }
+
+            function sendTo(target, type, payload) {
+                if (!ws || ws.readyState !== WebSocket.OPEN) return;
+                ws.send(JSON.stringify({
+                    type,
+                    target: target.toUpperCase(),
+                    payload
+                }));
+            }
+
+            function startConnection() {
+                const target = document.getElementById('target-id').value.toUpperCase();
+                if (!target) return;
+                targetPeer = target;
+                addLog(`>>> TARGET SET TO: ${target}`, 'sys');
+                sendTo(target, 'data', {hello: 'from ' + myId});
+                startPing();
+            }
+
+            function startPing() {
+                if (pingInterval) clearInterval(pingInterval);
+                sendPing(); // First one immediately
+                pingInterval = setInterval(sendPing, 2000);
+            }
+
+            function stopPing() {
+                if (pingInterval) clearInterval(pingInterval);
+                document.getElementById('ping-val').innerText = `RTT: --ms`;
+            }
+
+            function sendPing() {
+                const target = document.getElementById('target-id').value;
+                if (!target) {
+                    addLog('!!! ENTER TARGET ID FIRST', 'error');
+                    return;
+                }
+                addLog(`>>> PINGING ${target}...`, 'sys');
+                sendTo(target, 'ping', {t: Date.now()});
+            }
+
+            function copyId() {
+                navigator.clipboard.writeText(myId);
+                addLog('ID COPIED TO CLIPBOARD', 'success');
+            }
+
+            // Initialize
+            connectWS();
+        </script>
+    </body>
+</html>
