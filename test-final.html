@@ -6,151 +6,194 @@
         <title>EmuX Master v6.0 (Survival Edition)</title>
         <style>
             :root {
-                --primary: #00ff88;
-                --bg: #050a0f;
-                --surface: #0f2030;
-                --text: #e0f0ff;
+                --bg: #0a0c10;
+                --surface: #161b22;
+                --primary: #58a6ff;
+                --accent: #238636;
+                --text: #c9d1d9;
+                --dim: #8b949e;
+            }
+
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
             }
 
             body {
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
                 background: var(--bg);
                 color: var(--text);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
                 padding: 20px;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
             }
 
-            .app {
+            .container {
                 width: 100%;
-                max-width: 480px;
-            }
-
-            .box {
+                max-width: 360px;
                 background: var(--surface);
-                border-radius: 20px;
-                padding: 25px;
-                margin-bottom: 20px;
-                border: 1px solid #1a3a50;
-                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-                position: relative;
-                overflow: hidden;
+                border-radius: 12px;
+                border: 1px solid #30363d;
+                padding: 24px;
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
             }
 
-            .id-val {
-                font-size: 2.8rem;
-                font-weight: 800;
-                color: var(--primary);
-                letter-spacing: 5px;
-                text-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
-            }
-
-            .net-type {
-                position: absolute;
-                top: 15px;
-                right: 20px;
-                font-size: 0.65rem;
-                background: #000;
-                padding: 4px 10px;
-                border-radius: 10px;
-                border: 1px solid #333;
-            }
-
-            .ping-val {
-                font-size: 1.2rem;
-                font-weight: bold;
-                color: #ffcc00;
-                margin-top: 10px;
+            header {
                 display: flex;
+                justify-content: space-between;
                 align-items: center;
+                margin-bottom: 24px;
+            }
+
+            .status-badge {
+                font-size: 10px;
+                font-weight: bold;
+                padding: 2px 8px;
+                border-radius: 10px;
+                background: #21262d;
+                border: 1px solid #30363d;
+            }
+
+            .main-info {
+                text-align: center;
+                margin-bottom: 24px;
+            }
+
+            .id-label {
+                font-size: 11px;
+                color: var(--dim);
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }
+
+            #my-id {
+                display: block;
+                font-size: 42px;
+                font-weight: 800;
+                color: #fff;
+                letter-spacing: 4px;
+                margin: 4px 0;
+            }
+
+            .ping-row {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                gap: 12px;
+                font-size: 14px;
+            }
+
+            #rtt {
+                font-weight: 600;
+                color: #3fb950;
+            }
+
+            #conn-mode {
+                color: var(--dim);
+                font-size: 11px;
+                text-transform: uppercase;
+            }
+
+            .control-group {
+                display: flex;
                 gap: 8px;
-            }
-
-            .dot {
-                width: 10px;
-                height: 10px;
-                border-radius: 50%;
-                background: #444;
-            }
-
-            .dot.active {
-                background: #00ff88;
-                box-shadow: 0 0 15px #00ff88;
+                margin-bottom: 16px;
             }
 
             input {
-                width: 100%;
-                background: rgba(0, 0, 0, 0.5);
-                border: 2px solid #1a3a50;
-                border-radius: 15px;
+                flex: 1;
+                min-width: 0;
+                background: #0d1117;
+                border: 1px solid #30363d;
+                border-radius: 6px;
                 color: #fff;
-                padding: 18px;
-                font-size: 1.3rem;
-                margin: 15px 0;
+                padding: 10px 12px;
+                font-size: 16px;
+                font-family: inherit;
                 outline: none;
-                transition: 0.2s;
-                box-sizing: border-box;
+                transition: border-color 0.2s;
             }
 
             input:focus {
                 border-color: var(--primary);
-                background: #000;
             }
 
             button {
-                width: 100%;
-                background: var(--primary);
-                color: #050a0f;
-                border: none;
-                border-radius: 15px;
-                padding: 18px;
-                font-weight: 800;
+                background: #238636;
+                color: #fff;
+                border: 1px solid rgba(240, 246, 252, 0.1);
+                border-radius: 6px;
+                padding: 0 20px;
+                font-weight: 600;
                 cursor: pointer;
-                font-size: 1.1rem;
-                box-shadow: 0 5px 15px rgba(0, 255, 136, 0.2);
-                transition: 0.2s;
+                transition: background 0.2s;
+                flex-shrink: 0;
+            }
+
+            button:hover {
+                background: #2ea043;
             }
 
             button:active {
-                transform: scale(0.98);
+                transform: translateY(1px);
             }
 
             #log {
-                background: rgba(0, 0, 0, 0.8);
-                border-radius: 15px;
-                padding: 15px;
-                height: 250px;
+                font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, monospace;
+                font-size: 11px;
+                color: var(--dim);
+                height: 120px;
                 overflow-y: auto;
-                font-size: 0.75rem;
-                color: #789;
-                border: 1px solid #1a3a50;
-                line-height: 1.5;
+                border-top: 1px solid #30363d;
+                padding-top: 12px;
+                line-height: 1.6;
+            }
+
+            #log span {
+                opacity: 0.5;
+                margin-right: 8px;
+            }
+
+            /* Status Dot cho P2P */
+            #status-dot {
+                display: none;
+            }
+
+            /* Ẩn đi vì đã có chữ P2P/Relay tinh tế hơn */
+
+            #log::-webkit-scrollbar {
+                width: 4px;
+            }
+
+            #log::-webkit-scrollbar-thumb {
+                background: #30363d;
+                border-radius: 10px;
             }
         </style>
     </head>
     <body>
-        <div class="app">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
-                <b style="letter-spacing: 1px;">EMUX SURVIVAL v6.2</b>
-                <div id="ws-state" style="font-size: 0.7rem; color: #ff4466;">● OFFLINE</div>
-            </div>
+        <div class="container">
+            <header>
+                <span style="font-weight: 700; font-size: 14px; color: var(--primary);">EmuX Master 1.2</span>
+                <div id="ws-state" class="status-badge" style="color: #f85149;">OFFLINE</div>
+            </header>
 
-            <div class="box">
-                <div class="net-type" id="conn-mode">STBY</div>
-                <div style="font-size: 0.75rem; color: #6080a0; margin-bottom: 5px;">MY NODE ID</div>
-                <div class="id-val" id="my-id">....</div>
-                <div class="ping-box">
-                    <div class="ping-val">
-                        <div id="status-dot" class="dot"></div>
-                        <span id="rtt">-- ms</span>
-                    </div>
+            <div class="main-info">
+                <div class="id-label">Device Node ID</div>
+                <div id="my-id">....</div>
+                <div class="ping-row">
+                    <span id="rtt">-- ms</span>
+                    <span id="conn-mode">Standby</span>
                 </div>
+                <div id="status-dot"></div> <!-- Giữ ID này để tránh lỗi JS -->
             </div>
 
-            <div class="box">
-                <input type="text" id="target-id" placeholder="ENTER TARGET ID" maxlength="4" oninput="this.value=this.value.toUpperCase()">
-                <button onclick="connect()">CONNECT PLAYER 2</button>
+            <div class="control-group">
+                <input type="text" id="target-id" placeholder="Peer ID" maxlength="4" autocomplete="off" oninput="this.value=this.value.toUpperCase()">
+                <button onclick="connect()">Connect</button>
             </div>
 
             <div id="log"></div>
@@ -239,32 +282,52 @@
             function setupPC() {
                 pc = new RTCPeerConnection({
                     iceServers: [
-                        {urls: 'stun:stun.viettel.com.vn:3478'},
-                        {urls: 'stun:stun.fpt.net:3478'},
                         {urls: 'stun:stun.l.google.com:19302'},
-                        // TURN qua TCP cổng 443 - Con át chủ bài để vượt 4G
-                        {urls: 'turn:turn.anyfirewall.com:443?transport=tcp', username: 'anyfirewall', credential: 'anyfirewall'},
-                        {urls: 'turn:openrelayproject.org:3478', username: 'openrelayproject', credential: 'openrelayproject'}
-                    ]
+                        {urls: 'stun:stun.cloudflare.com:3478'},
+                        {urls: 'turn:a.relay.metered.ca:80', username: 'e7b4b4e3a5f7d2c1b0a9', credential: 'e7b4b4e3a5f7d2c1b0a9'},
+                        {urls: 'turn:a.relay.metered.ca:443', username: 'e7b4b4e3a5f7d2c1b0a9', credential: 'e7b4b4e3a5f7d2c1b0a9'},
+                        {urls: 'turn:a.relay.metered.ca:443?transport=tcp', username: 'e7b4b4e3a5f7d2c1b0a9', credential: 'e7b4b4e3a5f7d2c1b0a9'},
+                        {urls: 'turns:a.relay.metered.ca:443?transport=tcp', username: 'e7b4b4e3a5f7d2c1b0a9', credential: 'e7b4b4e3a5f7d2c1b0a9'},
+                    ],
+                    iceCandidatePoolSize: 10,
+                    bundlePolicy: 'max-bundle'
                 });
 
                 pc.onicecandidate = (e) => {
                     if (e.candidate) {
-                        // Log loại candidate để biết đang dùng đường nào (srflx = P2P, relay = qua server)
-                        const type = e.candidate.candidate.split(' ')[7];
-                        addLog(`📡 ICE Candidate found: ${type}`, '#6080a0');
+                        const c = e.candidate.candidate;
+                        const type = c.split(' ')[7];
+                        const isIPv6 = c.indexOf(':') !== -1 && c.indexOf('.') === -1;
+
+                        // VPN/WARP/Tailscale Detection
+                        if (c.includes('10.') || c.includes('172.') || c.includes('tailscale')) {
+                            addLog('🛡️ VPN/Tunnel Detected', '#58a6ff');
+                        }
+
+                        // Network Type Auto-Label
+                        let netLabel = 'WIFI';
+                        if (type === 'srflx') netLabel = 'MOBILE/NAT';
+                        if (type === 'relay') netLabel = 'TURN RELAY';
+                        document.getElementById('conn-mode').innerText = netLabel;
+
+                        // IPv6 Priority Feedback
+                        if (isIPv6) addLog(`🟣 IPv6 PRIORITY: ${type}`, '#cc88ff');
+                        else addLog(`📡 ICE: ${type}`, '#666');
+
                         sendSignal({type: 'candidate', candidate: e.candidate});
                     }
                 };
 
                 pc.oniceconnectionstatechange = () => {
-                    addLog(`🌐 ICE STATE: ${pc.iceConnectionState}`, '#6080a0');
-                    if (pc.iceConnectionState === 'connected') {
+                    const s = pc.iceConnectionState;
+                    addLog(`🌐 Node: ${s}`, '#8b949e');
+                    if (s === 'connected' || s === 'completed') {
                         isP2P = true;
                         document.getElementById('conn-mode').innerText = 'DIRECT P2P';
-                        document.getElementById('conn-mode').style.color = '#00ff88';
-                        document.getElementById('status-dot').classList.add('active');
-                        addLog('⚡ P2P UPGRADED - LOW LATENCY ACTIVE', '#00ff88');
+                        document.getElementById('conn-mode').style.color = '#3fb950';
+                        addLog('⚡ P2P STABLE - LOW LATENCY', '#3fb950');
+                    } else if (s === 'failed') {
+                        addLog('❌ P2P Failed. Try 4G/WARP!', '#f85149');
                     }
                 };
 

@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <title>EmuX P2P Lite</title>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+        <style>
+            :root {
+                --bg: #0d1117;
+                --card: #161b22;
+                --primary: #58a6ff;
+                --green: #3fb950;
+            }
+
+            body {
+                font-family: system-ui;
+                background: var(--bg);
+                color: #c9d1d9;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+                margin: 0;
+            }
+
+            .app {
+                width: 340px;
+                background: var(--card);
+                border: 1px solid #30363d;
+                border-radius: 20px;
+                padding: 25px;
+                text-align: center;
+            }
+
+            #my-id {
+                font-size: 40px;
+                font-weight: 800;
+                color: #fff;
+                margin-bottom: 5px;
+            }
+
+            #qr {
+                background: #fff;
+                padding: 8px;
+                border-radius: 10px;
+                display: inline-block;
+                margin-bottom: 15px;
+            }
+
+            #qr img {
+                width: 120px;
+                height: 120px;
+                display: block;
+            }
+
+            #ping {
+                font-size: 30px;
+                font-weight: 800;
+                color: var(--green);
+                margin: 10px 0;
+            }
+
+            #status {
+                font-size: 12px;
+                color: #8b949e;
+                margin-bottom: 15px;
+            }
+
+            .row {
+                display: flex;
+                gap: 8px;
+            }
+
+            input {
+                flex: 1;
+                background: #010409;
+                border: 1px solid #30363d;
+                border-radius: 10px;
+                color: #fff;
+                padding: 12px;
+                text-align: center;
+                outline: none;
+                text-transform: uppercase;
+                font-weight: 600;
+            }
+
+            button {
+                background: var(--primary);
+                color: #fff;
+                border: none;
+                border-radius: 10px;
+                padding: 12px 20px;
+                font-weight: 700;
+                cursor: pointer;
+            }
+
+            #log {
+                font-size: 10px;
+                color: #555;
+                height: 80px;
+                overflow-y: auto;
+                margin-top: 15px;
+                text-align: left;
+                border-top: 1px solid #30363d;
+                padding-top: 10px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="app">
+            <div style="font-size:10px; opacity:0.5; letter-spacing:2px">YOUR ID 0.6</div>
+            <div id="my-id">....</div>
+            <div id="qr"></div>
+            <div id="ping">--</div>
+            <div id="status">Connecting...</div>
+            <div class="row">
+                <input id="target" placeholder="TARGET CODE" maxlength="4">
+                <button onclick="go()">GO</button>
+            </div>
+            <div id="log"></div>
+        </div>
+
+        <script>
+            const SIG_URL = 'wss://emux-relay.fly.dev/ws';
+            const ID = Math.random().toString(36).substring(2, 6).toUpperCase();
+            document.getElementById('my-id').textContent = ID;
+            new QRCode(document.getElementById("qr"), {text: ID, width: 120, height: 120});
+
+            let ws, pc, dc, tid, pingInterval;
+            let candQueue = []; // Hàng đợi tránh "rơi" candidate
+
+            const ICE_SERVERS = [
+                {urls: 'stun:stun.l.google.com:19302'},
+                {urls: 'stun:stun.cloudflare.com:3478'},
+                // TURN Servers - Hỗ trợ cả UDP/TCP/TLS để đục 4G
+                {urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject'},
+                {urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject'},
+                {urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject'},
+                {urls: 'turns:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject'},
+                {urls: 'turns:standard.relay.metered.ca:443?transport=tcp', username: 'e7b4b4e3a5f7d2c1b0a9', credential: 'e7b4b4e3a5f7d2c1b0a9'}
+            ];
+
+            const log = (m, c = '#555') => {const d = document.createElement('div'); d.style.color = c; d.innerHTML = `<span style="opacity:0.4;font-size:9px">${new Date().toLocaleTimeString()}</span> ${m}`; document.getElementById('log').prepend(d);};
+            const updateStatus = (t, c = '#8b949e') => {const e = document.getElementById('status'); e.innerText = t; e.style.color = c;};
+            const sig = (d) => ws && ws.readyState === 1 && ws.send(JSON.stringify({target: tid, from: ID, ...d}));
+
+            function initWS() {
+                ws = new WebSocket(`${SIG_URL}?id=${ID}`);
+                ws.onopen = () => {updateStatus('⚡ SIGNAL OK', '#3fb950'); log('✅ Signal Online');};
+                ws.onmessage = async (e) => {
+                    const msg = JSON.parse(e.data);
+                    if (msg.from && msg.from !== ID) handleSignal(msg);
+                };
+                ws.onclose = () => setTimeout(initWS, 2000);
+            }
+
+            function makePC() {
+                if (pc) {
+                    pc.onicecandidate = null;
+                    pc.oniceconnectionstatechange = null;
+                    pc.close();
+                }
+                candQueue = [];
+                pc = new RTCPeerConnection({iceServers: ICE_SERVERS, iceCandidatePoolSize: 10, bundlePolicy: 'max-bundle'});
+                pc.onicecandidate = (e) => e.candidate && sig({type: 'cand', cand: e.candidate});
+                pc.oniceconnectionstatechange = () => {
+                    log(`🌐 ICE: ${pc.iceConnectionState}`);
+                    if (pc.iceConnectionState === 'connected') updateStatus('🟢 P2P CONNECTED', '#3fb950');
+                    if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
+                        updateStatus('🟡 Path lost, retrying...', '#d29922');
+                    }
+                };
+            }
+
+            // Tự động reset khi mạng thay đổi (Mô phỏng chế độ máy bay)
+            if (navigator.connection) {
+                navigator.connection.addEventListener('change', () => {
+                    log("📶 Network changed, cleaning up...");
+                    if (pc) makePC();
+                });
+            }
+
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden && pc && pc.iceConnectionState === 'disconnected') {
+                    log("👀 Back in focus, restarting ICE...");
+                    startP2P();
+                }
+            });
+
+            async function startP2P() {
+                log(`🚀 Calling ${tid}...`, '#58a6ff');
+                makePC();
+                dc = pc.createDataChannel('emu', {ordered: false, maxRetransmits: 0});
+                setupDC(dc);
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                sig({type: 'offer', sdp: offer});
+            }
+
+            async function handleSignal(msg) {
+                try {
+                    if (msg.type === 'offer') {
+                        tid = msg.from; log(`📥 Offer from ${tid}`);
+                        makePC();
+                        pc.ondatachannel = (e) => setupDC(e.channel);
+                        await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+                        const a = await pc.createAnswer();
+                        await pc.setLocalDescription(a);
+                        sig({type: 'answer', sdp: a});
+                        // Giải phóng hàng đợi candidate nếu có
+                        while (candQueue.length > 0) pc.addIceCandidate(candQueue.shift()).catch(() => { });
+                    } else if (msg.type === 'answer') {
+                        log(`📥 Answer from ${tid}`);
+                        await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+                        while (candQueue.length > 0) pc.addIceCandidate(candQueue.shift()).catch(() => { });
+                    } else if (msg.type === 'cand') {
+                        const cand = new RTCIceCandidate(msg.cand);
+                        if (pc && pc.remoteDescription) pc.addIceCandidate(cand).catch(() => { });
+                        else candQueue.push(cand);
+                    }
+                } catch (e) {log("❌ Signal Error: " + e.message, "#f85149");}
+            }
+
+            function setupDC(channel) {
+                dc = channel;
+                channel.onopen = () => {
+                    updateStatus('🟢 P2P CONNECTED', '#3fb950');
+                    log('🔗 P2P Active!', '#3fb950');
+                    if (pingInterval) clearInterval(pingInterval);
+                    pingInterval = setInterval(() => {
+                        if (channel.readyState === 'open') channel.send(JSON.stringify({t: Date.now()}));
+                    }, 1000);
+                };
+                channel.onmessage = (e) => {
+                    const d = JSON.parse(e.data);
+                    if (d.t) document.getElementById('ping').innerText = Date.now() - d.t;
+                };
+                channel.onclose = () => {updateStatus('🔴 DISCONNECTED'); clearInterval(pingInterval);};
+            }
+
+            function go() {
+                tid = document.getElementById('target').value.toUpperCase();
+                if (!tid || tid === ID) return;
+
+                updateStatus('🚀 CALLING...', '#58a6ff');
+                // Gọi thẳng startP2P, việc dọn dẹp đã có makePC lo bên trong
+                startP2P();
+            }
+
+            initWS();
+        </script>
+    </body>
+</html>
