@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <title>EmuX Debug 3.1 (Handshake Fixed)</title>
+        <style>
+            :root {
+                --primary: #00ff88;
+                --bg: #050a0f;
+                --surface: #0f1a24;
+                --text: #e0f0ff;
+            }
+
+            body {
+                font-family: monospace;
+                background: var(--bg);
+                color: var(--text);
+                padding: 20px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .app {
+                width: 100%;
+                max-width: 500px;
+            }
+
+            .box {
+                background: var(--surface);
+                border-radius: 8px;
+                padding: 20px;
+                margin-bottom: 15px;
+                border: 1px solid #1a3040;
+            }
+
+            .status-badge {
+                font-size: 0.7rem;
+                padding: 4px 10px;
+                border-radius: 4px;
+                background: #333;
+            }
+
+            .status-badge.active {
+                background: #004422;
+                color: #00ff88;
+            }
+
+            .id-val {
+                font-size: 2rem;
+                font-weight: bold;
+                color: var(--primary);
+            }
+
+            input {
+                width: 100%;
+                background: #000;
+                border: 1px solid #1a3040;
+                border-radius: 4px;
+                color: #fff;
+                padding: 12px;
+                font-size: 1.2rem;
+                margin: 10px 0;
+            }
+
+            button {
+                width: 100%;
+                background: var(--primary);
+                color: #050a0f;
+                border: none;
+                border-radius: 4px;
+                padding: 12px;
+                font-weight: bold;
+                cursor: pointer;
+            }
+
+            #log {
+                background: #000;
+                border-radius: 4px;
+                padding: 15px;
+                height: 350px;
+                overflow-y: auto;
+                font-size: 0.75rem;
+                border: 1px solid #1a3040;
+            }
+
+            .sys {
+                color: #6080a0;
+            }
+
+            .success {
+                color: #00ff88;
+            }
+
+            .error {
+                color: #ff4466;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="app">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <b style="color: var(--primary);">EMUX HYBRID v3.1</b>
+                <div id="conn-mode" class="status-badge">NOT CONNECTED</div>
+            </div>
+
+            <div class="box">
+                <div style="font-size: 0.7rem; opacity: 0.6;">YOUR ID</div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span id="my-id" class="id-val">....</span>
+                    <span id="ping-display" style="color: #ffcc00;">RTT: --ms</span>
+                </div>
+            </div>
+
+            <div class="box">
+                <input type="text" id="target-id" placeholder="ENTER PEER ID" maxlength="4" oninput="this.value=this.value.toUpperCase()">
+                <button onclick="startHandshake()">CONNECT P2P</button>
+            </div>
+
+            <div id="log"></div>
+        </div>
+
+        <script>
+            const SIGNALING_URL = 'wss://emux-relay.fly.dev/ws';
+            const myId = Math.random().toString(36).substring(2, 6).toUpperCase();
+            document.getElementById('my-id').innerText = myId;
+
+            const logEl = document.getElementById('log');
+            const modeBadge = document.getElementById('conn-mode');
+            const pingDisplay = document.getElementById('ping-display');
+
+            let ws, pc, dc, targetPeer;
+            let iceCandidatesBuffer = [];
+
+            function addLog(msg, type = '') {
+                const div = document.createElement('div');
+                div.className = type;
+                div.textContent = `[${new Date().toLocaleTimeString('en-GB', {hour12: false})}] ${msg}`;
+                logEl.appendChild(div);
+                logEl.scrollTop = logEl.scrollHeight;
+            }
+
+            function initSignaling() {
+                ws = new WebSocket(`${SIGNALING_URL}?id=${myId}`);
+                ws.onopen = () => addLog('>>> SIGNALING CONNECTED', 'success');
+                ws.onmessage = (e) => handleSignal(JSON.parse(e.data));
+                ws.onclose = () => setTimeout(initSignaling, 2000);
+            }
+
+            function setupPC(target) {
+                targetPeer = target;
+                if (pc) pc.close();
+
+                pc = new RTCPeerConnection({
+                    iceServers: [{urls: 'stun:stun.l.google.com:19302'}, {urls: 'turn:openrelayproject.org:3478', username: 'openrelayproject', credential: 'openrelayproject'}]
+                });
+
+                pc.onicecandidate = (e) => {
+                    if (e.candidate) {
+                        addLog('📍 Found Candidate', 'sys');
+                        sendSignal(target, 'candidate', e.candidate);
+                    }
+                };
+
+                pc.oniceconnectionstatechange = () => {
+                    addLog(`ICE State: ${pc.iceConnectionState}`, 'sys');
+                    if (pc.iceConnectionState === 'connected') {
+                        modeBadge.innerText = 'P2P CONNECTED';
+                        modeBadge.className = 'status-badge active';
+                    }
+                };
+
+                pc.ondatachannel = (e) => {
+                    addLog('📩 Incoming DataChannel', 'success');
+                    setupDataChannel(e.channel);
+                };
+            }
+
+            function setupDataChannel(channel) {
+                dc = channel;
+                dc.onopen = () => {
+                    addLog('🚀 DATA CHANNEL OPEN!', 'success');
+                    setInterval(() => {
+                        if (dc.readyState === 'open') dc.send(JSON.stringify({type: 'ping', t: Date.now()}));
+                    }, 1000);
+                };
+                dc.onmessage = (e) => {
+                    const data = JSON.parse(e.data);
+                    if (data.type === 'ping') dc.send(JSON.stringify({type: 'pong', t: data.t}));
+                    if (data.type === 'pong') pingDisplay.innerText = `RTT: ${Date.now() - data.t}ms`;
+                };
+            }
+
+            async function startHandshake() {
+                const target = document.getElementById('target-id').value;
+                if (!target) return;
+                addLog(`>>> Connecting to ${target}...`, 'sys');
+
+                setupPC(target);
+                dc = pc.createDataChannel('data');
+                setupDataChannel(dc);
+
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                sendSignal(target, 'offer', offer);
+            }
+
+            async function handleSignal(msg) {
+                const {from, type, payload} = msg;
+
+                if (type === 'offer') {
+                    addLog(`📩 Received Offer from ${from}`);
+                    setupPC(from);
+                    await pc.setRemoteDescription(new RTCSessionDescription(payload));
+                    const answer = await pc.createAnswer();
+                    await pc.setLocalDescription(answer);
+                    sendSignal(from, 'answer', answer);
+                    processIceBuffer();
+                }
+                else if (type === 'answer') {
+                    addLog(`📩 Received Answer from ${from}`);
+                    await pc.setRemoteDescription(new RTCSessionDescription(payload));
+                    processIceBuffer();
+                }
+                else if (type === 'candidate') {
+                    if (pc && pc.remoteDescription) {
+                        pc.addIceCandidate(new RTCIceCandidate(payload)).catch(e => { });
+                    } else {
+                        iceCandidatesBuffer.push(payload);
+                    }
+                }
+            }
+
+            function processIceBuffer() {
+                while (iceCandidatesBuffer.length > 0) {
+                    const cand = iceCandidatesBuffer.shift();
+                    pc.addIceCandidate(new RTCIceCandidate(cand)).catch(e => { });
+                }
+            }
+
+            function sendSignal(target, type, payload) {
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({target, type, payload}));
+                }
+            }
+
+            window.onload = initSignaling;
+        </script>
+    </body>
+</html>
