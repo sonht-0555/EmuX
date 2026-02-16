@@ -1,0 +1,15 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Toggle Hidden Files",
+      "type": "shell",
+      "command": "sed -i '' 's/\"\\.vscode\": true/\"\\.vscode\": false/g; s/\"\\.github\": true/\"\\.github\": false/g; s/\"\\.agent\": true/\"\\.agent\": false/g' .vscode/settings.json || sed -i '' 's/\"\\.vscode\": false/\"\\.vscode\": true/g; s/\"\\.github\": false/\"\\.github\": true/g; s/\"\\.agent\": false/\"\\.agent\": true/g' .vscode/settings.json",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "silent",
+        "close": true
+      }
+    }
+  ]
+}

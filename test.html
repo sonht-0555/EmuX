@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <title>EmuX Mini 1.5</title>
+        <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+        <style>
+            :root {
+                --bg: #0d1117;
+                --card: #161b22;
+                --primary: #58a6ff;
+                --green: #3fb950;
+            }
+
+            body {
+                font-family: system-ui, -apple-system, sans-serif;
+                background: var(--bg);
+                color: #c9d1d9;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+                margin: 0;
+            }
+
+            .app {
+                width: 320px;
+                background: var(--card);
+                border: 1px solid #30363d;
+                border-radius: 20px;
+                padding: 30px;
+                text-align: center;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            }
+
+            #my-id {
+                font-size: 48px;
+                font-weight: 800;
+                color: #fff;
+                margin-top: 5px;
+                letter-spacing: 2px;
+            }
+
+            #ping {
+                font-size: 30px;
+                font-weight: 800;
+                color: var(--green);
+                margin: 15px 0;
+            }
+
+            #status {
+                font-size: 13px;
+                color: #8b949e;
+                margin-bottom: 20px;
+            }
+
+            .row {
+                display: flex;
+                gap: 8px;
+            }
+
+            input {
+                flex: 1;
+                background: #010409;
+                border: 1px solid #30363d;
+                border-radius: 12px;
+                color: #fff;
+                padding: 14px;
+                text-align: center;
+                outline: none;
+                text-transform: uppercase;
+                font-weight: 700;
+                font-size: 16px;
+            }
+
+            button {
+                background: var(--primary);
+                color: #fff;
+                border: none;
+                border-radius: 12px;
+                padding: 14px 25px;
+                font-weight: 800;
+                cursor: pointer;
+            }
+
+            #log {
+                font-size: 10px;
+                color: #555;
+                height: 120px;
+                overflow-y: auto;
+                margin-top: 20px;
+                text-align: left;
+                border-top: 1px solid #30363d;
+                padding-top: 12px;
+                font-family: monospace;
+            }
+
+            .success {
+                color: var(--green);
+                font-weight: bold;
+            }
+
+            .error {
+                color: #f85149;
+            }
+
+            .sys {
+                color: #8b949e;
+                font-style: italic;
+            }
+
+            .ice {
+                color: #cc88ff;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="app">
+            <div style="font-size:11px; opacity:0.5; letter-spacing:2px">DEVICE ID v1.8</div>
+            <div id="my-id">....</div>
+            <div id="ping">--</div>
+            <div id="status">Connecting...</div>
+            <div class="row">
+                <input id="host-id" placeholder="TARGET" maxlength="4" autocomplete="off" oninput="this.value=this.value.toUpperCase()">
+                <button id="connect-btn">GO</button>
+            </div>
+            <div id="log"></div>
+        </div>
+
+        <script>
+            const logEl = document.getElementById('log');
+            const statusEl = document.getElementById('status');
+            const pingEl = document.getElementById('ping');
+
+            function addLog(msg, type = '') {
+                const div = document.createElement('div');
+                div.className = type;
+                div.innerHTML = `<span style="opacity:0.4">${new Date().toLocaleTimeString()}</span> ${msg}`;
+                logEl.prepend(div);
+            }
+
+            function updateStatus(t, c = '#8b949e') {
+                statusEl.innerText = t;
+                statusEl.style.color = c;
+            }
+
+            // Dàn TRẬN TURN SIN/VN dành riêng cho 4G (Viettel, MobiFone, VinaPhone)
+            const iceConfig = {
+                'iceServers': [
+                    {urls: 'stun:stun.l.google.com:19302'},
+                    {urls: 'stun:stun.cloudflare.com:3478'},
+                    // Các node Singapore lách luật cổng 80/443
+                    {urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject'},
+                    {urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject'},
+                    {urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject'},
+                    {urls: 'turns:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject'},
+                    // Node Singapore Cluster
+                    {urls: 'turn:standard.relay.metered.ca:443', username: 'e7b4b4e3a5f7d2c1b0a9', credential: 'e7b4b4e3a5f7d2c1b0a9'},
+                    {urls: 'turn:standard.relay.metered.ca:80?transport=tcp', username: 'e7b4b4e3a5f7d2c1b0a9', credential: 'e7b4b4e3a5f7d2c1b0a9'},
+                    {urls: 'turns:standard.relay.metered.ca:443?transport=tcp', username: 'e7b4b4e3a5f7d2c1b0a9', credential: 'e7b4b4e3a5f7d2c1b0a9'}
+                ],
+                iceCandidatePoolSize: 10
+            };
+
+            let peer, myID;
+
+            function initPeer() {
+                myID = Math.random().toString(36).substring(2, 6).toUpperCase();
+                document.getElementById('my-id').innerText = myID;
+                updateStatus('Connecting...', '#8b949e');
+
+                if (peer) peer.destroy();
+
+                peer = new Peer(myID, {
+                    config: iceConfig,
+                    debug: 1,
+                    secure: true
+                });
+
+                peer.on('open', (id) => {
+                    updateStatus('⚡ SIGNAL OK', '#3fb950');
+                    addLog(`>>> ID: ${id} ONLINE`, 'success');
+                });
+
+                peer.on('connection', (conn) => {
+                    addLog(`📥 INCOMING: ${conn.peer}`, 'ice');
+                    setupConnection(conn);
+                });
+
+                peer.on('disconnected', () => {
+                    addLog("⚠️ Signaling disconnected, reconnecting...", "sys");
+                    peer.reconnect();
+                });
+
+                peer.on('error', (err) => {
+                    addLog(`❌ PEER ERR: ${err.type}`, 'error');
+                    if (err.type === 'unavailable-id' || err.type === 'network') {
+                        addLog("♻️ Retrying with new ID...", "sys");
+                        setTimeout(initPeer, 2000);
+                    }
+                });
+            }
+
+            initPeer();
+
+            document.getElementById('connect-btn').onclick = () => {
+                const target = document.getElementById('host-id').value.toUpperCase();
+                if (!target || target === myID) return;
+
+                addLog(`🧹 Hard resetting signaling...`, 'sys');
+                updateStatus('RESETTING...', '#d29922');
+
+                // 1. Đóng mọi kết nối cũ đang treo
+                if (peer.connections[target]) {
+                    peer.connections[target].forEach(c => c.close());
+                    delete peer.connections[target];
+                }
+
+                // 2. Ép socket tỉnh dậy
+                if (peer.disconnected) {
+                    peer.reconnect();
+                }
+
+                // 3. Đợi socket "ấm" lên rồi mới Connect (Giải quyết vụ 2 lần click)
+                const startCall = () => {
+                    addLog(`🚀 CALLING: ${target}...`, 'sys');
+                    updateStatus('🚀 CALLING...', '#58a6ff');
+
+                    const conn = peer.connect(target, {
+                        serialization: 'json',
+                        reliable: false
+                    });
+                    setupConnection(conn);
+
+                    // 4. Nếu sau 1.5s vẫn Connecting (không có ICE), tự động "nhấn" lại hộ người dùng
+                    setTimeout(() => {
+                        if (conn.peerConnection && conn.peerConnection.iceConnectionState === 'new') {
+                            addLog("🔄 Auto-retrying handshake...", "sys");
+                            const retryConn = peer.connect(target, {reliable: false});
+                            setupConnection(retryConn);
+                        }
+                    }, 1500);
+                };
+
+                // Nếu socket chưa OPEN, đợi nó OPEN. Nếu đã OPEN, gọi luôn.
+                if (peer.open) {
+                    startCall();
+                } else {
+                    peer.once('open', startCall);
+                }
+            };
+
+            function setupConnection(conn) {
+                const checkPC = setInterval(() => {
+                    if (conn.peerConnection) {
+                        clearInterval(checkPC);
+                        const pc = conn.peerConnection;
+                        pc.oniceconnectionstatechange = () => {
+                            const state = pc.iceConnectionState;
+                            addLog(`🌐 ICE: ${state}`, 'ice');
+                            if (state === 'connected' || state === 'completed') {
+                                updateStatus('🟢 P2P ACTIVE', '#3fb950');
+                            } else if (state === 'failed') {
+                                addLog("⚠️ Relay fallback required...", "error");
+                                updateStatus('🟡 RELAYING...', '#d29922');
+                            }
+                        };
+                    }
+                }, 100);
+
+                conn.on('open', () => {
+                    updateStatus('🟢 P2P CONNECTED', '#3fb950');
+                    addLog("🟢 DATA CHANNEL OPEN!", "success");
+                    // Ping check RTT
+                    const startPing = Date.now();
+                    conn.send({type: "PING", t: startPing});
+                });
+
+                conn.on('data', (data) => {
+                    if (data.type === "PING") {
+                        conn.send({type: "PONG", t: data.t});
+                    } else if (data.type === "PONG") {
+                        const rtt = Date.now() - data.t;
+                        pingEl.innerText = rtt;
+                        addLog(`⚡ PING: ${rtt}ms`, 'success');
+                    } else {
+                        addLog(`📩 DATA: ${JSON.stringify(data)}`);
+                    }
+                });
+
+                conn.on('error', (err) => {
+                    addLog(`❌ ERR: ${err.type}`, 'error');
+                    updateStatus('🔴 ERROR', '#f85149');
+                });
+                conn.on('close', () => {
+                    updateStatus('🔴 DISCONNECTED', '#f85149');
+                    addLog("🔴 CLOSED", 'error');
+                });
+            }
+        </script>
+    </body>
+</html>
