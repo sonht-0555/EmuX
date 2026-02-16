@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <title>EmuX Lite 1.8</title>
+        <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+        <style>
+            :root {
+                --bg: #0d1117;
+                --card: #161b22;
+                --primary: #58a6ff;
+                --green: #3fb950;
+            }
+
+            body {
+                font-family: system-ui;
+                background: var(--bg);
+                color: #c9d1d9;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+                margin: 0;
+            }
+
+            .app {
+                width: 320px;
+                background: var(--card);
+                border: 1px solid #30363d;
+                border-radius: 20px;
+                padding: 30px;
+                text-align: center;
+            }
+
+            #my-id {
+                font-size: 48px;
+                font-weight: 800;
+                color: #fff;
+                margin: 5px 0;
+                letter-spacing: 2px;
+            }
+
+            #ping {
+                font-size: 30px;
+                font-weight: 800;
+                color: var(--green);
+                margin: 15px 0;
+            }
+
+            #status {
+                font-size: 13px;
+                color: #8b949e;
+                margin-bottom: 20px;
+            }
+
+            .row {
+                display: flex;
+                gap: 8px;
+            }
+
+            input {
+                flex: 1;
+                background: #010409;
+                border: 1px solid #30363d;
+                border-radius: 12px;
+                color: #fff;
+                padding: 14px;
+                text-align: center;
+                outline: none;
+                text-transform: uppercase;
+                font-weight: 700;
+                font-size: 16px;
+            }
+
+            button {
+                background: var(--primary);
+                color: #fff;
+                border: none;
+                border-radius: 12px;
+                padding: 14px 25px;
+                font-weight: 800;
+                cursor: pointer;
+            }
+
+            #log {
+                font-size: 10px;
+                color: #555;
+                height: 120px;
+                overflow-y: auto;
+                margin-top: 20px;
+                text-align: left;
+                border-top: 1px solid #30363d;
+                padding-top: 12px;
+                font-family: monospace;
+            }
+
+            .success {
+                color: var(--green);
+                font-weight: bold;
+            }
+
+            .error {
+                color: #f85149;
+            }
+
+            .sys {
+                color: #8b949e;
+                font-style: italic;
+            }
+
+            .ice {
+                color: #cc88ff;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="app">
+            <div style="font-size:11px; opacity:0.5; letter-spacing:2px">EMUX LITE v1.8</div>
+            <div id="my-id">....</div>
+            <div id="ping">--</div>
+            <div id="status">Connecting...</div>
+            <div class="row">
+                <input id="target" placeholder="TARGET" maxlength="4" autocomplete="off">
+                <button onclick="EmuX.dial()">GO</button>
+            </div>
+            <div id="log"></div>
+        </div>
+
+        <script>
+            const ui = (m, t) => {
+                if (m.status) {status.innerText = m.status; status.style.color = m.col || '#8b949e';}
+                if (m.log) {const d = document.createElement('div'); d.className = t; d.innerHTML = `<span style="opacity:0.4">${new Date().toLocaleTimeString()}</span> ${m.log}`; log.prepend(d);}
+            };
+
+            const EmuX = {
+                peer: null, conn: null, myID: '',
+                ice: [
+                    {urls: 'stun:stun.l.google.com:19302'}, {urls: 'stun:stun.cloudflare.com:3478'},
+                    {urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject'},
+                    {urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject'},
+                    {urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject'},
+                    {urls: 'turns:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject'},
+                    {urls: 'turn:standard.relay.metered.ca:443', username: 'e7b4b4e3a5f7d2c1b0a9', credential: 'e7b4b4e3a5f7d2c1b0a9'},
+                    {urls: 'turn:standard.relay.metered.ca:80?transport=tcp', username: 'e7b4b4e3a5f7d2c1b0a9', credential: 'e7b4b4e3a5f7d2c1b0a9'}
+                ],
+
+                init() {
+                    this.myID = Math.random().toString(36).substring(2, 6).toUpperCase();
+                    document.getElementById('my-id').innerText = this.myID;
+                    this.peer = new Peer(this.myID, {config: {iceServers: this.ice, iceCandidatePoolSize: 10}, debug: 1, secure: true});
+
+                    this.peer.on('open', (id) => ui({status: '⚡ SIGNAL OK', col: '#3fb950', log: `>>> ID: ${id} ONLINE`}, 'success'));
+                    this.peer.on('connection', (c) => {ui({log: `📥 INCOMING: ${c.peer}`}, 'ice'); this.setup(c);});
+                    this.peer.on('error', (e) => {ui({log: `❌ ERR: ${e.type}`}, 'error'); if (e.type === 'network') setTimeout(() => this.init(), 3000);});
+                },
+
+                dial() {
+                    const tid = target.value.toUpperCase();
+                    if (!this.peer || tid === this.myID) return;
+                    if (this.peer.connections[tid]) this.peer.connections[tid].forEach(c => c.close());
+
+                    const start = () => {
+                        ui({status: '🚀 CALLING...', col: '#58a6ff', log: `🚀 DIALING: ${tid}...`}, 'sys');
+                        const c = this.peer.connect(tid, {reliable: false});
+                        this.setup(c);
+
+                        setTimeout(() => {if (c.peerConnection && ['new', 'checking'].includes(c.peerConnection.iceConnectionState)) this.setup(this.peer.connect(tid, {reliable: false}));}, 1500);
+                    };
+                    this.peer.open ? start() : this.peer.once('open', start);
+                },
+
+                setup(c) {
+                    this.conn = c;
+                    const check = setInterval(() => {
+                        if (c.peerConnection) {
+                            clearInterval(check);
+                            c.peerConnection.oniceconnectionstatechange = () => {
+                                const s = c.peerConnection.iceConnectionState;
+                                ui({log: `🌐 ICE: ${s}`}, 'ice');
+                                if (['connected', 'completed'].includes(s)) ui({status: '🟢 P2P ACTIVE', col: '#3fb950'});
+                                if (s === 'failed') ui({status: '🟡 RELAYING...', col: '#d29922'});
+                            };
+                        }
+                    }, 100);
+
+                    c.on('open', () => {
+                        ui({status: '🟢 P2P CONNECTED', col: '#3fb950', log: "🟢 DATA CHANNEL OPEN!"}, 'success');
+                        setInterval(() => this.conn.open && this.conn.send({type: 'P', t: Date.now()}), 2000);
+                    });
+                    c.on('data', (d) => {
+                        if (d.type === 'P') this.conn.send({type: 'O', t: d.t});
+                        else if (d.type === 'O') ping.innerText = Date.now() - d.t;
+                        else ui({log: `📩 DATA: ${JSON.stringify(d)}`});
+                    });
+                    c.on('close', () => ui({status: '🔴 DISCONNECTED', col: '#f85149'}));
+                }
+            };
+
+            const status = document.getElementById('status'), log = document.getElementById('log'), ping = document.getElementById('ping'), target = document.getElementById('target');
+            EmuX.init();
+        </script>
+    </body>
+</html>

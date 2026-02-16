@@ -4,7 +4,6 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
         <title>EmuX P2P Lite</title>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
         <style>
             :root {
                 --bg: #0d1117;
@@ -25,46 +24,33 @@
             }
 
             .app {
-                width: 340px;
+                width: 320px;
                 background: var(--card);
                 border: 1px solid #30363d;
                 border-radius: 20px;
-                padding: 25px;
+                padding: 30px;
                 text-align: center;
             }
 
             #my-id {
-                font-size: 40px;
+                font-size: 48px;
                 font-weight: 800;
                 color: #fff;
-                margin-bottom: 5px;
-            }
-
-            #qr {
-                background: #fff;
-                padding: 8px;
-                border-radius: 10px;
-                display: inline-block;
-                margin-bottom: 15px;
-            }
-
-            #qr img {
-                width: 120px;
-                height: 120px;
-                display: block;
+                margin-top: 5px;
+                letter-spacing: 2px;
             }
 
             #ping {
                 font-size: 30px;
                 font-weight: 800;
                 color: var(--green);
-                margin: 10px 0;
+                margin: 15px 0;
             }
 
             #status {
-                font-size: 12px;
+                font-size: 13px;
                 color: #8b949e;
-                margin-bottom: 15px;
+                margin-bottom: 20px;
             }
 
             .row {
@@ -76,46 +62,46 @@
                 flex: 1;
                 background: #010409;
                 border: 1px solid #30363d;
-                border-radius: 10px;
+                border-radius: 12px;
                 color: #fff;
-                padding: 12px;
+                padding: 14px;
                 text-align: center;
                 outline: none;
                 text-transform: uppercase;
-                font-weight: 600;
+                font-weight: 700;
+                font-size: 16px;
             }
 
             button {
                 background: var(--primary);
                 color: #fff;
                 border: none;
-                border-radius: 10px;
-                padding: 12px 20px;
-                font-weight: 700;
+                border-radius: 12px;
+                padding: 14px 25px;
+                font-weight: 800;
                 cursor: pointer;
             }
 
             #log {
                 font-size: 10px;
                 color: #555;
-                height: 80px;
+                height: 100px;
                 overflow-y: auto;
-                margin-top: 15px;
+                margin-top: 20px;
                 text-align: left;
                 border-top: 1px solid #30363d;
-                padding-top: 10px;
+                padding-top: 12px;
             }
         </style>
     </head>
     <body>
         <div class="app">
-            <div style="font-size:10px; opacity:0.5; letter-spacing:2px">YOUR ID 0.6</div>
+            <div style="font-size:11px; opacity:0.5; letter-spacing:2px">DEVICE ID v0.8</div>
             <div id="my-id">....</div>
-            <div id="qr"></div>
             <div id="ping">--</div>
             <div id="status">Connecting...</div>
             <div class="row">
-                <input id="target" placeholder="TARGET CODE" maxlength="4">
+                <input id="target" placeholder="TARGET" maxlength="4">
                 <button onclick="go()">GO</button>
             </div>
             <div id="log"></div>
@@ -125,20 +111,31 @@
             const SIG_URL = 'wss://emux-relay.fly.dev/ws';
             const ID = Math.random().toString(36).substring(2, 6).toUpperCase();
             document.getElementById('my-id').textContent = ID;
-            new QRCode(document.getElementById("qr"), {text: ID, width: 120, height: 120});
 
             let ws, pc, dc, tid, pingInterval;
             let candQueue = []; // Hàng đợi tránh "rơi" candidate
 
             const ICE_SERVERS = [
+                // --- STUN (Vượt NAT cơ bản) ---
                 {urls: 'stun:stun.l.google.com:19302'},
                 {urls: 'stun:stun.cloudflare.com:3478'},
-                // TURN Servers - Hỗ trợ cả UDP/TCP/TLS để đục 4G
+                {urls: 'stun:stun.voip.blackberry.com:3478'},
+
+                // --- TURN VN-OPTIMIZED (Node Singapore / Cổng Web) ---
+                // Đây là dàn server giúp vượt 4G Viettel/MobiFone/VinaPhone
                 {urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject'},
                 {urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject'},
                 {urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject'},
+                // Cố gắng dùng cổng HTTPS (443) để nhà mạng không chặn
                 {urls: 'turns:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject'},
-                {urls: 'turns:standard.relay.metered.ca:443?transport=tcp', username: 'e7b4b4e3a5f7d2c1b0a9', credential: 'e7b4b4e3a5f7d2c1b0a9'}
+
+                // Backup Cluster Singapore (Low Latency for VN)
+                {urls: 'turn:standard.relay.metered.ca:443', username: 'e7b4b4e3a5f7d2c1b0a9', credential: 'e7b4b4e3a5f7d2c1b0a9'},
+                {urls: 'turn:standard.relay.metered.ca:80?transport=tcp', username: 'e7b4b4e3a5f7d2c1b0a9', credential: 'e7b4b4e3a5f7d2c1b0a9'},
+                {urls: 'turns:standard.relay.metered.ca:443?transport=tcp', username: 'e7b4b4e3a5f7d2c1b0a9', credential: 'e7b4b4e3a5f7d2c1b0a9'},
+
+                // Public Node dự phòng (Cực kỳ lì lợm)
+                {urls: 'turn:numb.viagenie.ca', username: 'demo@viagenie.ca', credential: 'demo'}
             ];
 
             const log = (m, c = '#555') => {const d = document.createElement('div'); d.style.color = c; d.innerHTML = `<span style="opacity:0.4;font-size:9px">${new Date().toLocaleTimeString()}</span> ${m}`; document.getElementById('log').prepend(d);};
