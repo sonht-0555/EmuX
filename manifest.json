@@ -8,7 +8,7 @@
   "description": "EmuX - Play retro games in your browser",
   "icons": [
     {
-      "src": "/src/img/icon.png",
+      "src": "./src/assets/img/icon.png",
       "sizes": "512x512",
       "type": "image/png"
     }

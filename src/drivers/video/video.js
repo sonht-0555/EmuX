@@ -32,7 +32,7 @@ function video_cb(pointer, width, height, pitch) {
     rendererReady = true;
     scriptName = local('render') || 'wgpu';
     const script = document.createElement('script');
-    script.src = `./src/backend/${scriptName}.js`;
+    script.src = `./src/drivers/video/${scriptName}.js`;
     script.onload = () => {
         renderFunction = window.activeRenderFn;
         renderFunction?.(pointer, width, height, pitch);

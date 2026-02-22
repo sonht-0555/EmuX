@@ -6,7 +6,7 @@ var currentModule = null, resampledPtrL = 0, resampledPtrR = 0, sabL, sabR, sabI
 async function initAudio(ratio) {
     if (audioContext) return audioContext.resume();
     audioContext = new (window.AudioContext || window.webkitAudioContext)({sampleRate: 48000});
-    await audioContext.audioWorklet.addModule('./src/backend/audio-processor.js');
+    await audioContext.audioWorklet.addModule('./src/drivers/audio/audio-processor.js');
     const bufSize = 16384;
     sabL = new SharedArrayBuffer(bufSize * 4);
     sabR = new SharedArrayBuffer(bufSize * 4);

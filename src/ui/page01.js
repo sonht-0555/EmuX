@@ -32,7 +32,11 @@ async function verticalSetting(values = [80, 160, 5]) {
     current = (current + 1) % values.length;
 }
 // ===== optionClick =====
-const optionClick = text => ({'Cloud': () => { }, 'Restore': () => { }, 'Backup': () => { }}[text]?.());
+const optionClick = text => ({
+    'Cloud': () => {const t = prompt("GitHub Token:"); if (t) local('gh_token', t);},
+    'Restore': () => cloudRestore(),
+    'Backup': () => cloudBackup()
+}[text]?.());
 // ===== Event Listeners =====
 document.addEventListener("DOMContentLoaded", () => {
     if ('serviceWorker' in navigator) {

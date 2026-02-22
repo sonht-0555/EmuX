@@ -51,17 +51,21 @@ jobs:
         fi
     - name: Build
       run: |
+        export OPT_FLAGS="-O2 -ffast-math -fno-tree-vectorize -flto -DNDEBUG"
+        export CFLAGS="$OPT_FLAGS"
+        export CXXFLAGS="$OPT_FLAGS"
+        export LDFLAGS="$OPT_FLAGS"
         cd libretro-super/libretro-${{ matrix.core.fetch }}
         if [ -n "${{ matrix.core.subdir }}" ]; then cd ${{ matrix.core.subdir }}; fi
         [ "${{ matrix.core.id }}" == "nds2021" ] && (sed -i 's/-Wl,--no-undefined//g' Makefile; sed -i 's/-Wl,--version-script=[^ ]*//g' Makefile; emmake make platform=emscripten -j$(nproc) || true) || emmake make ${{ matrix.core.make }} platform=emscripten -j$(nproc)
         cd $GITHUB_WORKSPACE/libretro-super/libretro-${{ matrix.core.fetch }}
         
-        emcc -c $GITHUB_WORKSPACE/emux/.github/workflows/retro_utils.c -o $GITHUB_WORKSPACE/retro_utils.o -O2 -flto -DNDEBUG
+        emcc -c $GITHUB_WORKSPACE/emux/.github/workflows/retro_utils.c -o $GITHUB_WORKSPACE/retro_utils.o $OPT_FLAGS
         
         if [ "${{ matrix.core.method }}" == "arcade" ]; then
-          emcc -c $GITHUB_WORKSPACE/emux/.github/workflows/retro_glue.c -o $GITHUB_WORKSPACE/retro_glue.o -O2 -flto -DNDEBUG -s USE_ZLIB=1
+          emcc -c $GITHUB_WORKSPACE/emux/.github/workflows/retro_glue.c -o $GITHUB_WORKSPACE/retro_glue.o $OPT_FLAGS -s USE_ZLIB=1
           ALL_OBJS=$(find . -name "*.o")
-          emcc $ALL_OBJS $GITHUB_WORKSPACE/retro_glue.o $GITHUB_WORKSPACE/retro_utils.o -O2 -flto -DNDEBUG \
+          emcc $ALL_OBJS $GITHUB_WORKSPACE/retro_glue.o $GITHUB_WORKSPACE/retro_utils.o $OPT_FLAGS \
             -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web \
             -s ALLOW_MEMORY_GROWTH=1 -s WASM_BIGINT=1 --no-heap-copy -s ALLOW_TABLE_GROWTH=1 \
             -s INITIAL_MEMORY=${{ matrix.core.initial_mem }} -s STACK_SIZE=${{ matrix.core.stack }} -s FORCE_FILESYSTEM=1 \
@@ -72,7 +76,7 @@ jobs:
           zip -j arcade.zip arcade.js arcade.wasm
         elif [ "${{ matrix.core.method }}" == "objects" ]; then
           ALL_OBJS=$(find . -name "*.o")
-          emcc $ALL_OBJS $GITHUB_WORKSPACE/retro_utils.o -O2 -flto -DNDEBUG \
+          emcc $ALL_OBJS $GITHUB_WORKSPACE/retro_utils.o $OPT_FLAGS \
             -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web \
             -s ALLOW_MEMORY_GROWTH=1 -s WASM_BIGINT=1 --no-heap-copy -s ALLOW_TABLE_GROWTH=1 \
             -s INITIAL_MEMORY=${{ matrix.core.initial_mem }} -s STACK_SIZE=${{ matrix.core.stack }} \

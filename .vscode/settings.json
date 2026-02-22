@@ -1,12 +1,27 @@
 {
     "editor.formatOnSave": true,
+    "[javascript]": {
+        "editor.defaultFormatter": "vscode.typescript-language-features"
+    },
+    "[css]": {
+        "editor.defaultFormatter": "vscode.css-language-features"
+    },
+    "[html]": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "vscode.html-language-features"
+    },
+    "html.format.wrapAttributes": "auto",
+    "html.format.wrapLineLength": 1000,
+    "html.format.extraLiners": "",
+    "html.format.indentInnerHtml": true,
+    "html.format.indentHandlebars": true,
     "editor.codeActionsOnSave": {
         "source.fixAll": "explicit"
     },
     // Tiêu chuẩn xóa khoảng trắng dư thừa
-    "editor.trimAutoWhitespace": true,
-    "files.trimTrailingWhitespace": true,
-    "files.trimFinalNewlines": true,
+    "editor.trimAutoWhitespace": false,
+    "files.trimTrailingWhitespace": false,
+    "files.trimFinalNewlines": false,
     // Cấu hình Javascript để mọi thứ compact nhất có thể
     "javascript.format.semicolons": "insert",
     "javascript.format.insertSpaceBeforeFunctionParenthesis": false,
@@ -18,12 +33,15 @@
     // Cấu hình CSS/HTML để giữ mật độ code cao
     "css.format.newlineBetweenRules": false,
     "css.format.newlineBetweenSelectors": false,
-    "html.format.wrapAttributes": "auto",
-    "html.format.indentInnerHtml": true,
     // Setting hiển thị giúp dễ nhìn code "đặc"
     "editor.lineHeight": 18,
     "editor.minimap.enabled": false,
     "editor.renderLineHighlight": "all",
     "editor.guides.bracketPairs": "active",
-    "editor.semanticHighlighting.enabled": true
+    "editor.semanticHighlighting.enabled": false,
+    "explorer.fileNesting.enabled": true,
+    "explorer.fileNesting.expand": false,
+    "explorer.fileNesting.patterns": {
+        "index.html": "src, docs, .github, .vscode, .agent, .gitignore, manifest.json, .prettierignore, _headers, CNAME"
+    }
 }
