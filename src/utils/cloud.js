@@ -6,7 +6,7 @@ const headers = {'Authorization': `token ${decode(MASTER_TOKEN)}`, 'Content-Type
 // ===== cloudBackup =====
 async function cloudBackup() {
     try {
-        const name = prompt("Enter Backup Name:");
+        const name = prompt("Create backup code:");
         if (!name) return;
         showNotification(" pa", "use.", "", " Uploading data...");
         const file = `${name.toLowerCase()}.json`, stores = await listStore(), data = {};
@@ -30,7 +30,7 @@ async function cloudBackup() {
 // ===== cloudRestore =====
 async function cloudRestore() {
     try {
-        const name = prompt("Enter Backup Name:");
+        const name = prompt("Enter backup code:");
         if (!name) return;
         showNotification(" pa", "use.", "", " Downloading data...");
         const file = `${name.toLowerCase()}.json`;
