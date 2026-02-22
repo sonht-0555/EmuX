@@ -25,11 +25,16 @@ async function listGame() {
     });
 }
 // ===== verticalSetting =====
-async function verticalSetting(values = [80, 160, 5]) {
-    page02.style.paddingTop = `${values[current]}px`;
-    values.forEach((value, index) => document.getElementById(`k${value}`).style.stroke = index === current ? "var(--profile-1)" : "var(--profile-4)");
+async function verticalSetting(values) {
+    const list = Array.isArray(values) ? values : [80, 160, 5];
+    if (current >= list.length) current = 0;
+    page02.style.paddingTop = `${list[current]}px`;
+    list.forEach((value, index) => {
+        const el = document.getElementById(`k${value}`);
+        if (el) el.style.stroke = index === current ? "var(--profile-1)" : "var(--profile-4)";
+    });
     local('vertical', current);
-    current = (current + 1) % values.length;
+    current = (current + 1) % list.length;
 }
 // ===== optionClick =====
 const optionClick = text => ({
@@ -54,7 +59,8 @@ document.addEventListener("DOMContentLoaded", () => {
     switch0.textContent = local('render') || 'WGPU';
     setTimeout(() => {listGame(); verticalSetting();}, 2000);
     romInput.onchange = event => inputGame(event);
-    vertical.onclick = verticalSetting;
+    vertical.onclick = () => verticalSetting();
+    setting.onclick = () => {list02.hidden = !list02.hidden; list.hidden = !list02.hidden; list01.hidden = true;};
     logo.onclick = () => {list.hidden = false; list01.hidden = list02.hidden = true; listGame();};
     document.querySelectorAll('opti').forEach(element => element.onclick = () => optionClick(element.textContent.trim()));
 });

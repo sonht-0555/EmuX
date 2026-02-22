@@ -1,12 +1,9 @@
-let revision = 'EmuX_4.33';
+let revision = 'EmuX_4.41';
 var urlsToCache = [
     './',
     './sw.js',
     './index.html',
     './manifest.json',
-    './_headers',
-    './CNAME',
-    './src/utils/cloud.js'
 ];
 self.addEventListener('install', event => {
     postMsg({msg: 'Updating...'});
@@ -15,22 +12,26 @@ self.addEventListener('install', event => {
     );
 });
 self.addEventListener('fetch', event => {
+    const isLocal = event.request.url.startsWith(self.location.origin);
     event.respondWith(
         caches.match(event.request, {ignoreSearch: true}).then(response => {
-            if (response) return addHeaders(response, event.request.url);
+            if (response) return isLocal ? addHeaders(response) : response;
             return fetch(event.request).then(res => {
-                if (!res || res.status !== 200 || (res.type !== 'basic' && !event.request.url.includes('githubusercontent'))) {
-                    return addHeaders(res, event.request.url);
+                if (!res || res.status !== 200) return res;
+                if (isLocal || event.request.url.includes('githubusercontent')) {
+                    const resClone = res.clone();
+                    caches.open(revision).then(cache => cache.put(event.request, resClone)).catch(() => { });
                 }
-                const resClone = res.clone();
-                caches.open(revision).then(cache => cache.put(event.request, resClone));
-                return addHeaders(res, event.request.url);
-            }).catch(() => new Response("Offline", {status: 503}));
+                return isLocal ? addHeaders(res) : res;
+            }).catch(err => {
+                if (event.request.mode === 'navigate') return new Response("Offline", {status: 503});
+                throw err;
+            });
         })
     );
 });
-function addHeaders(response, url) {
-    if (!response || response.status === 0 || response.status === 304 || response.type === 'opaque' || (!url.startsWith(self.location.origin) && !url.includes('githubusercontent'))) return response;
+function addHeaders(response) {
+    if (!response || response.status === 0 || response.type === 'opaque') return response;
     const headers = new Headers(response.headers);
     headers.set("Cross-Origin-Embedder-Policy", "require-corp");
     headers.set("Cross-Origin-Opener-Policy", "same-origin");

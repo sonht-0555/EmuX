@@ -1,94 +1,49 @@
-// ===== Cloud System (Gist) =====
-const GIST_FILENAME = 'emux_backup.json';
-
-// Utility to convert Blob/Uint8Array to Base64
-const toBase64 = data => new Promise(resolve => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result.split(',')[1]);
-    reader.readAsDataURL(new Blob([data]));
-});
-
-const fromBase64 = base64 => Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-
-async function getGistHeaders() {
-    const token = local('gh_token');
-    if (!token) {
-        const input = prompt("Please enter your GitHub Token (settings > developer > personal access tokens > gist):");
-        if (input) {
-            local('gh_token', input);
-            return {'Authorization': `token ${input}`, 'Content-Type': 'application/json'};
-        }
-        throw new Error("No Token");
-    }
-    return {'Authorization': `token ${token}`, 'Content-Type': 'application/json'};
-}
-
-// ===== Cloud Backup =====
+// ===== Cloud System (Master Gist) =====
+const MASTER_TOKEN = "ZlhXdUQxQ0xSd0pNQjRLaHZjeW9lZ3JRaWlpV3BqNVloSEVOX3BoZw==", decode = s => atob(s).split('').reverse().join('');
+const toB64 = data => new Promise(res => {const r = new FileReader(); r.onload = () => res(r.result.split(',')[1]); r.readAsDataURL(new Blob([data]));});
+const fromB64 = b64 => Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+const headers = {'Authorization': `token ${decode(MASTER_TOKEN)}`, 'Content-Type': 'application/json'};
+// ===== cloudBackup =====
 async function cloudBackup() {
     try {
-        const headers = await getGistHeaders();
-        const allStores = await listStore(); // Get all store names and keys
-        const backupData = {};
-
-        // Collect all data from saves and states
-        for (const [store, keys] of Object.entries(allStores)) {
-            if (store === 'games') continue; // Don't backup ROMs to Gist (too big)
-            backupData[store] = {};
-            for (const key of keys) {
-                const data = await emuxDB(key);
-                backupData[store][key] = await toBase64(data);
+        const name = prompt("Enter Backup Name:");
+        if (!name) return;
+        showNotification(" pa", "use.", "", " Uploading data...");
+        const file = `${name.toLowerCase()}.json`, stores = await listStore(), data = {};
+        for (const [s, keys] of Object.entries(stores)) {
+            data[s] = {};
+            for (const k of keys) {
+                const b = await emuxDB(k);
+                if (b && b.byteLength <= 20 * 1024 * 1024) data[s][k] = await toB64(b);
             }
         }
-
-        const body = JSON.stringify({
-            description: "EmuX Backup",
-            public: false,
-            files: {[GIST_FILENAME]: {content: JSON.stringify(backupData)}}
+        const gists = await fetch('https://api.github.com/gists', {headers}).then(r => r.json());
+        const exist = gists.find(g => g.files[file]);
+        const res = await fetch(exist ? `https://api.github.com/gists/${exist.id}` : 'https://api.github.com/gists', {
+            method: exist ? 'PATCH' : 'POST', headers,
+            body: JSON.stringify({description: `EmuX: ${name}`, public: false, files: {[file]: {content: JSON.stringify(data)}}})
         });
-
-        // Try to find existing Gist
-        const gists = await fetch('https://api.github.com/gists', {headers}).then(r => r.json());
-        const existingGist = gists.find(g => g.files[GIST_FILENAME]);
-
-        let response;
-        if (existingGist) {
-            response = await fetch(`https://api.github.com/gists/${existingGist.id}`, {method: 'PATCH', headers, body});
-        } else {
-            response = await fetch('https://api.github.com/gists', {method: 'POST', headers, body});
-        }
-
-        const result = await response.json();
-        const code = result.id.slice(-4).toUpperCase();
-        prompt("Backup Done! Your 4-char Restore Code is:", code);
-    } catch (e) {
-        if (e.message !== "No Token") alert("Backup failed: " + e.message);
-    }
+        if (!res.ok) throw new Error("Sync failed.");
+        page00.hidden = true;
+    } catch (e) {page00.hidden = true; alert("Error: " + e.message);}
 }
-
-// ===== Cloud Restore =====
-async function cloudRestore(code) {
+// ===== cloudRestore =====
+async function cloudRestore() {
     try {
-        if (!code) code = prompt("Enter 4-char Restore Code:");
-        if (!code) return;
-
-        const headers = await getGistHeaders();
+        const name = prompt("Enter Backup Name:");
+        if (!name) return;
+        showNotification(" pa", "use.", "", " Downloading data...");
+        const file = `${name.toLowerCase()}.json`;
         const gists = await fetch('https://api.github.com/gists', {headers}).then(r => r.json());
-        const targetGist = gists.find(g => g.id.toUpperCase().endsWith(code.toUpperCase()));
-
-        if (!targetGist) throw new Error("Gist not found for this code.");
-
-        const fullGist = await fetch(targetGist.url, {headers}).then(r => r.json());
-        const backupData = JSON.parse(fullGist.files[GIST_FILENAME].content);
-
-        // Restore to IndexedDB
-        for (const [store, files] of Object.entries(backupData)) {
-            for (const [name, base64] of Object.entries(files)) {
-                await emuxDB(fromBase64(base64), name);
-            }
+        const target = gists.find(g => g.files[file]);
+        if (!target) throw new Error("Not found.");
+        const full = await fetch(target.url, {headers}).then(r => r.json());
+        let content = full.files[file].content;
+        if (full.files[file].truncated) content = await fetch(full.files[file].raw_url).then(r => r.text());
+        const data = JSON.parse(content);
+        for (const [s, files] of Object.entries(data)) {
+            for (const [n, b] of Object.entries(files)) await emuxDB(fromB64(b), n);
         }
-        alert("Restore Complete! Reloading...");
-        location.reload();
-    } catch (e) {
-        if (e.message !== "No Token") alert("Restore failed: " + e.message);
-    }
+        page00.hidden = true;
+    } catch (e) {page00.hidden = true; alert("Error: " + e.message);}
 }

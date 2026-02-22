@@ -15,22 +15,31 @@ function storeForFilename(filename) {
 }
 // ===== getDB =====
 async function getDB() {
-    if (databaseCache) return databaseCache;
+    if (databaseCache && databaseCache.readyState !== 'closing') return databaseCache;
     const openDB = version => new Promise((resolve, reject) => {
         const request = indexedDB.open(DATABASE_NAME, version);
-        if (version) request.onupgradeneeded = event => {
+        request.onupgradeneeded = event => {
             const db = event.target.result;
-            getAllStoreNames().forEach(storeName => !db.objectStoreNames.contains(storeName) && db.createObjectStore(storeName));
+            getAllStoreNames().forEach(s => !db.objectStoreNames.contains(s) && db.createObjectStore(s));
         };
-        request.onsuccess = event => resolve(event.target.result);
+        request.onsuccess = event => {
+            const db = event.target.result;
+            db.onversionchange = () => {db.close(); databaseCache = null;};
+            resolve(db);
+        };
         request.onerror = reject;
     });
-    const db = await openDB();
-    if (getAllStoreNames().some(storeName => !db.objectStoreNames.contains(storeName))) {
-        db.close();
-        return databaseCache = await openDB(db.version + 1);
+    try {
+        const db = await openDB();
+        if (getAllStoreNames().some(s => !db.objectStoreNames.contains(s))) {
+            db.close();
+            return databaseCache = await openDB(db.version + 1);
+        }
+        return databaseCache = db;
+    } catch (e) {
+        databaseCache = null;
+        throw e;
     }
-    return databaseCache = db;
 }
 // ===== emuxDB =====
 async function emuxDB(dataOrKey, name) {

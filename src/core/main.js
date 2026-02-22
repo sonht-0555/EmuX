@@ -11,7 +11,7 @@ function findCore(name, data) {
         const extension = getExtension(fileName), consoleCore = CORE_CONFIG.find(core => core.ext !== '.zip' && core.ext.split(',').includes(extension));
         if (consoleCore) {
             if (extension === '.bin' && filenames.length > 5) continue;
-            if (['.nes', '.gb', '.gbc'].includes(extension)) {
+            if (['.nes', '.gb', '.gbc', '.gba', '.md', '.gen', '.smc', '.sfc'].includes(extension)) {
                 const unzipped = fflate.unzipSync(data, {filter: (file) => file.name === fileName});
                 return {config: consoleCore, data: unzipped[fileName], name: fileName};
             }
