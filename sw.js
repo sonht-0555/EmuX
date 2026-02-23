@@ -1,4 +1,4 @@
-let revision = 'EmuX_4.43';
+let revision = 'EmuX_4.40';
 var urlsToCache = [
     './',
     './sw.js',
