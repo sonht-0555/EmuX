@@ -1,8 +1,6 @@
 // ===== Audio System =====
 const audio_batch_cb = (pointer, frames) => writeAudio(pointer, frames), audio_cb = () => { };
-var audioContext, audioWorkletNode, audioGainNode, totalSamplesSent = 0, audioStartTime = 0, audioCoreRatio = 1.0;
-var currentModule = null, resampledPtrL = 0, resampledPtrR = 0, sabL, sabR, sabIndices;
-var sabViewLeft, sabViewRight, sabViewIndices;
+var audioContext, audioWorkletNode, audioGainNode, totalSamplesSent = 0, audioStartTime = 0, audioCoreRatio = 1.0, currentModule = null, resampledPtrL = 0, resampledPtrR = 0, sabL, sabR, sabIndices, sabViewLeft, sabViewRight, sabViewIndices;
 // ===== initAudio =====
 async function initAudio(ratio) {
     if (audioContext) return audioContext.resume();
