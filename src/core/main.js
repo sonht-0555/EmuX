@@ -65,15 +65,13 @@ async function timer(isStart) {
             if (seconds === 60) {seconds = 0; minutes++;}
             if (minutes === 60) {minutes = 0; hours++;}
             time1Element.textContent = `${hours}h${minutes.toString().padStart(2, '0')}.${(seconds % 60).toString().padStart(2, '0')}`;
-            if (++count1 === 60) {autoSave(); count1 = 0;}
+            if (++count1 === 60) {saveState(); count1 = 0;}
         }, 1000);
     } else if (timerId) {
         clearInterval(timerId);
         timerId = null;
     }
 }
-// ===== autoSave =====
-async function autoSave() {await saveState(); await message(`[${recCount}]_Recorded!`); recCount++;}
 // ===== resumeGame =====
 async function resumeGame() {
     isRunning = true;

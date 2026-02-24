@@ -63,7 +63,8 @@ async function initCore(romFile) {
         const coreBuffer = await coreFetch;
         if (!coreBuffer) return;
         const coreFiles = fflate.unzipSync(new Uint8Array(coreBuffer));
-        const jsFile = Object.keys(coreFiles).find(name => name.endsWith('.js')), wasmFile = Object.keys(coreFiles).find(name => name.endsWith('.wasm'));
+        let jsFile, wasmFile;
+        for (const name of Object.keys(coreFiles)) {if (name.endsWith('.js')) jsFile = name; if (name.endsWith('.wasm')) wasmFile = name;}
         if (!jsFile || !wasmFile) return;
         scriptSource = URL.createObjectURL(new Blob([coreFiles[jsFile]], {type: 'application/javascript'}));
         window.wasmUrl = URL.createObjectURL(new Blob([coreFiles[wasmFile]], {type: 'application/wasm'}));
@@ -106,23 +107,18 @@ async function initCore(romFile) {
                 audioContext.resume();
                 Module._free(audioVideoPointer);
                 if (window.resetAudioSync) window.resetAudioSync();
-                const session = Math.random();
+                const session = Math.random(), perf = window.Perf;
                 window.currentSessionId = session;
                 function mainLoop() {
                     if (!isRunning || window.currentSessionId !== session) return window.mainRafId = 0;
                     window.mainRafId = requestAnimationFrame(mainLoop);
-                    let backlog = window.getAudioBacklog();
-                    if (window.Perf && window.Perf.enabled) {
-                        window.Perf.samples.backlog += backlog;
-                        window.Perf.samples.backlogCount++;
-                    }
-                    let targetRuns = 1;
-                    if (backlog > 4000) targetRuns = 0;
-                    if (backlog < 1000) targetRuns = 2;
-                    for (let index = 0; index < targetRuns; index++) {
-                        if (window.Perf) window.Perf.beginCore();
+                    var backlog = window.getAudioBacklog();
+                    if (perf && perf.enabled) {perf.samples.backlog += backlog; perf.samples.backlogCount++;}
+                    var targetRuns = backlog > 4000 ? 0 : backlog < 1000 ? 2 : 1;
+                    for (var index = 0; index < targetRuns; index++) {
+                        if (perf) perf.beginCore();
                         Module._retro_run();
-                        if (window.Perf) window.Perf.endCore();
+                        if (perf) perf.endCore();
                         window._runCount = (window._runCount || 0) + 1;
                     }
                 }
@@ -131,7 +127,7 @@ async function initCore(romFile) {
                 startLoop();
                 await loadState();
                 await timer(true);
-                if (window.wasmUrl.startsWith('blob:')) URL.revokeObjectURL(window.wasmUrl);
+                if (window.wasmUrl && window.wasmUrl.startsWith('blob:')) URL.revokeObjectURL(window.wasmUrl);
                 resolve();
             }
         };
