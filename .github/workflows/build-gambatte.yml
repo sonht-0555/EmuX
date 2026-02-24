@@ -21,23 +21,23 @@ jobs:
 
       - name: Build Core
         run: |
-          export OPT_FLAGS="-O3 -ffast-math -flto -DNDEBUG"
-          export CFLAGS="$OPT_FLAGS"
-          export CXXFLAGS="$OPT_FLAGS"
-          export LDFLAGS="$OPT_FLAGS"
-
           cd gambatte
+          # Build core with static linking to ensure all objects are generated
           emmake make -f Makefile.libretro platform=emscripten STATIC_LINKING=1 -j$(nproc)
 
-          # Link WASM - use STATIC_LINKING=1 above so make only produces .o files
+          # Find all object files. Gambatte source is in libgambatte/src
+          # We also need to make sure libretro-common files are included if they were built
           ALL_OBJS=$(find . -name "*.o")
-          emcc $ALL_OBJS $OPT_FLAGS \
-            -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web \
-            -s ALLOW_MEMORY_GROWTH=1 --no-heap-copy -s ALLOW_TABLE_GROWTH=1 \
-            -s INITIAL_MEMORY=64mb -s STACK_SIZE=2mb \
-            -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap","getValue","setValue"]' \
-            -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free","_retro_serialize_size","_retro_serialize","_retro_unserialize"]' \
-            -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 \
+          
+          # Link everything into one WASM
+          emcc $ALL_OBJS -O2 \
+            -s WASM=1 -s ENVIRONMENT=web \
+            -s ALLOW_MEMORY_GROWTH=1 -s ALLOW_TABLE_GROWTH=1 \
+            -s NO_EXIT_RUNTIME=1 \
+            -s EXPORTED_RUNTIME_METHODS='["addFunction","getValue","setValue","ccall","cwrap","UTF8ToString","stringToUTF8"]' \
+            -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free"]' \
+            -s ERROR_ON_UNDEFINED_SYMBOLS=0 \
+            --no-entry \
             -o gambatte_core.js
 
           zip -j gambatte.zip gambatte_core.js gambatte_core.wasm

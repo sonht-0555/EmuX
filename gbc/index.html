@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Gambatte Simple Loader</title>
+        <style>
+            body {
+                background: #000;
+                color: #0f0;
+                font-family: monospace;
+                padding: 20px;
+                line-height: 1.4;
+            }
+
+            #log {
+                white-space: pre-wrap;
+                word-break: break-all;
+            }
+
+            .success {
+                color: #0f0;
+            }
+
+            .error {
+                color: #f00;
+                font-weight: bold;
+            }
+
+            .info {
+                color: #0af;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="log">Starting Gambatte Core...</div>
+
+        <script>
+            const logNode = document.getElementById('log');
+            function log(msg, type = 'info') {
+                const span = document.createElement('div');
+                span.className = type;
+                span.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+                logNode.appendChild(span);
+                window.scrollTo(0, document.body.scrollHeight);
+            }
+
+            window.Module = {
+                print: (m) => log(m, 'success'),
+                printErr: (m) => log(m, 'error'),
+                onRuntimeInitialized: () => {
+                    log("WASM Runtime Ready.");
+                    runCore();
+                }
+            };
+
+            async function runCore() {
+                try {
+                    log("Loading test.gbc...");
+                    const res = await fetch('test.gbc');
+                    const data = new Uint8Array(await res.arrayBuffer());
+                    log(`ROM Size: ${data.length} bytes`);
+
+                    // 1. Setup Environment
+                    const logCallback = Module.addFunction((level, fmt, argptr) => {
+                        let msg = Module.UTF8ToString(fmt);
+                        if (msg.includes('%s') && argptr) {
+                            try {
+                                const subPtr = Module.getValue(argptr, 'i32');
+                                if (subPtr) msg = msg.replace('%s', Module.UTF8ToString(subPtr));
+                            } catch (e) { }
+                        }
+                        log(`[Core] ${msg}`);
+                    }, 'viii');
+
+                    Module._retro_set_environment(Module.addFunction((cmd, ptr) => {
+                        // log(`Env call: ${cmd}`, 'info');
+
+                        // Commands that we should return true and/or set value to 1
+                        const booleanCommands = [1, 2, 3, 8, 10, 16, 21, 22, 39, 59, 70];
+
+                        if (booleanCommands.includes(cmd)) {
+                            if (ptr) {
+                                // Write 1 as both 1-byte and 4-byte for maximum compatibility
+                                Module.HEAPU8[ptr] = 1;
+                                Module.HEAPU8[ptr + 1] = 0;
+                                Module.HEAPU8[ptr + 2] = 0;
+                                Module.HEAPU8[ptr + 3] = 0;
+                            }
+                            // log(` -> Responding TRUE (1) to cmd ${cmd}`);
+                            return true;
+                        }
+
+                        if (cmd === 27) { // GET_LOG_INTERFACE
+                            if (ptr) Module.setValue(ptr, logCallback, 'i32');
+                            return true;
+                        }
+
+                        // 1: GET_ADDR_CONTROL
+                        if (cmd === 1) return false;
+
+                        // 39, 59: CORE_OPTIONS
+                        if (cmd === 39 || cmd === 59) return true;
+
+                        return false;
+                    }, 'iii'));
+
+                    const dummyVideo = Module.addFunction((data, w, h, p) => { }, 'viiii');
+                    const dummyAudio = Module.addFunction((l, r) => { }, 'vii');
+                    const dummyAudioBatch = Module.addFunction((data, f) => f, 'iii');
+                    const dummyPoll = Module.addFunction(() => { }, 'v');
+                    const dummyInput = Module.addFunction((p, d, i, id) => 0, 'iiiii');
+
+                    if (Module._retro_set_video_refresh) Module._retro_set_video_refresh(dummyVideo);
+                    if (Module._retro_set_audio_sample) Module._retro_set_audio_sample(dummyAudio);
+                    if (Module._retro_set_audio_sample_batch) Module._retro_set_audio_sample_batch(dummyAudioBatch);
+                    if (Module._retro_set_input_poll) Module._retro_set_input_poll(dummyPoll);
+                    if (Module._retro_set_input_state) Module._retro_set_input_state(dummyInput);
+
+                    // 2. Init Core
+                    Module._retro_init();
+                    log("retro_init() finished.");
+
+                    // 3. Load Game
+                    const gameInfo = Module._malloc(120);
+                    // Zero out the struct
+                    for (let i = 0; i < 120; i++) Module.HEAPU8[gameInfo + i] = 0;
+
+                    const romBuf = Module._malloc(data.length);
+                    Module.HEAPU8.set(data, romBuf);
+
+                    const path = "test.gbc";
+                    const pathPtr = Module._malloc(path.length + 1);
+                    Module.stringToUTF8(path, pathPtr, path.length + 1);
+
+                    Module.setValue(gameInfo + 0, pathPtr, 'i32'); // path
+                    Module.setValue(gameInfo + 4, romBuf, 'i32'); // data
+                    Module.setValue(gameInfo + 8, data.length, 'i32'); // size
+
+                    log("Calling retro_load_game...");
+                    const ok = Module._retro_load_game(gameInfo);
+
+                    if (ok) {
+                        log("SUCCESS: Game loaded!", "success");
+
+                        const avInfo = Module._malloc(120);
+                        Module._retro_get_system_av_info(avInfo);
+
+                        const fps = Module.HEAPF64[(avInfo + 24) >> 3];
+                        const rate = Module.HEAPF64[(avInfo + 32) >> 3];
+
+                        log("--- Core Stats ---");
+                        log(`FPS: ${fps}`);
+                        log(`Sample Rate: ${rate}`);
+                        log("------------------");
+
+                        log("Running 10 frames to verify...");
+                        for (let i = 0; i < 10; i++) Module._retro_run();
+                        log("Completed 10 frames without crash.");
+                    } else {
+                        log("FAILED: retro_load_game returned false", "error");
+                    }
+
+                } catch (e) {
+                    log(`CRASH: ${e.message}`, "error");
+                    console.error(e);
+                }
+            }
+        </script>
+        <script src="gambatte_core.js"></script>
+    </body>
+</html>
