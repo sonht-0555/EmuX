@@ -3,7 +3,7 @@ const tags = ["html", "body", "page00", "page01", "page02", "notification", "dis
 tags.forEach(selector => window[selector] = document.querySelector(selector));
 const local = (key, value) => (value === undefined || value === null) ? localStorage.getItem(key) : localStorage.setItem(key, value);
 const delay = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
-let gameName, gameWidth, gameHeight, integer, timerId, count = null, recCount = 1, canvasBottom, hours = 0, minutes = 0, seconds = 0, count1 = 0, current = parseInt(local('vertical')) || 0;
+let gameName, gameWidth, gameHeight, integer, timerId, time1Element, count = null, recCount = 1, canvasBottom, hours = 0, minutes = 0, seconds = 0, count1 = 0, current = parseInt(local('vertical')) || 0;
 const canvas = document.getElementById('canvas');
 // ===== doubleTap =====
 function doubleTap(event, element, distance) {

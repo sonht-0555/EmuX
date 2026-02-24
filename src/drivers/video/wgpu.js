@@ -191,6 +191,5 @@ window.activeRenderFn = async function (pointer, width, height, pitch) {
         }
     }
     gpuQueue.submit([encoder.finish()]);
-    logSkip();
 };
 console.log("wgpu.js loaded");

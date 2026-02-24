@@ -50,7 +50,6 @@ function writeAudio(pointer, frames) {
         Atomics.store(sabViewIndices, 0, (writeIndex + count) & (bufferSize - 1));
         totalSamplesSent += count;
     }
-    if (window.Perf) window.Perf.countAudio(frames);
     return frames;
 }
 // ===== getAudioBacklog =====

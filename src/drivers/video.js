@@ -5,21 +5,6 @@ var lookupTable565 = new Uint32Array(65536);
 for (let i = 0; i < 65536; i++) {
     lookupTable565[i] = 0xFF000000 | (((i & 0x001F) << 3) << 16) | (((i & 0x07E0) >> 3) << 8) | ((i & 0xF800) >> 8);
 }
-// ===== logSkip =====
-function logSkip() {
-    if (window._runCount >= 60 && window.skip1) {
-        const renderPct = (frameCount > 0) ? ((frameCount - skippedFrames) * 100 / frameCount) | 0 : 0;
-        window.skip1.textContent = `${scriptName.toUpperCase()}.[${renderPct}] `;
-        if (window.Perf) {
-            window.Perf.video.frames = frameCount;
-            window.Perf.video.skipped = skippedFrames;
-            window.Perf.report(scriptName, window._runCount);
-        }
-        window._runCount = 0;
-        frameCount = skippedFrames = 0;
-    }
-    if (frameCount > 1000) frameCount = skippedFrames = 0;
-}
 // ===== video_cb =====
 function video_cb(pointer, width, height, pitch) {
     if (renderFunction) {

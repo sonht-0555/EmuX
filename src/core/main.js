@@ -55,21 +55,20 @@ async function loadState(slot = 1) {
     }
 }
 // ===== timer =====
-let time1Element;
 async function timer(isStart) {
-    if (isStart) {
-        if (timerId) return;
+    if (isStart && !timerId) {
         if (!time1Element) time1Element = document.querySelector("time1");
         timerId = setInterval(() => {
             seconds++;
             if (seconds === 60) {seconds = 0; minutes++;}
             if (minutes === 60) {minutes = 0; hours++;}
-            time1Element.textContent = `${hours}h${minutes.toString().padStart(2, '0')}.${(seconds % 60).toString().padStart(2, '0')}`;
+            const renderPct = (frameCount > 0) ? ((frameCount - skippedFrames) * 100 / frameCount) | 0 : 0;
+            time1Element.textContent = `W${renderPct.toString().padStart(2, '0')}/${hours ? hours + '.' : ''}${minutes.toString().padStart(2, '0')}.${(seconds % 60).toString().padStart(2, '0')}`;
+            window._runCount = 0; frameCount = skippedFrames = 0;
             if (++count1 === 60) {saveState(); count1 = 0;}
         }, 1000);
-    } else if (timerId) {
-        clearInterval(timerId);
-        timerId = null;
+    } else if (!isStart && timerId) {
+        clearInterval(timerId); timerId = null;
     }
 }
 // ===== resumeGame =====

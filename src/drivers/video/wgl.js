@@ -84,7 +84,6 @@ function renderNDS(pointer, width, height) {
     }
     render32(sourceView32, 0, lastMainFramePtr, visualBufferPtr, pixelView, glContext, glTexture, width, halfHeight, pixelCount, 0);
     render32(sourceView32, pixelCount, lastBottomFramePtr, visualBufferBottomPtr, pixelViewBottom, glContextBottom, glTextureBottom, width, halfHeight, pixelCount, 1);
-    logSkip();
 }
 // ===== activeRenderFn =====
 window.activeRenderFn = function (pointer, width, height, pitch) {
@@ -115,6 +114,5 @@ window.activeRenderFn = function (pointer, width, height, pitch) {
     }
     if (is32Bit) render32(sourceView32, 0, lastMainFramePtr, visualBufferPtr, pixelView, glContext, glTexture, width, height, pixelCount, 0);
     else render16(sourceView32, lastMainFramePtr, visualBufferPtr, pixelView, glContext, glTexture, width, height, pitch >> 1, 0);
-    logSkip();
 };
 console.log("wgl.js loaded");

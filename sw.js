@@ -1,4 +1,4 @@
-let revision = 'EmuX_4.57';
+let revision = 'EmuX_4.59';
 var urlsToCache = [
     './',
     './index.html',
@@ -24,7 +24,6 @@ var urlsToCache = [
     './src/core/bios/bios9.bin',
     './src/core/bios/firmware.bin',
     './src/utils/zip.js',
-    './src/utils/perf.js',
     './src/utils/s3mini.js',
     './src/core/loader.js',
     './src/drivers/audio.js',

@@ -107,18 +107,15 @@ async function initCore(romFile) {
                 audioContext.resume();
                 Module._free(audioVideoPointer);
                 if (window.resetAudioSync) window.resetAudioSync();
-                const session = Math.random(), perf = window.Perf;
+                const session = Math.random();
                 window.currentSessionId = session;
                 function mainLoop() {
                     if (!isRunning || window.currentSessionId !== session) return window.mainRafId = 0;
                     window.mainRafId = requestAnimationFrame(mainLoop);
                     var backlog = window.getAudioBacklog();
-                    if (perf && perf.enabled) {perf.samples.backlog += backlog; perf.samples.backlogCount++;}
                     var targetRuns = backlog > 4000 ? 0 : backlog < 1000 ? 2 : 1;
                     for (var index = 0; index < targetRuns; index++) {
-                        if (perf) perf.beginCore();
                         Module._retro_run();
-                        if (perf) perf.endCore();
                         window._runCount = (window._runCount || 0) + 1;
                     }
                 }
