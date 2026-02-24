@@ -4,7 +4,7 @@ description: Increment version, stage changes, generate a professional commit me
 
 // turbo-all
 To complete this efficiently (one-click approval), I will:
-1. Increment the version number (e.g., EmuX_3.30 -> EmuX_3.31) in both `index.html` (`gameVer`) and `sw.js` (`revision`).
+1. Increment the version number (e.g., EmuX_3.30 -> EmuX_3.31) in `sw.js` (`revision`).
 2. Run `git add .` to stage all changes, including the version bump.
 3. Analyze `git diff --cached` to understand the modifications.
 4. Craft a **Conventional Commits** message (type(scope): description).

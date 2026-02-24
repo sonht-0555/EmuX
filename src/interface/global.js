@@ -52,7 +52,7 @@ async function gameView(name) {
     cta.ontouchstart = event => event.preventDefault();
     gameWidth = canvas.width;
     gameHeight = canvas.height;
-    title1.textContent = name;
+    title1.textContent = name.charAt(0).toUpperCase() + name.slice(1);
     switch0.textContent = local('render');
     const maxInteger = Math.floor((window.innerWidth * window.devicePixelRatio) / gameWidth);
     integer = (maxInteger > 6) ? maxInteger - (maxInteger % 2) : maxInteger;

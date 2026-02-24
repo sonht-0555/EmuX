@@ -64,7 +64,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
     }
-    ver.textContent = gameVer;
+    fetch('./sw.js').then(r => r.text()).then(t => ver.textContent = t.match(/revision = '(.*?)'/)[1]);
     switch0.textContent = local('render') || 'WGPU';
     setTimeout(() => {listGame(); verticalSetting();}, 2000);
     romInput.onchange = event => inputGame(event);

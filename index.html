@@ -8,7 +8,6 @@
     <link rel="stylesheet" type="text/css" href="./src/assets/css/main.css" />
     <link rel="manifest" href="/manifest.json" />
   </head>
-  <script> let gameVer = 'EmuX_4.59'; </script>
   <body hide>
     <page00 hidden>
       <divide></divide>
@@ -56,10 +55,7 @@
         <screen><canvas fil id="canvas"></canvas></screen>
         <notification>
           <title1>...</title1>
-          <status1>
-            <skip1></skip1>
-            <time1>W00/00.00</time1>
-          </status1>
+          <time1>W00_00.00</time1>
         </notification>
       </display>
       <divide></divide>
@@ -103,16 +99,16 @@
       <invis></invis>
     </page02>
   </body>
+  <script src="./src/interface/global.js"></script>
+  <script src="./src/interface/page01.js"></script>
+  <script src="./src/interface/page02.js"></script>
   <script src="./src/utils/s3mini.js"></script>
   <script src="./src/utils/zip.js"></script>
-  <script src="./src/drivers/audio.js"></script>
-  <script src="./src/drivers/video.js"></script>
-  <script src="./src/drivers/gamepad.js"></script>
-  <script src="./src/drivers/storage.js"></script>
-  <script src="./src/drivers/cloud.js"></script>
-  <script src="./src/ui/global.js"></script>
-  <script src="./src/ui/page01.js"></script>
-  <script src="./src/ui/page02.js"></script>
+  <script src="./src/core/audio.js"></script>
+  <script src="./src/core/video.js"></script>
+  <script src="./src/core/gamepad.js"></script>
+  <script src="./src/core/storage.js"></script>
+  <script src="./src/core/cloud.js"></script>
   <script src="./src/core/main.js"></script>
   <script src="./src/core/loader.js"></script>
 </html>

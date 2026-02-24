@@ -254,7 +254,7 @@
     text-align: left;
     align-items: end;
   }
-  notification title1, status1 {
+  notification title1, time1 {
     line-height: 6px;
     height: 7px;
     white-space: nowrap;
@@ -265,7 +265,7 @@
   notification title1 {
     max-width: 70%
   }
-  notification status1 {
+  notification time1 {
     font-family: "04bf";
     position: absolute;
     right: -1px;

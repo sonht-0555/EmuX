@@ -1,4 +1,4 @@
-let revision = 'EmuX_4.59';
+let revision = 'EmuX_4.63';
 var urlsToCache = [
     './',
     './index.html',
@@ -18,26 +18,26 @@ var urlsToCache = [
     'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/arcade.zip',
     'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/nds2021.zip',
     'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/ps1.zip',
-    './src/core/bios/neogeo.zip',
-    './src/core/bios/scph5501.bin',
-    './src/core/bios/bios7.bin',
-    './src/core/bios/bios9.bin',
-    './src/core/bios/firmware.bin',
+    './src/utils/bios/neogeo.zip',
+    './src/utils/bios/scph5501.bin',
+    './src/utils/bios/bios7.bin',
+    './src/utils/bios/bios9.bin',
+    './src/utils/bios/firmware.bin',
     './src/utils/zip.js',
     './src/utils/s3mini.js',
     './src/core/loader.js',
-    './src/drivers/audio.js',
-    './src/drivers/video.js',
-    './src/drivers/video/w2d.js',
-    './src/drivers/video/wgl.js',
-    './src/drivers/video/wgpu.js',
-    './src/drivers/gamepad.js',
-    './src/drivers/storage.js',
-    './src/drivers/cloud.js',
+    './src/core/audio.js',
+    './src/core/video.js',
+    './src/core/video/w2d.js',
+    './src/core/video/wgl.js',
+    './src/core/video/wgpu.js',
+    './src/core/gamepad.js',
+    './src/core/storage.js',
+    './src/core/cloud.js',
     './src/core/main.js',
-    './src/ui/global.js',
-    './src/ui/page01.js',
-    './src/ui/page02.js'
+    './src/interface/global.js',
+    './src/interface/page01.js',
+    './src/interface/page02.js'
 ];
 self.addEventListener('install', function (event) {
     postMsg({msg: 'Updating...'});
