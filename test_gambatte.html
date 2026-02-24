@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Gambatte Standalone Test v17</title>
+        <meta charset="utf-8">
+        <style>
+            body {
+                background: #1a1a1a;
+                color: #ccc;
+                font-family: monospace;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                padding: 20px;
+            }
+
+            #controls {
+                background: #333;
+                padding: 15px;
+                border-radius: 8px;
+                margin-bottom: 20px;
+                border: 1px solid #444;
+                width: 480px;
+                text-align: center;
+            }
+
+            canvas {
+                background: #000;
+                border: 2px solid #555;
+                image-rendering: pixelated;
+                width: 480px;
+                height: 432px;
+            }
+
+            #status {
+                color: #0f0;
+                font-weight: bold;
+                margin-top: 10px;
+            }
+
+            #log-area {
+                width: 480px;
+                height: 400px;
+                overflow-y: auto;
+                background: #000;
+                font-size: 10px;
+                margin-top: 10px;
+                text-align: left;
+                padding: 10px;
+                color: #00ff00;
+                border: 1px solid #333;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="controls">
+            <h2>Gambatte v17 - The Final Alignment</h2>
+            <div id="status">Initializing...</div>
+            <div id="log-area"></div>
+        </div>
+        <canvas id="canvas"></canvas>
+
+        <script src="https://unpkg.com/fflate"></script>
+        <script>
+            const logArea = document.getElementById('log-area');
+            function logger(msg) {
+                const div = document.createElement('div');
+                div.innerText = "[" + new Date().toLocaleTimeString().split(' ')[0] + "] " + msg;
+                logArea.appendChild(div);
+                logArea.scrollTop = logArea.scrollHeight;
+                console.log(msg);
+            }
+
+            let ctx, romData, isRunning = false;
+            const keys = new Uint8Array(16);
+
+            window.onload = async () => {
+                try {
+                    logger("v17: Force Alignment & High Priority Env");
+                    const coreResp = await fetch('gambatte.zip');
+                    const coreBuf = await coreResp.arrayBuffer();
+                    const unzipped = fflate.unzipSync(new Uint8Array(coreBuf));
+                    const jsFile = Object.keys(unzipped).find(n => n.endsWith('.js'));
+                    const wasmFile = Object.keys(unzipped).find(n => n.endsWith('.wasm'));
+                    window.wasmUrl = URL.createObjectURL(new Blob([unzipped[wasmFile]], {type: 'application/wasm'}));
+                    const script = document.createElement('script');
+                    script.src = URL.createObjectURL(new Blob([unzipped[jsFile]], {type: 'application/javascript'}));
+                    document.body.appendChild(script);
+
+                    const romResp = await fetch(encodeURIComponent("Pokemon - Crystal Version (USA, Europe) (Rev 1).gbc"));
+                    romData = new Uint8Array(await romResp.arrayBuffer());
+                    logger("ROM Loaded.");
+
+                    const checkReady = setInterval(() => {
+                        if (window.Module && window.Module._retro_init && window.Module.FS) {
+                            clearInterval(checkReady);
+                            startEmulator();
+                        }
+                    }, 100);
+                } catch (e) {
+                    logger("INIT ERROR: " + e.message);
+                }
+            };
+
+            window.Module = {
+                canvas: document.getElementById('canvas'),
+                locateFile: (path) => path.endsWith('.wasm') ? window.wasmUrl : path,
+                onRuntimeInitialized: () => logger("Runtime Ready."),
+                print: (t) => logger("[Core] " + t),
+                printErr: (t) => logger("[Err] " + t)
+            };
+
+            function startEmulator() {
+                const env_cb = (cmd, data) => {
+                    const c = Number(cmd);
+                    const d = Number(data);
+
+                    // HIGH PRIORITY LOGGING
+                    if (c === 10) logger(">>> PRIORITY: cmd 10 (CAN_DUPE) called at " + d);
+                    else logger("Env: " + c + " data=" + d);
+
+                    switch (c) {
+                        case 10: // GET_CAN_DUPE
+                            if (d) Module.HEAPU8[d] = 1; // 1 byte write for bool
+                            return 1;
+                        case 3: // SET_PIXEL_FORMAT
+                            return 1;
+                        case 9: // SYSTEM_DIR
+                        case 31: // SAVE_DIR
+                            if (d) {
+                                const p = Module._malloc(2);
+                                Module.stringToUTF8(".", p, 2);
+                                Module.HEAP32[d >> 2] = p;
+                            }
+                            return 1;
+                        case 15: // GET_VARIABLE
+                            if (d) {
+                                const k = Module.HEAP32[d >> 2];
+                                const key = Module.UTF8ToString(k);
+                                if (key === "gambatte_gb_bootloader") {
+                                    const v = Module._malloc(10);
+                                    Module.stringToUTF8("disabled", v, 10);
+                                    Module.HEAP32[(d >> 2) + 1] = v;
+                                    return 1;
+                                }
+                            }
+                            return 0;
+                        case 21: case 27: case 64: return 0;
+                        default: return (c < 40) ? 1 : 0;
+                    }
+                };
+
+                const video_cb = (ptr, w, h, pitch) => {
+                    const p = Number(ptr);
+                    if (!p) return;
+                    if (!ctx || canvas.width !== w || canvas.height !== h) {
+                        canvas.width = w; canvas.height = h;
+                        ctx = canvas.getContext('2d', {alpha: false});
+                        window.imageData = ctx.createImageData(w, h);
+                    }
+                    const dest = new Uint32Array(window.imageData.data.buffer);
+                    if (pitch === w * 4) {
+                        dest.set(new Uint32Array(Module.HEAPU8.buffer, p, w * h));
+                    } else {
+                        const src = new Uint16Array(Module.HEAPU8.buffer, p, w * h);
+                        for (let i = 0; i < w * h; i++) {
+                            const col = src[i];
+                            dest[i] = 0xFF000000 | ((col & 0x1F) << 19) | ((col & 0x7E0) << 5) | ((col & 0xF800) >> 8);
+                        }
+                    }
+                    ctx.putImageData(window.imageData, 0, 0);
+                };
+
+                const addFn = Module.addFunction;
+                Module._retro_set_environment(addFn(env_cb, 'iii'));
+                Module._retro_set_video_refresh(addFn(video_cb, 'viiii'));
+                Module._retro_set_audio_sample(addFn(() => { }, 'vii'));
+                Module._retro_set_audio_sample_batch(addFn(() => 0, 'iii'));
+                Module._retro_set_input_poll(addFn(() => { }, 'v'));
+                Module._retro_set_input_state(addFn((p, d, idx, id) => (Number(p) === 0 && Number(d) === 1) ? keys[Number(id)] : 0, 'iiiii'));
+
+                logger("Running _retro_init...");
+                Module._retro_init();
+
+                // Setup ROM with strict alignment
+                const romPtr = Module._malloc(romData.length);
+                Module.HEAPU8.set(romData, romPtr);
+                const pathPtr = Module._malloc(16);
+                Module.stringToUTF8("game.gbc", pathPtr, 16);
+                Module.FS.writeFile("game.gbc", romData);
+
+                // Create Info structure on 4-byte boundary
+                const info = Module._malloc(16);
+                Module.HEAP32[info >> 2] = pathPtr;
+                Module.HEAP32[(info >> 2) + 1] = romPtr;
+                Module.HEAP32[(info >> 2) + 2] = romData.length;
+                Module.HEAP32[(info >> 2) + 3] = 0;
+
+                logger("Final _retro_load_game...");
+                if (Module._retro_load_game(info)) {
+                    isRunning = true;
+                    document.getElementById('status').innerText = "RUNNING!";
+                    const runLoop = () => {if (isRunning) {Module._retro_run(); requestAnimationFrame(runLoop);} };
+                    runLoop();
+                } else {
+                    logger("LOAD FAILED. Check if 'Env: 10' ever appeared.");
+                }
+            }
+
+            const map = {'ArrowRight': 7, 'ArrowLeft': 6, 'ArrowUp': 4, 'ArrowDown': 5, 'z': 8, 'x': 0, 'Enter': 3, 'Shift': 2};
+            window.onkeydown = (e) => {if (map[e.key] !== undefined) keys[map[e.key]] = 1;};
+            window.onkeyup = (e) => {if (map[e.key] !== undefined) keys[map[e.key]] = 0;};
+        </script>
+    </body>
+</html>

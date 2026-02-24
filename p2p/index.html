@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="vi">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <title>EmuX P2P V3.1 DECENTRALIZED</title>
+        <style>
+            :root {
+                --bg: #030303;
+                --glass: rgba(255, 255, 255, 0.03);
+                --accent: #00ffcc;
+                --secondary: #7000ff;
+                --text: #ffffff;
+                --sub: #555;
+            }
+
+            * {
+                box-sizing: border-box;
+                -webkit-tap-highlight-color: transparent;
+            }
+
+            body {
+                background: var(--bg);
+                color: var(--text);
+                margin: 0;
+                padding: 20px;
+                font-family: 'Inter', system-ui, -apple-system, sans-serif;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                min-height: 100vh;
+                overflow-x: hidden;
+            }
+
+            body::before {
+                content: '';
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: radial-gradient(circle at 50% 50%, #111 0%, #000 100%);
+                z-index: -1;
+            }
+
+            .container {
+                width: 100%;
+                max-width: 440px;
+                background: var(--glass);
+                backdrop-filter: blur(40px);
+                border-radius: 40px;
+                padding: 30px;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                box-shadow: 0 40px 100px rgba(0, 0, 0, 0.5);
+                animation: fadeIn 0.8s ease-out;
+            }
+
+            @keyframes fadeIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(20px);
+                }
+
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+
+            .app-status {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 30px;
+            }
+
+            .badge {
+                background: rgba(0, 255, 204, 0.1);
+                color: var(--accent);
+                padding: 6px 12px;
+                border-radius: 12px;
+                font-size: 10px;
+                font-weight: 900;
+                letter-spacing: 1px;
+            }
+
+            .ver {
+                color: var(--sub);
+                font-size: 10px;
+                font-weight: 700;
+            }
+
+            h1 {
+                font-size: 40px;
+                margin: 0;
+                font-weight: 950;
+                letter-spacing: -3px;
+            }
+
+            h1 span {
+                color: var(--secondary);
+                text-shadow: 0 0 20px rgba(112, 0, 255, 0.4);
+            }
+
+            .subtitle {
+                font-size: 14px;
+                color: var(--sub);
+                margin-bottom: 30px;
+                font-weight: 500;
+            }
+
+            .join-panel {
+                background: rgba(0, 0, 0, 0.3);
+                border-radius: 30px;
+                padding: 24px;
+                margin-bottom: 24px;
+                border: 1px solid rgba(255, 255, 255, 0.02);
+                text-align: center;
+            }
+
+            .room-label {
+                font-size: 10px;
+                color: var(--sub);
+                text-transform: uppercase;
+                letter-spacing: 3px;
+                margin-bottom: 12px;
+                display: block;
+            }
+
+            .input-box {
+                position: relative;
+                margin-bottom: 16px;
+            }
+
+            input {
+                width: 100%;
+                background: #000;
+                border: 2px solid #111;
+                border-radius: 24px;
+                padding: 22px;
+                color: #fff;
+                font-size: 24px;
+                text-align: center;
+                font-weight: 900;
+                transition: 0.3s;
+            }
+
+            input:focus {
+                border-color: var(--accent);
+                box-shadow: 0 0 30px rgba(0, 255, 204, 0.1);
+            }
+
+            .cta-btn {
+                width: 100%;
+                background: var(--accent);
+                color: #000;
+                border: none;
+                border-radius: 24px;
+                padding: 20px;
+                font-size: 18px;
+                font-weight: 950;
+                cursor: pointer;
+                transition: 0.3s;
+                text-transform: uppercase;
+                box-shadow: 0 10px 30px rgba(0, 255, 204, 0.2);
+            }
+
+            .cta-btn:active {
+                transform: scale(0.96);
+            }
+
+            .diagnostics {
+                margin-top: 30px;
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 15px;
+            }
+
+            .diag-card {
+                background: rgba(0, 0, 0, 0.2);
+                padding: 20px;
+                border-radius: 24px;
+                text-align: center;
+                border: 1px solid rgba(255, 255, 255, 0.03);
+            }
+
+            .diag-label {
+                font-size: 9px;
+                color: var(--sub);
+                text-transform: uppercase;
+                margin-bottom: 6px;
+            }
+
+            .diag-val {
+                font-size: 20px;
+                font-weight: 900;
+                color: #fff;
+            }
+
+            .console-wrap {
+                margin-top: 30px;
+                background: #000;
+                border-radius: 30px;
+                padding: 20px;
+                height: 160px;
+                overflow-y: auto;
+                border: 1px solid #111;
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 11px;
+                color: #333;
+            }
+
+            .log-entry {
+                margin-bottom: 8px;
+                border-left: 2px solid #1a1a1a;
+                padding-left: 12px;
+            }
+
+            .log-entry.ready {
+                border-left-color: var(--accent);
+                color: #888;
+            }
+
+            .log-entry.peer {
+                border-left-color: var(--secondary);
+                color: #aaa;
+            }
+
+            ::-webkit-scrollbar {
+                width: 0;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="app-status">
+                <span class="badge" id="netStatus">DECENTR-CORE READY</span>
+                <span class="ver">V3.1.0</span>
+            </div>
+            <h1>NEBU<span>LA</span></h1>
+            <div class="subtitle">Decentralized P2P - Nostr Network Signaling.</div>
+            <div class="join-panel">
+                <span class="room-label">MÃ PHÒNG (ROOM ID)</span>
+                <div class="input-box">
+                    <input type="number" id="roomId" placeholder="NHẬP 4 SỐ" inputmode="numeric">
+                </div>
+                <button class="cta-btn" id="joinBtn">THAM GIA PHÒNG</button>
+            </div>
+            <div class="diagnostics">
+                <div class="diag-card">
+                    <div class="diag-label">P2P LATENCY</div>
+                    <div class="diag-val" id="latVal">--ms</div>
+                </div>
+                <div class="diag-card">
+                    <div class="diag-label">PEERS IN ROOM</div>
+                    <div class="diag-val" id="peerCount">0</div>
+                </div>
+            </div>
+            <div class="console-wrap" id="logs">
+                <div class="log-entry">> Động cơ tín hiệu Nostr đã sẵn sàng.</div>
+            </div>
+        </div>
+
+        <script type="module">
+            import {joinRoom} from './trystero-nostr.min.js';
+
+            const roomIdInp = document.getElementById('roomId');
+            const joinBtn = document.getElementById('joinBtn');
+            const latVal = document.getElementById('latVal');
+            const peerCountEl = document.getElementById('peerCount');
+            const logs = document.getElementById('logs');
+            const netStatus = document.getElementById('netStatus');
+
+            function log(msg, type = '') {
+                const div = document.createElement('div');
+                div.className = 'log-entry ' + type;
+                div.textContent = `> ${msg}`;
+                logs.prepend(div);
+            }
+
+            const config = {
+                appId: 'emux-p2p-ultra-2026',
+                nostrRelays: [
+                    'wss://nos.lol',
+                    'wss://relay.damus.io',
+                    'wss://relay.snort.social',
+                    'wss://nostr.mom',
+                    'wss://offchain.pub',
+                    'wss://relay.current.xyz'
+                ]
+            };
+            const rtcConfig = {
+                iceServers: [
+                    {urls: 'stun:stun.l.google.com:19302'},
+                    {urls: 'stun:stun.cloudflare.com:3478'},
+                    {
+                        urls: 'turns:openrelay.metered.ca:443?transport=tcp',
+                        username: 'openrelayproject',
+                        credential: 'openrelayproject'
+                    }
+                ]
+            };
+
+            let room;
+            let sendPing;
+
+            joinBtn.onclick = () => {
+                const id = roomIdInp.value;
+                if (id.length < 4) {
+                    alert("Vui lòng nhập mã phòng 4 chữ số!");
+                    return;
+                }
+
+                log(`Đang tham gia mạng lưới Nostr với mã phòng: ${id}...`, 'ready');
+                netStatus.textContent = "JOINING NOSTR RELAYS...";
+
+                try {
+                    room = joinRoom(config, 'emux-room-' + id, rtcConfig);
+
+                    const [send, recv] = room.makeAction('ping');
+                    sendPing = send;
+
+                    room.onPeerJoin(peerId => {
+                        log(`Đã phát hiện đối phương tham gia phòng.`, 'peer');
+                        peerCountEl.textContent = Object.keys(room.getPeers()).length;
+                        netStatus.textContent = "PEER SYNCED";
+                        sendPing({t: performance.now()}, peerId);
+                    });
+
+                    room.onPeerLeave(peerId => {
+                        log(`Một máy đã rời khỏi phòng.`);
+                        peerCountEl.textContent = Object.keys(room.getPeers()).length;
+                    });
+
+                    recv((data, peerId) => {
+                        const rtt = Math.round(performance.now() - data.t);
+                        latVal.textContent = rtt + 'ms';
+                        log(`Tín hiệu từ đối phương: ${rtt}ms`);
+                    });
+
+                    joinBtn.textContent = "PHÒNG " + id + " ĐÃ MỞ";
+                    joinBtn.style.background = "#7000ff";
+                    joinBtn.style.color = "#fff";
+                } catch (e) {
+                    log("LỖI KHỞI TẠO: " + e.message, "error");
+                }
+            };
+
+            setInterval(() => {
+                if (room && sendPing) {
+                    const peers = room.getPeers();
+                    Object.keys(peers).forEach(pid => {
+                        sendPing({t: performance.now()}, pid);
+                    });
+                }
+            }, 3000);
+        </script>
+    </body>
+</html>
