@@ -1,3 +1,13 @@
+// ===== view (Navigation Manager) =====
+function view(name) {
+    const isHome = name === 'home';
+    list.hidden = !isHome;
+    list01.hidden = name !== 'details';
+    list02.hidden = name !== 'settings';
+    logo.setAttribute('green', isHome ? 'em' : 'ba');
+    logo.innerText = isHome ? 'ux' : 'ck';
+    if (isHome) listGame();
+}
 // ===== showFileGroups =====
 async function showFileGroups(gameName) {
     const titles = ["saves", "states", "games"], results = await Promise.all(titles.map(type => listStore(type)));
@@ -20,8 +30,7 @@ async function listGame() {
     list.querySelectorAll('more').forEach(button => button.onclick = () => {
         const name = button.parentElement.querySelector('name').textContent;
         showFileGroups(name.slice(0, -4));
-        list.hidden = true;
-        list01.hidden = false;
+        view('details');
     });
 }
 // ===== verticalSetting =====
@@ -59,8 +68,8 @@ document.addEventListener("DOMContentLoaded", () => {
     switch0.textContent = local('render') || 'WGPU';
     setTimeout(() => {listGame(); verticalSetting();}, 2000);
     romInput.onchange = event => inputGame(event);
-    vertical.onclick = () => verticalSetting();
-    setting.onclick = () => {list02.hidden = !list02.hidden; list.hidden = !list02.hidden; list01.hidden = true;};
-    logo.onclick = () => {list.hidden = false; list01.hidden = list02.hidden = true; listGame();};
+    logo.onpointerdown = () => view('home');
+    vertical.onpointerdown = () => verticalSetting();
+    setting.onpointerdown = () => view(list02.hidden ? 'settings' : 'home');
     document.querySelectorAll('opti').forEach(element => element.onclick = () => optionClick(element.textContent.trim()));
 });

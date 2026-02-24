@@ -1,5 +1,5 @@
 // ===== Global System =====
-const tags = ["html", "body", "page00", "page01", "page02", "notification", "display", "list", "list01", "list02", "name", "ver", "gamepad", "title1", "vertical", "screen", "invis", "message0", "skip1", "switch0", "title0", "logo", "joypad", "setting"];
+const tags = ["html", "body", "page00", "page01", "page02", "notification", "display", "list", "list01", "list02", "name", "ver", "gamepad", "title1", "vertical", "screen", "invis", "message0", "skip1", "switch0", "title0", "logo", "joypad", "setting", "cta"];
 tags.forEach(selector => window[selector] = document.querySelector(selector));
 const local = (key, value) => (value === undefined || value === null) ? localStorage.getItem(key) : localStorage.setItem(key, value);
 const delay = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
@@ -49,6 +49,7 @@ async function message(text, duration = 2000) {
 // ===== gameView =====
 async function gameView(name) {
     page02.ontouchstart = event => event.preventDefault();
+    cta.ontouchstart = event => event.preventDefault();
     gameWidth = canvas.width;
     gameHeight = canvas.height;
     title1.textContent = name;
