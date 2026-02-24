@@ -1,24 +1,8 @@
-// ===== Cloud System =====
-const CLOUD_CONFIG = {
-    TOKEN: atob("NnZCSmthb1E0N0ZHSTVPRmpPTVZTOFBEOUxqVXEwYjFjUDRKdWJOOW00NDNTblhueDJ6aENYczVsclRfdUYxN1Z6c3h4VVN4MFFaTldLR0ExMV90YXBfYnVodGln").split('').reverse().join(''),
-    GIST_PREFIX: "EmuX: ", CHUNK_SIZE: 8 * 1024 * 1024, RESTORE_BATCH: 5
-};
-const getHeaders = () => ({'Authorization': `Bearer ${CLOUD_CONFIG.TOKEN}`, 'Content-Type': 'application/json'});
-const cloudCache = (key, value) => {
-    if (value !== undefined) return localStorage.setItem(key, JSON.stringify(value));
-    try {return JSON.parse(localStorage.getItem(key));} catch (error) {return null;}
-};
-function bytesToBase64(bytes) {
-    let binary = "";
-    for (let index = 0; index < bytes.byteLength; index += 8192) binary += String.fromCharCode.apply(null, bytes.subarray(index, index + 8192));
-    return btoa(binary);
-}
-function splitChunks(data, size) {
-    if (data.length <= size) return [data];
-    const chunks = [];
-    for (let index = 0; index < data.length; index += size) chunks.push(data.substring(index, index + size));
-    return chunks;
-}
+const cloudDecode = (value) => atob(value).split('').reverse().join('');
+const CLOUD_CONFIG = {ACCESS_KEY_ID: cloudDecode("NDJiODI1YWIwNDBlYzgxOTUwMzNlYjNjOGYxYmFiY2E="), SECRET_ACCESS_KEY: cloudDecode("NGM5NjRmN2IyZjI0ZDVhMzMxYTg5MTRhMTRiOWYzNTlhZWE3NjliNmQ2MzA3MGU2ZTllNjdhOGIxZTk4YTk5YQ=="), ENDPOINT: cloudDecode("bW9jLmVnYXJvdHNlcmFsZmR1b2xjLjJyLjcwNDk1ZTI3OTA0ZjhkNjFhMWI1MGNkMDI0YWI3OGJlLy86c3B0dGg="), BUCKET: cloudDecode("eHVtZQ=="), REGION: "auto", PARALLEL: 5};
+const cloudCache = (key, value) => {if (value !== undefined) return localStorage.setItem(key, JSON.stringify(value)); return JSON.parse(localStorage.getItem(key) || "null");};
+const getS3 = () => new S3mini({accessKeyId: CLOUD_CONFIG.ACCESS_KEY_ID, secretAccessKey: CLOUD_CONFIG.SECRET_ACCESS_KEY, endpoint: `${CLOUD_CONFIG.ENDPOINT}/${CLOUD_CONFIG.BUCKET}`, region: CLOUD_CONFIG.REGION});
+// ===== quickHash =====
 function quickHash(buffer) {
     let hash = 2166136261;
     const bytes = new Uint8Array(buffer), step = bytes.length > 65536 ? Math.floor(bytes.length / 1024) : 1;
@@ -27,98 +11,80 @@ function quickHash(buffer) {
 }
 // ===== cloudBackup =====
 async function cloudBackup() {
-    const startTime = Date.now();
-    const backupName = prompt("Enter Backup Code:");
+    const startTime = Date.now(), backupName = prompt("Enter backup code");
     if (!backupName) return;
-    showNotification(" pa", "use.", "", "Establishing secure link...");
-    const headers = getHeaders(), gistTitle = CLOUD_CONFIG.GIST_PREFIX + backupName;
-    let gistId = cloudCache('cloud_gist_' + backupName);
-    if (!gistId) {
-        const gists = await fetch('https://api.github.com/gists', {headers}).then(response => response.json());
-        let targetGist = gists.find(gist => gist.description === gistTitle);
-        if (!targetGist) {
-            targetGist = await fetch('https://api.github.com/gists', {
-                method: 'POST', headers, body: JSON.stringify({description: gistTitle, public: false, files: {"manifest.txt": {content: "EmuX Verified"}}})
-            }).then(response => response.json());
-        }
-        gistId = targetGist.id;
-        cloudCache('cloud_gist_' + backupName, gistId);
-    }
+    showNotification(" pa", "use.", "", "Connecting to R2...");
+    const s3 = getS3(), prefix = `${backupName}/`;
     const databaseStores = await listStore(), fileList = [];
-    for (const [store, keys] of Object.entries(databaseStores)) keys.forEach(key => fileList.push({store, key}));
+    for (const [storeName, keys] of Object.entries(databaseStores)) {
+        keys.forEach(key => fileList.push({store: storeName, key: key}));
+    }
     const oldHashes = cloudCache('cloud_hash_' + backupName) || {}, newHashes = {};
-    let skippedFiles = 0, uploadedFiles = 0;
-    console.log(`>>> BACKUP: [${backupName}]`);
-    for (let index = 0; index < fileList.length; index++) {
-        const {store, key} = fileList[index], buffer = await emuxDB(key);
-        if (!buffer) continue;
-        const fileKey = `${store}__${key}`, fileHash = quickHash(buffer);
-        newHashes[fileKey] = fileHash;
-        if (oldHashes[fileKey] === fileHash) {console.log(`   Skipped: ${key}`); skippedFiles++; continue;}
-        showNotification(" pa", "use.", "", `Uploading |${index + 1}/${fileList.length}|...`);
-        const dataChunks = splitChunks(bytesToBase64(new Uint8Array(buffer)), CLOUD_CONFIG.CHUNK_SIZE), uploadPayload = {};
-        for (let chunkIndex = 0; chunkIndex < dataChunks.length; chunkIndex++) {
-            uploadPayload[`${fileKey}${dataChunks.length > 1 ? `.p${chunkIndex + 1}` : ""}.bin`] = {content: dataChunks[chunkIndex]};
+    let uploadedFiles = 0, skippedFiles = 0;
+    for (let index = 0; index < fileList.length; index += CLOUD_CONFIG.PARALLEL) {
+        const batch = fileList.slice(index, index + CLOUD_CONFIG.PARALLEL);
+        await Promise.all(batch.map(async (item, batchIndex) => {
+            const buffer = await emuxDB(item.key);
+            if (!buffer) return;
+            const fileKey = `${item.store}__${item.key}`, fileHash = quickHash(buffer);
+            newHashes[fileKey] = fileHash;
+            if (oldHashes[fileKey] === fileHash) {
+                console.log(`Skipped: ${item.key}`);
+                skippedFiles++;
+                return;
+            }
+            const currentFileIndex = index + batchIndex + 1;
+            showNotification(" pa", "use.", "", `Uploading...|${currentFileIndex}/${fileList.length}|`);
+            await s3.putAnyObject(`${prefix}${fileKey}`, buffer, "application/octet-stream");
+            uploadedFiles++;
+            console.log(`Uploaded: ${item.key}`);
+        }));
+    }
+    const cloudObjects = await s3.listObjects('/', prefix);
+    const zombieFiles = cloudObjects.filter(object => {
+        if (!object.Key || !object.Key.includes('__')) return false;
+        const fileName = object.Key.split('/').pop();
+        return !newHashes[fileName];
+    });
+    if (zombieFiles.length > 0) {
+        for (let index = 0; index < zombieFiles.length; index += CLOUD_CONFIG.PARALLEL) {
+            const batch = zombieFiles.slice(index, index + CLOUD_CONFIG.PARALLEL);
+            await Promise.all(batch.map(object => {
+                console.log(`Deleting: ${object.Key.split('/').pop()}`);
+                return s3.deleteObject(object.Key);
+            }));
         }
-        await fetch(`https://api.github.com/gists/${gistId}`, {method: 'PATCH', headers, body: JSON.stringify({files: uploadPayload})});
-        uploadedFiles++;
-        console.log(`   Uploaded: ${key}`);
     }
     cloudCache('cloud_hash_' + backupName, newHashes);
     const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(2);
-    showNotification(" pa", "use.", "", `Backup successful! (${elapsedTime}s)`);
-    console.log(`>>> DONE: ${elapsedTime}s (${uploadedFiles} uploaded, ${skippedFiles} skipped)`);
+    console.log(`Done: ${elapsedTime}s (${uploadedFiles} uploaded, ${skippedFiles} skipped, ${zombieFiles.length} cleaned)`);
     page00.hidden = true;
-    fetch('https://api.github.com/gists', {headers}).then(response => response.json()).then(allGists => {
-        allGists.filter(gist => gist.description === gistTitle && gist.id !== gistId).forEach(oldGist => fetch(`https://api.github.com/gists/${oldGist.id}`, {method: 'DELETE', headers}));
-    });
 }
 // ===== cloudRestore =====
 async function cloudRestore() {
-    const startTime = Date.now();
-    const backupName = prompt("Enter Restore Code:");
+    const startTime = Date.now(), backupName = prompt("Enter restore code");
     if (!backupName) return;
-    showNotification(" pa", "use.", "", "Accessing storage...");
-    const headers = getHeaders(), gistTitle = CLOUD_CONFIG.GIST_PREFIX + backupName;
-    let gistId = cloudCache('cloud_gist_' + backupName), gistDetail;
-    if (gistId) {
-        gistDetail = await fetch(`https://api.github.com/gists/${gistId}`, {headers}).then(response => response.json());
+    showNotification(" pa", "use.", "", "Scanning R2 storage...");
+    const s3 = getS3(), prefix = `${backupName}/`, objects = await s3.listObjects('/', prefix);
+    if (!objects || objects.length === 0) {
+        page00.hidden = true;
+        return;
     }
-    if (!gistId || !gistDetail || !gistDetail.files) {
-        const gists = await fetch('https://api.github.com/gists', {headers}).then(response => response.json());
-        const targetGist = gists.find(gist => gist.description === gistTitle);
-        gistId = targetGist.id;
-        cloudCache('cloud_gist_' + backupName, gistId);
-        gistDetail = await fetch(targetGist.url, {headers}).then(response => response.json());
-    }
-    const fileGroups = {};
-    Object.entries(gistDetail.files).forEach(([fileName, fileData]) => {
-        if (!fileName.includes('__')) return;
-        const baseName = fileName.split('.p')[0].replace('.bin', '');
-        if (!fileGroups[baseName]) fileGroups[baseName] = [];
-        fileGroups[baseName].push({name: fileName, file: fileData});
-    });
-    const truncatedFiles = [];
-    Object.values(fileGroups).flat().forEach(item => {
-        if (item.file.truncated) truncatedFiles.push((async () => {item.file.content = await fetch(item.file.raw_url).then(response => response.text());})());
-    });
-    if (truncatedFiles.length > 0) {
-        showNotification(" pa", "use.", "", `Downloading ${truncatedFiles.length} large files...`);
-        await Promise.all(truncatedFiles);
-    }
-    const groupItems = Object.entries(fileGroups);
-    for (let batchIndex = 0; batchIndex < groupItems.length; batchIndex += CLOUD_CONFIG.RESTORE_BATCH) {
-        const currentBatch = groupItems.slice(batchIndex, batchIndex + CLOUD_CONFIG.RESTORE_BATCH);
-        await Promise.all(currentBatch.map(async ([baseName, chunks], index) => {
-            const realKey = baseName.split('__')[1];
-            showNotification(" pa", "use.", "", `Restoring |${batchIndex + index + 1}/${groupItems.length}|...`);
-            chunks.sort((first, second) => first.name.localeCompare(second.name, undefined, {numeric: true}));
-            const combinedBase64 = chunks.map(chunkItem => chunkItem.file.content).join('');
-            await emuxDB(Uint8Array.from(atob(combinedBase64), character => character.charCodeAt(0)), realKey);
-            console.log(`   Restored: ${realKey}`);
+    const validFiles = objects.filter(object => object.Key && object.Key.includes('__'));
+    for (let index = 0; index < validFiles.length; index += CLOUD_CONFIG.PARALLEL) {
+        const batch = validFiles.slice(index, index + CLOUD_CONFIG.PARALLEL);
+        await Promise.all(batch.map(async (object, batchIndex) => {
+            const objectKey = object.Key, fileName = objectKey.split('/').pop(), realKey = fileName.split('__')[1];
+            const currentFileIndex = index + batchIndex + 1;
+            showNotification(" pa", "use.", "", `Restoring...|${currentFileIndex}/${validFiles.length}|`);
+            const data = await s3.getObjectArrayBuffer(objectKey);
+            if (data) {
+                await emuxDB(new Uint8Array(data), realKey);
+                console.log(`Restored: ${realKey}`);
+            }
         }));
     }
     const elapsedTime = ((Date.now() - startTime) / 1000).toFixed(2);
-    showNotification(" pa", "use.", "", `Restore completed! (${elapsedTime}s)`);
+    console.log(`Done: ${elapsedTime}s (${validFiles.length} restored)`);
     page00.hidden = true;
 }
