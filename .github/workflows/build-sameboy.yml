@@ -13,33 +13,61 @@ jobs:
         with:
           version: 3.1.46
 
+      - name: Install RGBDS
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bison flex gettext
+          wget https://github.com/gbdev/rgbds/releases/download/v0.9.1/rgbds-0.9.1-linux-x86_64.tar.xz
+          tar -xf rgbds-0.9.1-linux-x86_64.tar.xz
+          sudo cp rgbasm rgblink rgbfix rgbgfx /usr/local/bin/
       - name: Fetch SameBoy
         run: |
           git clone --depth 1 https://github.com/LIJI32/SameBoy.git sameboy
-
+      - name: Build BootROMs & Pre-generate C files
+        run: |
+          cd sameboy
+          make bootroms -j$(nproc)
+          
+          # Manually generate the .c files that the libretro Makefile struggles with
+          echo "Pre-generating bootrom C files..."
+          for f in build/bin/BootROMs/*.bin; do
+            filename=$(basename "$f")
+            name="${filename%.*}"
+            target="libretro/${name}.c"
+            echo "Generating $target from $f"
+            echo "/* AUTO-GENERATED */" > "$target"
+            echo "const unsigned char ${name}[] = {" >> "$target"
+            hexdump -v -e '/1 "0x%02x, "' "$f" >> "$target"
+            echo "};" >> "$target"
+            echo "const unsigned ${name}_length = sizeof(${name});" >> "$target"
+          done
       - name: Build Core
         run: |
           cd sameboy/libretro
-          # SameBoy libretro Makefile is inside the libretro directory
-          emmake make platform=emscripten -j$(nproc)
+          # Patch the Makefile to remove incompatible linker flags
+          sed -i 's/-Wl,--version-script=[^ ]*//g' Makefile
+          sed -i 's/-Wl,--no-undefined//g' Makefile
           
-          # SameBoy outputs sameboy_libretro_emscripten.bc
-          TARGET=$(find . -name "*_libretro_emscripten.bc" -o -name "*_libretro.bc" -o -name "sameboy_libretro.bc" | head -n 1)
-          echo "Found target: $TARGET"
-
-          emcc $TARGET -O3 \
+          # Compile objects - we ignore errors from the final Makefile link step
+          emmake make platform=emscripten -j$(nproc) || true
+          
+          echo "Linking final WASM from object files..."
+          # Find all objects created during the build
+          ALL_OBJS=$(find ../build/obj -name "*.o")
+          
+          # Link directly from .o files for maximum compatibility
+          emcc $ALL_OBJS -O3 \
             -s WASM=1 -s ENVIRONMENT=web \
             -s ALLOW_MEMORY_GROWTH=1 \
+            -s ALLOW_TABLE_GROWTH=1 \
             -s NO_EXIT_RUNTIME=1 \
             -s EXPORTED_RUNTIME_METHODS='["addFunction","getValue","setValue","ccall","cwrap","UTF8ToString","stringToUTF8"]' \
             -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free"]' \
             --no-entry \
             -o ../../sameboy_core.js
-
           cd ../..
           zip -j sameboy.zip sameboy_core.js sameboy_core.wasm
-
       - uses: actions/upload-artifact@v4
         with:
           name: sameboy-core
-          path: sameboy/sameboy.zip
+          path: sameboy.zip
