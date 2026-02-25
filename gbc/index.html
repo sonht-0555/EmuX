@@ -30,17 +30,21 @@
             }
         </style>
     </head>
+    <canvas id="canvas" width="160" height="144" style="width: 320px; height: 288px; image-rendering: pixelated;"></canvas>
     <body>
         <div id="log">Starting Gambatte Core...</div>
 
         <script>
             const logNode = document.getElementById('log');
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            const imageData = ctx.createImageData(160, 144);
+
             function log(msg, type = 'info') {
                 const span = document.createElement('div');
                 span.className = type;
                 span.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
                 logNode.appendChild(span);
-                window.scrollTo(0, document.body.scrollHeight);
             }
 
             window.Module = {
@@ -59,6 +63,8 @@
                     const data = new Uint8Array(await res.arrayBuffer());
                     log(`ROM Size: ${data.length} bytes`);
 
+                    let pixelFormat = 0; // 0: XRGB1555, 1: XRGB8888, 2: RGB565
+
                     // 1. Setup Environment
                     const logCallback = Module.addFunction((level, fmt, argptr) => {
                         let msg = Module.UTF8ToString(fmt);
@@ -72,20 +78,19 @@
                     }, 'viii');
 
                     Module._retro_set_environment(Module.addFunction((cmd, ptr) => {
-                        // log(`Env call: ${cmd}`, 'info');
-
-                        // Commands that we should return true and/or set value to 1
+                        // Commands that MUST return true/1 for Gambatte to load
                         const booleanCommands = [1, 2, 3, 8, 10, 16, 21, 22, 39, 59, 70];
+
+                        if (cmd === 10) { // SET_PIXEL_FORMAT
+                            if (ptr) pixelFormat = Module.getValue(ptr, 'i32');
+                            return true;
+                        }
 
                         if (booleanCommands.includes(cmd)) {
                             if (ptr) {
-                                // Write 1 as both 1-byte and 4-byte for maximum compatibility
                                 Module.HEAPU8[ptr] = 1;
-                                Module.HEAPU8[ptr + 1] = 0;
-                                Module.HEAPU8[ptr + 2] = 0;
-                                Module.HEAPU8[ptr + 3] = 0;
+                                Module.HEAPU8[ptr + 1] = 0; Module.HEAPU8[ptr + 2] = 0; Module.HEAPU8[ptr + 3] = 0;
                             }
-                            // log(` -> Responding TRUE (1) to cmd ${cmd}`);
                             return true;
                         }
 
@@ -94,22 +99,52 @@
                             return true;
                         }
 
-                        // 1: GET_ADDR_CONTROL
-                        if (cmd === 1) return false;
-
-                        // 39, 59: CORE_OPTIONS
-                        if (cmd === 39 || cmd === 59) return true;
-
+                        if (cmd === 9) { // GET_SYSTEM_DIRECTORY
+                            if (ptr) {
+                                const pathPtr = Module._malloc(2);
+                                Module.stringToUTF8(".", pathPtr, 2);
+                                Module.setValue(ptr, pathPtr, 'i32');
+                            }
+                            return true;
+                        }
                         return false;
                     }, 'iii'));
 
-                    const dummyVideo = Module.addFunction((data, w, h, p) => { }, 'viiii');
-                    const dummyAudio = Module.addFunction((l, r) => { }, 'vii');
-                    const dummyAudioBatch = Module.addFunction((data, f) => f, 'iii');
-                    const dummyPoll = Module.addFunction(() => { }, 'v');
-                    const dummyInput = Module.addFunction((p, d, i, id) => 0, 'iiiii');
+                    const videoCallback = Module.addFunction((dataPtr, w, h, pitch) => {
+                        if (!dataPtr) return;
+                        const pixels = imageData.data;
 
-                    if (Module._retro_set_video_refresh) Module._retro_set_video_refresh(dummyVideo);
+                        if (pixelFormat === 2) { // RGB565
+                            const src = new Uint16Array(Module.HEAPU8.buffer, dataPtr, w * h);
+                            for (let i = 0; i < w * h; i++) {
+                                const c = src[i];
+                                const r = ((c >> 11) & 0x1f) << 3;
+                                const g = ((c >> 5) & 0x3f) << 2;
+                                const b = (c & 0x1f) << 3;
+                                pixels[i * 4] = r;
+                                pixels[i * 4 + 1] = g;
+                                pixels[i * 4 + 2] = b;
+                                pixels[i * 4 + 3] = 255;
+                            }
+                        } else { // XRGB8888
+                            const src = new Uint32Array(Module.HEAPU8.buffer, dataPtr, w * h);
+                            for (let i = 0; i < w * h; i++) {
+                                const c = src[i];
+                                pixels[i * 4] = (c >> 16) & 0xff;
+                                pixels[i * 4 + 1] = (c >> 8) & 0xff;
+                                pixels[i * 4 + 2] = c & 0xff;
+                                pixels[i * 4 + 3] = 255;
+                            }
+                        }
+                        ctx.putImageData(imageData, 0, 0);
+                    }, 'viiii');
+
+                    const dummyAudio = Module.addFunction(() => { }, 'vii');
+                    const dummyAudioBatch = Module.addFunction((d, f) => f, 'iii');
+                    const dummyPoll = Module.addFunction(() => { }, 'v');
+                    const dummyInput = Module.addFunction(() => 0, 'iiiii');
+
+                    if (Module._retro_set_video_refresh) Module._retro_set_video_refresh(videoCallback);
                     if (Module._retro_set_audio_sample) Module._retro_set_audio_sample(dummyAudio);
                     if (Module._retro_set_audio_sample_batch) Module._retro_set_audio_sample_batch(dummyAudioBatch);
                     if (Module._retro_set_input_poll) Module._retro_set_input_poll(dummyPoll);
@@ -117,7 +152,6 @@
 
                     // 2. Init Core
                     Module._retro_init();
-                    log("retro_init() finished.");
 
                     // 3. Load Game
                     const gameInfo = Module._malloc(120);
@@ -127,44 +161,29 @@
                     const romBuf = Module._malloc(data.length);
                     Module.HEAPU8.set(data, romBuf);
 
-                    const path = "test.gbc";
-                    const pathPtr = Module._malloc(path.length + 1);
-                    Module.stringToUTF8(path, pathPtr, path.length + 1);
+                    const pathPtr = Module._malloc(10);
+                    Module.stringToUTF8("test.gbc", pathPtr, 10);
 
                     Module.setValue(gameInfo + 0, pathPtr, 'i32'); // path
                     Module.setValue(gameInfo + 4, romBuf, 'i32'); // data
                     Module.setValue(gameInfo + 8, data.length, 'i32'); // size
 
-                    log("Calling retro_load_game...");
-                    const ok = Module._retro_load_game(gameInfo);
-
-                    if (ok) {
-                        log("SUCCESS: Game loaded!", "success");
-
-                        const avInfo = Module._malloc(120);
-                        Module._retro_get_system_av_info(avInfo);
-
-                        const fps = Module.HEAPF64[(avInfo + 24) >> 3];
-                        const rate = Module.HEAPF64[(avInfo + 32) >> 3];
-
-                        log("--- Core Stats ---");
-                        log(`FPS: ${fps}`);
-                        log(`Sample Rate: ${rate}`);
-                        log("------------------");
-
-                        log("Running 10 frames to verify...");
-                        for (let i = 0; i < 10; i++) Module._retro_run();
-                        log("Completed 10 frames without crash.");
+                    if (Module._retro_load_game(gameInfo)) {
+                        log("SUCCESS: Running game loop...", "success");
+                        function loop() {
+                            Module._retro_run();
+                            requestAnimationFrame(loop);
+                        }
+                        loop();
                     } else {
-                        log("FAILED: retro_load_game returned false", "error");
+                        log("FAILED: retro_load_game", "error");
                     }
 
                 } catch (e) {
                     log(`CRASH: ${e.message}`, "error");
-                    console.error(e);
                 }
             }
         </script>
-        <script src="gambatte_core.js"></script>
+        <script src="sameboy_core.js"></script>
     </body>
 </html>

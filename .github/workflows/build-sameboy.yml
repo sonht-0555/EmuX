@@ -1,0 +1,45 @@
+name: Build SameBoy Core
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 3.1.46
+
+      - name: Fetch SameBoy
+        run: |
+          git clone --depth 1 https://github.com/LIJI32/SameBoy.git sameboy
+
+      - name: Build Core
+        run: |
+          cd sameboy/libretro
+          # SameBoy libretro Makefile is inside the libretro directory
+          emmake make platform=emscripten -j$(nproc)
+          
+          # SameBoy outputs sameboy_libretro_emscripten.bc
+          TARGET=$(find . -name "*_libretro_emscripten.bc" -o -name "*_libretro.bc" -o -name "sameboy_libretro.bc" | head -n 1)
+          echo "Found target: $TARGET"
+
+          emcc $TARGET -O3 \
+            -s WASM=1 -s ENVIRONMENT=web \
+            -s ALLOW_MEMORY_GROWTH=1 \
+            -s NO_EXIT_RUNTIME=1 \
+            -s EXPORTED_RUNTIME_METHODS='["addFunction","getValue","setValue","ccall","cwrap","UTF8ToString","stringToUTF8"]' \
+            -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free"]' \
+            --no-entry \
+            -o ../../sameboy_core.js
+
+          cd ../..
+          zip -j sameboy.zip sameboy_core.js sameboy_core.wasm
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sameboy-core
+          path: sameboy/sameboy.zip
