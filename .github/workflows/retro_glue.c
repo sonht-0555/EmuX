@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <zlib.h>
 
 /* Fix for IDE/IntelliSense red squiggly lines */
 #ifndef EMSCRIPTEN_KEEPALIVE
@@ -17,6 +18,11 @@
 
 /* Weak attribute to avoid "multiple definition" errors when linking with cores that already have these functions */
 #define WEAK __attribute__((weak))
+
+/* CRC32 Utility */
+WEAK EMSCRIPTEN_KEEPALIVE uint32_t encoding_crc32(uint32_t crc, const uint8_t *data, size_t len) {
+  return (uint32_t)crc32((unsigned long)crc, (const unsigned char *)data, (unsigned int)len);
+}
 
 /* Libretro VFS Constants */
 #define RETRO_VFS_FILE_ACCESS_READ (1 << 0)
