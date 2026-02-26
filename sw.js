@@ -1,4 +1,4 @@
-let revision = 'EmuX_4.74';
+let revision = 'EmuX_4.75';
 var urlsToCache = [
     './',
     './index.html',
@@ -10,7 +10,7 @@ var urlsToCache = [
     './src/assets/font/mother.ttf',
     './src/assets/font/3x3.ttf',
     'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/gba.zip',
-    'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/gbc.zip',
+    'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/pce.zip',
     'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/snes2010.zip',
     'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/nes.zip',
     'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/genesis.zip',
