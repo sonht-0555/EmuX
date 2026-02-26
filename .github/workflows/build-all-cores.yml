@@ -78,7 +78,10 @@ jobs:
         emcc -c $GITHUB_WORKSPACE/emux/.github/workflows/retro_utils.c -o $GITHUB_WORKSPACE/retro_utils.o $OPT_FLAGS
         emcc -c $GITHUB_WORKSPACE/emux/.github/workflows/retro_glue.c -o $GITHUB_WORKSPACE/retro_glue.o $OPT_FLAGS -s USE_ZLIB=1
         
-        EXTRA_GLUE="$GITHUB_WORKSPACE/retro_glue.o"
+        EXTRA_GLUE=""
+        if [[ "${{ matrix.core.id }}" == "pce" || "${{ matrix.core.id }}" == "wswan" || "${{ matrix.core.id }}" == "a26" || "${{ matrix.core.method }}" == "arcade" ]]; then
+          EXTRA_GLUE="$GITHUB_WORKSPACE/retro_glue.o"
+        fi
 
         ALL_OBJS=$(find . -name "*.o")
 
