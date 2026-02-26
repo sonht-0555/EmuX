@@ -58,7 +58,7 @@ jobs:
 
     - name: Build
       run: |
-        export OPT_FLAGS="-Os -ffast-math -fno-tree-vectorize -flto -DNDEBUG"
+        export OPT_FLAGS="-Os -ffast-math -fno-tree-vectorize -ffunction-sections -fdata-sections -flto -DNDEBUG"
         export CFLAGS="$OPT_FLAGS"
         export CXXFLAGS="$OPT_FLAGS"
         export LDFLAGS="$OPT_FLAGS"
