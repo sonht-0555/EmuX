@@ -14,6 +14,7 @@ const getPointer = (string, pointer) => {
 // ===== env_cb =====
 function env_cb(command, data) {
     const data32 = Number(data) >> 2;
+    if (command === 1) Module.pixelFormat = Module.HEAP32[data32];
     if (command === 15) {
         const key = Module.UTF8ToString(Module.HEAP32[data32]);
         if (activeVars[key]) {

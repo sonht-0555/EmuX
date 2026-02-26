@@ -149,7 +149,7 @@ window.activeRenderFn = async function (pointer, width, height, pitch) {
         }
     }
     const encoder = gpuDevice.createCommandEncoder();
-    const is32BitFormat = pitch === (width << 2);
+    const is32BitFormat = Module.pixelFormat === 1;
     const heap = Module.HEAPU8;
     if (Module.isNDS) {
         renderNDS(pointer, width, height, encoder);
