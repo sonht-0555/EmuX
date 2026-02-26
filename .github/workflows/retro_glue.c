@@ -36,10 +36,10 @@ WEAK EMSCRIPTEN_KEEPALIVE char *string_trim_whitespace_right(char *str) {
 
 WEAK EMSCRIPTEN_KEEPALIVE size_t strlcpy_retro__(char *dest, const char *src, size_t size) {
   size_t i;
+  if (!size) return strlen(src);
   for (i = 0; i < size - 1 && src[i] != '\0'; i++) dest[i] = src[i];
-  if (size > 0) dest[i] = '\0';
-  while (src[i] != '\0') i++;
-  return i;
+  dest[i] = '\0';
+  return strlen(src);
 }
 
 /* Libretro VFS Constants */
@@ -199,15 +199,9 @@ WEAK EMSCRIPTEN_KEEPALIVE void retro_closedir(struct RDIR *r) {
 
 /* File I/O utilities */
 static const char *vfs_mode_to_string(unsigned mode) {
-  if (mode == RETRO_VFS_FILE_ACCESS_READ)
-    return "rb";
-  if (mode == RETRO_VFS_FILE_ACCESS_WRITE)
-    return "wb";
-  if (mode == RETRO_VFS_FILE_ACCESS_READ_WRITE)
-    return "w+b";
-  if (mode == (RETRO_VFS_FILE_ACCESS_READ_WRITE |
-               RETRO_VFS_FILE_ACCESS_UPDATE_EXISTING))
-    return "r+b";
+  if (mode & (RETRO_VFS_FILE_ACCESS_UPDATE_EXISTING)) return "r+b";
+  if ((mode & RETRO_VFS_FILE_ACCESS_READ_WRITE) == RETRO_VFS_FILE_ACCESS_READ_WRITE) return "w+b";
+  if (mode & RETRO_VFS_FILE_ACCESS_WRITE) return "wb";
   return "rb";
 }
 
@@ -256,23 +250,29 @@ WEAK EMSCRIPTEN_KEEPALIVE void path_vfs_init(void) {
 
 WEAK EMSCRIPTEN_KEEPALIVE int64_t filestream_seek(void *stream, int64_t offset,
                                               int seek_position) {
-  return (int64_t)fseeko((FILE *)stream, offset, seek_position);
+  if (fseeko((FILE *)stream, offset, seek_position) == 0)
+    return ftello((FILE *)stream);
+  return -1;
 }
 
 WEAK EMSCRIPTEN_KEEPALIVE int64_t filestream_tell(void *stream) {
   return (int64_t)ftello((FILE *)stream);
 }
 
+WEAK EMSCRIPTEN_KEEPALIVE void filestream_rewind(void *stream) {
+  rewind((FILE *)stream);
+}
+
 WEAK EMSCRIPTEN_KEEPALIVE int filestream_close(void *stream) {
   return fclose((FILE *)stream);
 }
 
-EMSCRIPTEN_KEEPALIVE int64_t filestream_read_file(const char *path, void **buf, int64_t *len) {
+WEAK EMSCRIPTEN_KEEPALIVE int64_t filestream_read_file(const char *path, void **buf, int64_t *len) {
   FILE *fp = fopen(path, "rb");
   if (!fp) return 0;
-  fseek(fp, 0, SEEK_END);
-  int64_t size = ftell(fp);
-  fseek(fp, 0, SEEK_SET);
+  fseeko(fp, 0, SEEK_END);
+  int64_t size = ftello(fp);
+  fseeko(fp, 0, SEEK_SET);
   void *data = malloc(size);
   if (!data) {
     fclose(fp);
@@ -318,7 +318,7 @@ WEAK EMSCRIPTEN_KEEPALIVE int64_t rfwrite(const void *buffer, size_t size,
   return (int64_t)fwrite(buffer, size, count, (FILE *)stream);
 }
 WEAK EMSCRIPTEN_KEEPALIVE int64_t rfseek(void *stream, int64_t offset, int origin) {
-  return (int64_t)fseeko((FILE *)stream, offset, origin);
+  return filestream_seek(stream, offset, origin);
 }
 WEAK EMSCRIPTEN_KEEPALIVE int64_t rftell(void *stream) {
   return (int64_t)ftello((FILE *)stream);
@@ -386,7 +386,9 @@ WEAK EMSCRIPTEN_KEEPALIVE int64_t retro_vfs_file_write_impl(
 
 WEAK EMSCRIPTEN_KEEPALIVE int64_t retro_vfs_file_seek_impl(
     struct retro_vfs_file_handle *stream, int64_t offset, int seek_position) {
-  return (int64_t)fseeko(stream->fp, offset, seek_position);
+  if (fseeko(stream->fp, offset, seek_position) == 0)
+    return ftello(stream->fp);
+  return -1;
 }
 
 WEAK EMSCRIPTEN_KEEPALIVE int64_t
