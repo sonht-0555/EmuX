@@ -16,16 +16,31 @@
 #define EMSCRIPTEN_KEEPALIVE
 #endif
 
+/* Weak attribute to avoid "multiple definition" errors when linking with cores that already have these functions */
 #define WEAK __attribute__((weak))
 
 /* CRC32 Utility */
-EMSCRIPTEN_KEEPALIVE uint32_t encoding_crc32(uint32_t crc, const uint8_t *data, size_t len) {
+WEAK EMSCRIPTEN_KEEPALIVE uint32_t encoding_crc32(uint32_t crc, const uint8_t *data, size_t len) {
   return (uint32_t)crc32((unsigned long)crc, (const unsigned char *)data, (unsigned int)len);
 }
 
-/* CPU Features Dummy */
-WEAK EMSCRIPTEN_KEEPALIVE uint64_t retro_get_cpu_features(void) { return 0; }
-WEAK EMSCRIPTEN_KEEPALIVE int64_t cpu_features_get_time_usec(void) { return 0; }
+WEAK EMSCRIPTEN_KEEPALIVE char *string_trim_whitespace_right(char *str) {
+  if (!str) return NULL;
+  char *end = str + strlen(str) - 1;
+  while (end >= str && (*end == ' ' || *end == '\t' || *end == '\n' || *end == '\r')) {
+    *end = '\0';
+    end--;
+  }
+  return str;
+}
+
+WEAK EMSCRIPTEN_KEEPALIVE size_t strlcpy_retro__(char *dest, const char *src, size_t size) {
+  size_t i;
+  for (i = 0; i < size - 1 && src[i] != '\0'; i++) dest[i] = src[i];
+  if (size > 0) dest[i] = '\0';
+  while (src[i] != '\0') i++;
+  return i;
+}
 
 /* Libretro VFS Constants */
 #define RETRO_VFS_FILE_ACCESS_READ (1 << 0)
@@ -207,6 +222,14 @@ WEAK EMSCRIPTEN_KEEPALIVE int64_t filestream_write(void *stream, const void *dat
   return (int64_t)fwrite(data, 1, (size_t)len, (FILE *)stream);
 }
 
+WEAK EMSCRIPTEN_KEEPALIVE char *filestream_gets(void *stream, char *s, size_t len) {
+  return fgets(s, (int)len, (FILE *)stream);
+}
+
+WEAK EMSCRIPTEN_KEEPALIVE void filestream_vfs_init(void) {
+  /* Dummy */
+}
+
 WEAK EMSCRIPTEN_KEEPALIVE int64_t filestream_seek(void *stream, int64_t offset,
                                               int seek_position) {
   return (int64_t)fseeko((FILE *)stream, offset, seek_position);
@@ -242,7 +265,7 @@ EMSCRIPTEN_KEEPALIVE int64_t filestream_read_file(const char *path, void **buf, 
   return 1;
 }
 
-EMSCRIPTEN_KEEPALIVE bool filestream_exists(const char *path) {
+WEAK EMSCRIPTEN_KEEPALIVE bool filestream_exists(const char *path) {
   struct stat st;
   return (stat(path, &st) == 0);
 }
