@@ -16,13 +16,16 @@
 #define EMSCRIPTEN_KEEPALIVE
 #endif
 
-/* Weak attribute to avoid "multiple definition" errors when linking with cores that already have these functions */
 #define WEAK __attribute__((weak))
 
 /* CRC32 Utility */
-WEAK EMSCRIPTEN_KEEPALIVE uint32_t encoding_crc32(uint32_t crc, const uint8_t *data, size_t len) {
+EMSCRIPTEN_KEEPALIVE uint32_t encoding_crc32(uint32_t crc, const uint8_t *data, size_t len) {
   return (uint32_t)crc32((unsigned long)crc, (const unsigned char *)data, (unsigned int)len);
 }
+
+/* CPU Features Dummy */
+WEAK EMSCRIPTEN_KEEPALIVE uint64_t retro_get_cpu_features(void) { return 0; }
+WEAK EMSCRIPTEN_KEEPALIVE int64_t cpu_features_get_time_usec(void) { return 0; }
 
 /* Libretro VFS Constants */
 #define RETRO_VFS_FILE_ACCESS_READ (1 << 0)
@@ -217,7 +220,7 @@ WEAK EMSCRIPTEN_KEEPALIVE int filestream_close(void *stream) {
   return fclose((FILE *)stream);
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE int64_t filestream_read_file(const char *path, void **buf, int64_t *len) {
+EMSCRIPTEN_KEEPALIVE int64_t filestream_read_file(const char *path, void **buf, int64_t *len) {
   FILE *fp = fopen(path, "rb");
   if (!fp) return 0;
   fseek(fp, 0, SEEK_END);
@@ -239,7 +242,7 @@ WEAK EMSCRIPTEN_KEEPALIVE int64_t filestream_read_file(const char *path, void **
   return 1;
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE bool filestream_exists(const char *path) {
+EMSCRIPTEN_KEEPALIVE bool filestream_exists(const char *path) {
   struct stat st;
   return (stat(path, &st) == 0);
 }
