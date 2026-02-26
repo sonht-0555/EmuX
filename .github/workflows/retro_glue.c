@@ -211,6 +211,33 @@ WEAK EMSCRIPTEN_KEEPALIVE int filestream_close(void *stream) {
   return fclose((FILE *)stream);
 }
 
+WEAK EMSCRIPTEN_KEEPALIVE int64_t filestream_read_file(const char *path, void **buf, int64_t *len) {
+  FILE *fp = fopen(path, "rb");
+  if (!fp) return 0;
+  fseek(fp, 0, SEEK_END);
+  int64_t size = ftell(fp);
+  fseek(fp, 0, SEEK_SET);
+  void *data = malloc(size);
+  if (!data) {
+    fclose(fp);
+    return 0;
+  }
+  if (fread(data, 1, size, fp) != (size_t)size) {
+    free(data);
+    fclose(fp);
+    return 0;
+  }
+  fclose(fp);
+  *buf = data;
+  *len = size;
+  return 1;
+}
+
+WEAK EMSCRIPTEN_KEEPALIVE bool filestream_exists(const char *path) {
+  struct stat st;
+  return (stat(path, &st) == 0);
+}
+
 WEAK EMSCRIPTEN_KEEPALIVE int64_t filestream_get_size(void *stream) {
   FILE *fp = (FILE *)stream;
   if (!fp)
