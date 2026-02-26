@@ -19,7 +19,6 @@ async function initAudio(coreRate) {
     audioWorkletNode = new AudioWorkletNode(audioContext, 'p', {processorOptions: {sabL, sabR, sabIndices, bufSize: sabBufSize}});
     audioGainNode = audioContext.createGain();
     audioGainNode.gain.value = 1;
-    // Lấy pointer từ WASM (gọi 1 lần duy nhất)
     wasmOutL = Module._emux_audio_get_buffer_l();
     wasmOutR = Module._emux_audio_get_buffer_r();
     Module._emux_audio_set_core_rate(coreRate);
@@ -33,7 +32,6 @@ function writeAudio(pointer, frames) {
     if (!audioWorkletNode || !isRunning || !Module._emux_audio_process) return frames;
     const count = Module._emux_audio_process(pointer, frames);
     if (count > 0) {
-        // Copy từ Heap WASM sang SAB
         const left = new Float32Array(Module.HEAPU8.buffer, wasmOutL, count);
         const right = new Float32Array(Module.HEAPU8.buffer, wasmOutR, count);
         const writeIndex = Atomics.load(sabViewIndices, 0);
