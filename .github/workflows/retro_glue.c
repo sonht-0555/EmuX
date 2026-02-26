@@ -226,6 +226,18 @@ WEAK EMSCRIPTEN_KEEPALIVE char *filestream_gets(void *stream, char *s, size_t le
   return fgets(s, (int)len, (FILE *)stream);
 }
 
+WEAK EMSCRIPTEN_KEEPALIVE int filestream_eof(void *stream) {
+  return feof((FILE *)stream);
+}
+
+WEAK EMSCRIPTEN_KEEPALIVE int filestream_getc(void *stream) {
+  return fgetc((FILE *)stream);
+}
+
+WEAK EMSCRIPTEN_KEEPALIVE int filestream_error(void *stream) {
+  return ferror((FILE *)stream);
+}
+
 WEAK EMSCRIPTEN_KEEPALIVE void filestream_vfs_init(void) {
   /* Dummy */
 }
@@ -301,6 +313,18 @@ WEAK EMSCRIPTEN_KEEPALIVE int64_t rftell(void *stream) {
 }
 WEAK EMSCRIPTEN_KEEPALIVE int64_t rfsize(void *stream) {
   return filestream_get_size(stream);
+}
+WEAK EMSCRIPTEN_KEEPALIVE char *rfgets(char *s, int len, void *stream) {
+  return fgets(s, len, (FILE *)stream);
+}
+WEAK EMSCRIPTEN_KEEPALIVE int rfeof(void *stream) {
+  return feof((FILE *)stream);
+}
+WEAK EMSCRIPTEN_KEEPALIVE int rfgetc(void *stream) {
+  return fgetc((FILE *)stream);
+}
+WEAK EMSCRIPTEN_KEEPALIVE int rferror(void *stream) {
+  return ferror((FILE *)stream);
 }
 WEAK EMSCRIPTEN_KEEPALIVE int rfclose(void *stream) {
   return fclose((FILE *)stream);
