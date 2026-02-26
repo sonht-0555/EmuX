@@ -79,7 +79,7 @@ jobs:
         emcc -c $GITHUB_WORKSPACE/emux/.github/workflows/retro_glue.c -o $GITHUB_WORKSPACE/retro_glue.o $OPT_FLAGS -s USE_ZLIB=1
         
         EXTRA_GLUE=""
-        if [[ "${{ matrix.core.id }}" == "pce" || "${{ matrix.core.id }}" == "wswan" || "${{ matrix.core.id }}" == "a26" || "${{ matrix.core.method }}" == "arcade" ]]; then
+        if [[ "${{ matrix.core.id }}" == "pce" || "${{ matrix.core.id }}" == "wswan" || "${{ matrix.core.method }}" == "arcade" ]]; then
           EXTRA_GLUE="$GITHUB_WORKSPACE/retro_glue.o"
         fi
 
