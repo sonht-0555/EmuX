@@ -186,6 +186,10 @@ WEAK EMSCRIPTEN_KEEPALIVE bool retro_dirent_is_dir(struct RDIR *r,
   return (stat(fp, &st) == 0 && S_ISDIR(st.st_mode));
 }
 
+WEAK EMSCRIPTEN_KEEPALIVE int retro_dirent_error(struct RDIR *r) {
+  return 0;
+}
+
 WEAK EMSCRIPTEN_KEEPALIVE void retro_closedir(struct RDIR *r) {
   if (r) {
     closedir(r->d);
@@ -239,6 +243,14 @@ WEAK EMSCRIPTEN_KEEPALIVE int filestream_error(void *stream) {
 }
 
 WEAK EMSCRIPTEN_KEEPALIVE void filestream_vfs_init(void) {
+  /* Dummy */
+}
+
+WEAK EMSCRIPTEN_KEEPALIVE void dirent_vfs_init(void) {
+  /* Dummy */
+}
+
+WEAK EMSCRIPTEN_KEEPALIVE void path_vfs_init(void) {
   /* Dummy */
 }
 
