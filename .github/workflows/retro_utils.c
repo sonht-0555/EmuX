@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <emscripten.h>
 
+// ===== Video Utilities (Không đổi) =====
 EMSCRIPTEN_KEEPALIVE int emux_is_dirty(const uint32_t * restrict buf1, uint32_t * restrict buf2, size_t size) {
     size_t len = size >> 2;
     size_t step = len >> 8;
@@ -60,54 +61,54 @@ dirty32:
     return 1;
 }
 
-// ===== Audio Resampler (Lightweight & Fast) =====
-#define AUDIO_RING_SIZE 16384
-#define AUDIO_RING_MASK (AUDIO_RING_SIZE - 1)
+// ===== Audio Engine (Truyền thống + Tối ưu) =====
+#define AUDIO_OUT_MAX 4096
 
-static float audio_ring_l[AUDIO_RING_SIZE];
-static float audio_ring_r[AUDIO_RING_SIZE];
-static int audio_write_pos = 0;
-static float audio_read_pos = 0.0f;
+static float audio_out_l[AUDIO_OUT_MAX];
+static float audio_out_r[AUDIO_OUT_MAX];
 
-EMSCRIPTEN_KEEPALIVE void emux_audio_reset() {
-    audio_write_pos = 0;
-    audio_read_pos = 0.0f;
-    memset(audio_ring_l, 0, sizeof(audio_ring_l));
-    memset(audio_ring_r, 0, sizeof(audio_ring_r));
+static float audio_ratio = 1.0f;
+static float audio_frac = 0.0f;
+static float prev_l = 0.0f;
+static float prev_r = 0.0f;
+
+EMSCRIPTEN_KEEPALIVE float* emux_audio_get_buffer_l() { return audio_out_l; }
+EMSCRIPTEN_KEEPALIVE float* emux_audio_get_buffer_r() { return audio_out_r; }
+
+EMSCRIPTEN_KEEPALIVE void emux_audio_set_core_rate(float core_rate) {
+    audio_ratio = core_rate / 48000.0f;
 }
 
-EMSCRIPTEN_KEEPALIVE int emux_audio_process(const int16_t *src, int frames, float *dst_l, float *dst_r, float ratio) {
+EMSCRIPTEN_KEEPALIVE void emux_audio_reset() {
+    audio_frac = 0.0f;
+    prev_l = 0.0f;
+    prev_r = 0.0f;
+}
+
+EMSCRIPTEN_KEEPALIVE int emux_audio_process(const int16_t *src, int frames) {
+    if (frames <= 0) return 0;
+
     const float inv = 1.0f / 32768.0f;
-    
-    // 1. Ghi cực nhanh vào ring buffer
-    for (int i = 0; i < frames; i++) {
-        audio_ring_l[audio_write_pos] = src[i * 2] * inv;
-        audio_ring_r[audio_write_pos] = src[i * 2 + 1] * inv;
-        audio_write_pos = (audio_write_pos + 1) & AUDIO_RING_MASK;
-    }
-
     int out_count = 0;
-    int write_snapshot = audio_write_pos;
-    float p = audio_read_pos;
 
-    // 2. Nội suy tuyến tính (Linear) - Rẻ nhất và mát CPU nhất
-    // Chỉ cần 2 điểm: p1 và p2. Yêu cầu avail >= 2
-    int avail = (write_snapshot - (int)p + AUDIO_RING_SIZE) & AUDIO_RING_MASK;
-    while (avail >= 2) {
-        int i = (int)p;
-        float f = p - i;
-        int next = (i + 1) & AUDIO_RING_MASK;
-        
-        // Công thức nội suy tuyến tính: p1 + f * (p2 - p1)
-        dst_l[out_count] = audio_ring_l[i] + f * (audio_ring_l[next] - audio_ring_l[i]);
-        dst_r[out_count] = audio_ring_r[i] + f * (audio_ring_r[next] - audio_ring_r[i]);
-        
-        out_count++;
-        p += ratio;
-        if (p >= (float)AUDIO_RING_SIZE) p -= (float)AUDIO_RING_SIZE;
-        avail = (write_snapshot - (int)p + AUDIO_RING_SIZE) & AUDIO_RING_MASK;
+    for (int i = 0; i < frames; i++) {
+        float cur_l = src[i * 2] * inv;
+        float cur_r = src[i * 2 + 1] * inv;
+
+        while (audio_frac < 1.0f) {
+            if (out_count >= AUDIO_OUT_MAX) goto done;
+
+            float t = audio_frac;
+            audio_out_l[out_count] = prev_l + t * (cur_l - prev_l);
+            audio_out_r[out_count] = prev_r + t * (cur_r - prev_r);
+            out_count++;
+            audio_frac += audio_ratio;
+        }
+        audio_frac -= 1.0f;
+        prev_l = cur_l;
+        prev_r = cur_r;
     }
 
-    audio_read_pos = p;
+done:
     return out_count;
 }

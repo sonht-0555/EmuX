@@ -103,7 +103,7 @@ async function initCore(romFile) {
                 // Step 8: Audio & render loop start
                 const audioVideoPointer = Module._malloc(120);
                 Module._retro_get_system_av_info(audioVideoPointer);
-                initAudio(Module.HEAPF64[(Number(audioVideoPointer) + 32) >> 3] / 48000);
+                initAudio(Module.HEAPF64[(Number(audioVideoPointer) + 32) >> 3]);
                 audioContext.resume();
                 Module._free(audioVideoPointer);
                 if (window.resetAudioSync) window.resetAudioSync();

@@ -48,21 +48,24 @@ jobs:
           sed -i 's/-Wl,--version-script=[^ ]*//g' Makefile
           sed -i 's/-Wl,--no-undefined//g' Makefile
           
-          # Compile objects - we ignore errors from the final Makefile link step
+          # Compile objects - standard mode
           emmake make platform=emscripten -j$(nproc) || true
           
           echo "Linking final WASM from object files..."
           # Find all objects created during the build
           ALL_OBJS=$(find ../build/obj -name "*.o")
           
-          # Link directly from .o files for maximum compatibility
-          emcc $ALL_OBJS -O3 \
+          # Compile retro_utils
+          emcc -c $GITHUB_WORKSPACE/.github/workflows/retro_utils.c -o $GITHUB_WORKSPACE/retro_utils.o -O3
+          
+          # Link directly from .o files 
+          emcc $ALL_OBJS $GITHUB_WORKSPACE/retro_utils.o -O3 \
             -s WASM=1 -s ENVIRONMENT=web \
             -s ALLOW_MEMORY_GROWTH=1 \
             -s ALLOW_TABLE_GROWTH=1 \
             -s NO_EXIT_RUNTIME=1 \
             -s EXPORTED_RUNTIME_METHODS='["addFunction","getValue","setValue","ccall","cwrap","UTF8ToString","stringToUTF8"]' \
-            -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free"]' \
+            -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free","_emux_is_dirty","_emux_render16","_emux_render32","_emux_audio_reset","_emux_audio_process","_emux_audio_get_buffer_l","_emux_audio_get_buffer_r","_emux_audio_set_core_rate"]' \
             --no-entry \
             -o ../../sameboy_core.js
           cd ../..
