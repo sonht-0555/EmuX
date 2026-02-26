@@ -20,11 +20,11 @@
 #define WEAK __attribute__((weak))
 
 /* CRC32 Utility */
-WEAK EMSCRIPTEN_KEEPALIVE uint32_t encoding_crc32(uint32_t crc, const uint8_t *data, size_t len) {
+WEAK uint32_t encoding_crc32(uint32_t crc, const uint8_t *data, size_t len) {
   return (uint32_t)crc32((unsigned long)crc, (const unsigned char *)data, (unsigned int)len);
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE char *string_trim_whitespace_right(char *str) {
+WEAK char *string_trim_whitespace_right(char *str) {
   if (!str) return NULL;
   char *end = str + strlen(str) - 1;
   while (end >= str && (*end == ' ' || *end == '\t' || *end == '\n' || *end == '\r')) {
@@ -34,7 +34,7 @@ WEAK EMSCRIPTEN_KEEPALIVE char *string_trim_whitespace_right(char *str) {
   return str;
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE size_t strlcpy_retro__(char *dest, const char *src, size_t size) {
+WEAK size_t strlcpy_retro__(char *dest, const char *src, size_t size) {
   size_t i;
   if (!size) return strlen(src);
   for (i = 0; i < size - 1 && src[i] != '\0'; i++) dest[i] = src[i];
@@ -53,7 +53,7 @@ WEAK EMSCRIPTEN_KEEPALIVE size_t strlcpy_retro__(char *dest, const char *src, si
 #define RETRO_VFS_FILE_ACCESS_HINT_FREQUENT_ACCESS (1 << 0)
 
 /* String utilities - Kept for core logic compatibility */
-WEAK EMSCRIPTEN_KEEPALIVE char *string_to_lower(const char *str) {
+WEAK char *string_to_lower(const char *str) {
   if (!str)
     return NULL;
   char *lower = strdup(str);
@@ -63,7 +63,7 @@ WEAK EMSCRIPTEN_KEEPALIVE char *string_to_lower(const char *str) {
   return lower;
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE char *
+WEAK char *
 string_replace_substring(const char *in, size_t in_len, const char *pattern,
                          size_t pattern_len, const char *replacement,
                          size_t replacement_len) {
@@ -104,17 +104,17 @@ string_replace_substring(const char *in, size_t in_len, const char *pattern,
 }
 
 /* Path utilities */
-WEAK EMSCRIPTEN_KEEPALIVE const char *find_last_slash(const char *str) {
+WEAK const char *find_last_slash(const char *str) {
   const char *s1 = strrchr(str, '/'), *s2 = strrchr(str, '\\');
   return (s1 > s2) ? s1 : (s2 ? s2 : s1);
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE const char *path_basename(const char *path) {
+WEAK const char *path_basename(const char *path) {
   const char *last = find_last_slash(path);
   return last ? last + 1 : path;
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE void path_parent_dir(char *path) {
+WEAK void path_parent_dir(char *path) {
   char *last = (char *)find_last_slash(path);
   if (last)
     *last = '\0';
@@ -122,29 +122,29 @@ WEAK EMSCRIPTEN_KEEPALIVE void path_parent_dir(char *path) {
     *path = '\0';
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE bool path_is_absolute(const char *path) {
+WEAK bool path_is_absolute(const char *path) {
   return (path && (path[0] == '/' ||
                    (strlen(path) > 2 && path[1] == ':' && path[2] == '\\')));
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE void path_remove_extension(char *path) {
+WEAK void path_remove_extension(char *path) {
   char *dot = strrchr(path, '.');
   const char *slash = find_last_slash(path);
   if (dot && (!slash || dot > slash))
     *dot = '\0';
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE const char *path_get_extension(const char *path) {
+WEAK const char *path_get_extension(const char *path) {
   const char *dot = strrchr(path, '.');
   const char *slash = find_last_slash(path);
   return (dot && (!slash || dot > slash)) ? dot + 1 : "";
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE bool path_mkdir(const char *dir) {
+WEAK bool path_mkdir(const char *dir) {
   return mkdir(dir, 0777) == 0;
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE bool path_is_directory(const char *path) {
+WEAK bool path_is_directory(const char *path) {
   struct stat st;
   return (stat(path, &st) == 0 && S_ISDIR(st.st_mode));
 }
@@ -155,7 +155,7 @@ struct RDIR {
   struct dirent *e;
 };
 
-WEAK EMSCRIPTEN_KEEPALIVE struct RDIR *
+WEAK struct RDIR *
 retro_opendir_include_hidden(const char *name, bool include_hidden) {
   DIR *d = opendir(name);
   if (!d)
@@ -166,15 +166,15 @@ retro_opendir_include_hidden(const char *name, bool include_hidden) {
   return r;
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE bool retro_readdir(struct RDIR *r) {
+WEAK bool retro_readdir(struct RDIR *r) {
   return r && (r->e = readdir(r->d)) != NULL;
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE const char *retro_dirent_get_name(struct RDIR *r) {
+WEAK const char *retro_dirent_get_name(struct RDIR *r) {
   return r && r->e ? r->e->d_name : NULL;
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE bool retro_dirent_is_dir(struct RDIR *r,
+WEAK bool retro_dirent_is_dir(struct RDIR *r,
                                                const char *path) {
   if (!r || !r->e)
     return false;
@@ -186,11 +186,11 @@ WEAK EMSCRIPTEN_KEEPALIVE bool retro_dirent_is_dir(struct RDIR *r,
   return (stat(fp, &st) == 0 && S_ISDIR(st.st_mode));
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE int retro_dirent_error(struct RDIR *r) {
+WEAK int retro_dirent_error(struct RDIR *r) {
   return 0;
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE void retro_closedir(struct RDIR *r) {
+WEAK void retro_closedir(struct RDIR *r) {
   if (r) {
     closedir(r->d);
     free(r);
@@ -205,46 +205,46 @@ static const char *vfs_mode_to_string(unsigned mode) {
   return "rb";
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE void *filestream_open(const char *path, unsigned mode,
+WEAK void *filestream_open(const char *path, unsigned mode,
                                            unsigned hints) {
   return (void *)fopen(path, vfs_mode_to_string(mode));
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE int64_t filestream_read(void *stream, void *data,
+WEAK int64_t filestream_read(void *stream, void *data,
                                               int64_t len) {
   return (int64_t)fread(data, 1, (size_t)len, (FILE *)stream);
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE int64_t filestream_write(void *stream, const void *data,
+WEAK int64_t filestream_write(void *stream, const void *data,
                                                int64_t len) {
   return (int64_t)fwrite(data, 1, (size_t)len, (FILE *)stream);
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE char *filestream_gets(void *stream, char *s, size_t len) {
+WEAK char *filestream_gets(void *stream, char *s, size_t len) {
   return fgets(s, (int)len, (FILE *)stream);
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE int filestream_eof(void *stream) {
+WEAK int filestream_eof(void *stream) {
   return feof((FILE *)stream);
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE int filestream_getc(void *stream) {
+WEAK int filestream_getc(void *stream) {
   return fgetc((FILE *)stream);
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE int filestream_error(void *stream) {
+WEAK int filestream_error(void *stream) {
   return ferror((FILE *)stream);
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE void filestream_vfs_init(void) {
+WEAK void filestream_vfs_init(void) {
   /* Dummy */
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE void dirent_vfs_init(void) {
+WEAK void dirent_vfs_init(void) {
   /* Dummy */
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE void path_vfs_init(void) {
+WEAK void path_vfs_init(void) {
   /* Dummy */
 }
 
@@ -255,19 +255,19 @@ WEAK EMSCRIPTEN_KEEPALIVE int64_t filestream_seek(void *stream, int64_t offset,
   return -1;
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE int64_t filestream_tell(void *stream) {
+WEAK int64_t filestream_tell(void *stream) {
   return (int64_t)ftello((FILE *)stream);
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE void filestream_rewind(void *stream) {
+WEAK void filestream_rewind(void *stream) {
   rewind((FILE *)stream);
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE int filestream_close(void *stream) {
+WEAK int filestream_close(void *stream) {
   return fclose((FILE *)stream);
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE int64_t filestream_read_file(const char *path, void **buf, int64_t *len) {
+WEAK int64_t filestream_read_file(const char *path, void **buf, int64_t *len) {
   FILE *fp = fopen(path, "rb");
   if (!fp) return 0;
   fseeko(fp, 0, SEEK_END);
@@ -289,12 +289,12 @@ WEAK EMSCRIPTEN_KEEPALIVE int64_t filestream_read_file(const char *path, void **
   return 1;
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE bool filestream_exists(const char *path) {
+WEAK bool filestream_exists(const char *path) {
   struct stat st;
   return (stat(path, &st) == 0);
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE int64_t filestream_get_size(void *stream) {
+WEAK int64_t filestream_get_size(void *stream) {
   FILE *fp = (FILE *)stream;
   if (!fp)
     return 0;
@@ -306,42 +306,42 @@ WEAK EMSCRIPTEN_KEEPALIVE int64_t filestream_get_size(void *stream) {
 }
 
 /* Libretro Common Aliases */
-WEAK EMSCRIPTEN_KEEPALIVE void *rfopen(const char *path, const char *mode) {
+WEAK void *rfopen(const char *path, const char *mode) {
   return (void *)fopen(path, mode);
 }
-WEAK EMSCRIPTEN_KEEPALIVE int64_t rfread(void *buffer, size_t size, size_t count,
+WEAK int64_t rfread(void *buffer, size_t size, size_t count,
                                      void *stream) {
   return (int64_t)fread(buffer, size, count, (FILE *)stream);
 }
-WEAK EMSCRIPTEN_KEEPALIVE int64_t rfwrite(const void *buffer, size_t size,
+WEAK int64_t rfwrite(const void *buffer, size_t size,
                                       size_t count, void *stream) {
   return (int64_t)fwrite(buffer, size, count, (FILE *)stream);
 }
-WEAK EMSCRIPTEN_KEEPALIVE int64_t rfseek(void *stream, int64_t offset, int origin) {
+WEAK int64_t rfseek(void *stream, int64_t offset, int origin) {
   return filestream_seek(stream, offset, origin);
 }
-WEAK EMSCRIPTEN_KEEPALIVE int64_t rftell(void *stream) {
+WEAK int64_t rftell(void *stream) {
   return (int64_t)ftello((FILE *)stream);
 }
-WEAK EMSCRIPTEN_KEEPALIVE int64_t rfsize(void *stream) {
+WEAK int64_t rfsize(void *stream) {
   return filestream_get_size(stream);
 }
-WEAK EMSCRIPTEN_KEEPALIVE char *rfgets(char *s, int len, void *stream) {
+WEAK char *rfgets(char *s, int len, void *stream) {
   return fgets(s, len, (FILE *)stream);
 }
-WEAK EMSCRIPTEN_KEEPALIVE int rfeof(void *stream) {
+WEAK int rfeof(void *stream) {
   return feof((FILE *)stream);
 }
-WEAK EMSCRIPTEN_KEEPALIVE int rfgetc(void *stream) {
+WEAK int rfgetc(void *stream) {
   return fgetc((FILE *)stream);
 }
-WEAK EMSCRIPTEN_KEEPALIVE int rferror(void *stream) {
+WEAK int rferror(void *stream) {
   return ferror((FILE *)stream);
 }
-WEAK EMSCRIPTEN_KEEPALIVE int rfclose(void *stream) {
+WEAK int rfclose(void *stream) {
   return fclose((FILE *)stream);
 }
-WEAK EMSCRIPTEN_KEEPALIVE int64_t rfget_size(void *stream) {
+WEAK int64_t rfget_size(void *stream) {
   return filestream_get_size(stream);
 }
 
@@ -350,7 +350,7 @@ struct retro_vfs_file_handle {
   FILE *fp;
 };
 
-WEAK EMSCRIPTEN_KEEPALIVE struct retro_vfs_file_handle *
+WEAK struct retro_vfs_file_handle *
 retro_vfs_file_open_impl(const char *path, unsigned mode, unsigned hints) {
   FILE *fp = fopen(path, vfs_mode_to_string(mode));
   if (!fp)
@@ -360,7 +360,7 @@ retro_vfs_file_open_impl(const char *path, unsigned mode, unsigned hints) {
   return handle;
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE int
+WEAK int
 retro_vfs_file_close_impl(struct retro_vfs_file_handle *stream) {
   if (stream) {
     fclose(stream->fp);
@@ -369,17 +369,17 @@ retro_vfs_file_close_impl(struct retro_vfs_file_handle *stream) {
   return 0;
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE int64_t
+WEAK int64_t
 retro_vfs_file_get_size_impl(struct retro_vfs_file_handle *stream) {
   return filestream_get_size(stream ? stream->fp : NULL);
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE int64_t retro_vfs_file_read_impl(
+WEAK int64_t retro_vfs_file_read_impl(
     struct retro_vfs_file_handle *stream, void *data, int64_t len) {
   return (int64_t)fread(data, 1, (size_t)len, stream->fp);
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE int64_t retro_vfs_file_write_impl(
+WEAK int64_t retro_vfs_file_write_impl(
     struct retro_vfs_file_handle *stream, const void *data, int64_t len) {
   return (int64_t)fwrite(data, 1, (size_t)len, stream->fp);
 }
@@ -391,7 +391,7 @@ WEAK EMSCRIPTEN_KEEPALIVE int64_t retro_vfs_file_seek_impl(
   return -1;
 }
 
-WEAK EMSCRIPTEN_KEEPALIVE int64_t
+WEAK int64_t
 retro_vfs_file_tell_impl(struct retro_vfs_file_handle *stream) {
   return (int64_t)ftello(stream->fp);
 }
