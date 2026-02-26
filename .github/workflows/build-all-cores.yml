@@ -23,7 +23,7 @@ jobs:
           - { id: snes2010, name: snes9x2010, fetch: snes9x2010, make: "-f Makefile.libretro STATIC_LINKING=0", initial_mem: 128mb, stack: 4mb, method: objects }
           - { id: nds, name: melonds, fetch: melonds, initial_mem: 512mb, stack: 32mb, method: objects }
           - { id: nds2021, name: melonds2021, fetch: melonds2021, initial_mem: 512mb, stack: 32mb, method: objects }
-          - { id: gbc, name: gearboy, fetch: gearboy, subdir: platforms/libretro, initial_mem: 64mb, stack: 2mb, method: objects }
+          - { id: gbc, name: sameboy, fetch: sameboy, subdir: libretro, initial_mem: 128mb, stack: 4mb, method: objects }
 
     steps:
     - uses: actions/checkout@v3
@@ -33,6 +33,15 @@ jobs:
     - uses: mymindstorm/setup-emsdk@v14
       with:
         version: 3.1.46
+
+    - name: Install RGBDS (SameBoy only)
+      if: matrix.core.id == 'gbc'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y bison flex gettext
+        wget https://github.com/gbdev/rgbds/releases/download/v0.9.1/rgbds-0.9.1-linux-x86_64.tar.xz
+        tar -xf rgbds-0.9.1-linux-x86_64.tar.xz
+        sudo cp rgbasm rgblink rgbfix rgbgfx /usr/local/bin/
 
     - uses: actions/cache@v3
       with:
@@ -49,6 +58,7 @@ jobs:
         else
           cd libretro-super && ./libretro-fetch.sh ${{ matrix.core.fetch }}
         fi
+
     - name: Build
       run: |
         export OPT_FLAGS="-O2 -ffast-math -fno-tree-vectorize -flto -DNDEBUG"
@@ -57,10 +67,24 @@ jobs:
         export LDFLAGS="$OPT_FLAGS"
         
         cd libretro-super/libretro-${{ matrix.core.fetch }}
+        
+        if [ "${{ matrix.core.id }}" == "gbc" ]; then
+          make bootroms -j$(nproc)
+          for f in build/bin/BootROMs/*.bin; do
+            filename=$(basename "$f")
+            name="${filename%.*}"
+            target="libretro/${name}.c"
+            echo "/* AUTO-GENERATED */" > "$target"
+            echo "const unsigned char ${name}[] = {" >> "$target"
+            hexdump -v -e '/1 "0x%02x, "' "$f" >> "$target"
+            echo "};" >> "$target"
+            echo "const unsigned ${name}_length = sizeof(${name});" >> "$target"
+          done
+        fi
+        
         if [ -n "${{ matrix.core.subdir }}" ]; then cd ${{ matrix.core.subdir }}; fi
         
-        # Patch cho NDS
-        if [ "${{ matrix.core.id }}" == "nds2021" ]; then
+        if [ "${{ matrix.core.id }}" == "nds2021" ] || [ "${{ matrix.core.id }}" == "gbc" ]; then
           sed -i 's/-Wl,--no-undefined//g' Makefile
           sed -i 's/-Wl,--version-script=[^ ]*//g' Makefile
         fi
@@ -83,7 +107,11 @@ jobs:
             -o arcade.js
           zip -j arcade.zip arcade.js arcade.wasm
         elif [ "${{ matrix.core.method }}" == "objects" ]; then
-          ALL_OBJS=$(find . -name "*.o")
+          if [ "${{ matrix.core.id }}" == "gbc" ]; then
+             ALL_OBJS=$(find build/obj -name "*.o")
+          else
+             ALL_OBJS=$(find . -name "*.o")
+          fi
           emcc $ALL_OBJS $GITHUB_WORKSPACE/retro_utils.o $OPT_FLAGS \
             -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web \
             -s ALLOW_MEMORY_GROWTH=1 -s WASM_BIGINT=1 --no-heap-copy -s ALLOW_TABLE_GROWTH=1 \
@@ -94,6 +122,7 @@ jobs:
             -o ${{ matrix.core.id }}.js
           zip -j ${{ matrix.core.id }}.zip ${{ matrix.core.id }}.js ${{ matrix.core.id }}.wasm
         fi
+
     - uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.core.id }}-core

@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <emscripten.h>
 
-// ===== Video Utilities (Không đổi) =====
+// ===== Video Utilities =====
 EMSCRIPTEN_KEEPALIVE int emux_is_dirty(const uint32_t * restrict buf1, uint32_t * restrict buf2, size_t size) {
     size_t len = size >> 2;
     size_t step = len >> 8;
@@ -61,8 +61,9 @@ dirty32:
     return 1;
 }
 
-// ===== Audio Engine (Truyền thống + Tối ưu) =====
+// ===== Audio Engine =====
 #define AUDIO_OUT_MAX 4096
+static inline float clampf(float v) { return v < -1.0f ? -1.0f : (v > 1.0f ? 1.0f : v); }
 
 static float audio_out_l[AUDIO_OUT_MAX];
 static float audio_out_r[AUDIO_OUT_MAX];
@@ -99,8 +100,8 @@ EMSCRIPTEN_KEEPALIVE int emux_audio_process(const int16_t *src, int frames) {
             if (out_count >= AUDIO_OUT_MAX) goto done;
 
             float t = audio_frac;
-            audio_out_l[out_count] = prev_l + t * (cur_l - prev_l);
-            audio_out_r[out_count] = prev_r + t * (cur_r - prev_r);
+            audio_out_l[out_count] = clampf(prev_l + t * (cur_l - prev_l));
+            audio_out_r[out_count] = clampf(prev_r + t * (cur_r - prev_r));
             out_count++;
             audio_frac += audio_ratio;
         }
