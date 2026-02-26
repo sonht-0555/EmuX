@@ -60,6 +60,10 @@ jobs:
           cd libretro-super && ./libretro-fetch.sh ${{ matrix.core.fetch }}
         fi
 
+    - name: Pre-build Emscripten Ports
+      run: |
+        for i in {1..5}; do embuilder build zlib && break || (echo "Retry $i..." && sleep 5); done
+
     - name: Build
       run: |
         export OPT_FLAGS="-O2 -ffast-math -fno-tree-vectorize -flto -DNDEBUG"
