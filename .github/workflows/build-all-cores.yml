@@ -16,7 +16,7 @@ jobs:
           - { id: gba, name: mgba, fetch: mgba, make: "-f Makefile.libretro", initial_mem: 256mb, stack: 8mb, method: objects }
           - { id: nes, name: quicknes, fetch: quicknes, initial_mem: 128mb, stack: 4mb, method: objects }
           - { id: snes, name: snes9x, fetch: snes9x, make: "-C libretro", initial_mem: 256mb, stack: 8mb, method: objects }
-          - { id: pce, name: mednafen_pce_fast, fetch: mednafen_pce_fast, make: "-f Makefile", initial_mem: 128mb, stack: 4mb, method: objects }
+          - { id: pce, name: mednafen_pce_fast, fetch: mednafen_pce_fast, make: "-f Makefile WANT_VFS=1", initial_mem: 128mb, stack: 4mb, method: objects }
           - { id: neogeo, name: fbneo, fetch: fbneo, subdir: "src/burner/libretro", make: "WANT_VFS=1", initial_mem: 256mb, stack: 8mb, method: arcade }
           - { id: genesis, name: genesis_plus_gx, fetch: genesis_plus_gx, make: "-f Makefile.libretro STATIC_LINKING=0 WANT_ZLIB=1 WANT_VFS=1", initial_mem: 256mb, stack: 8mb, method: objects }
           - { id: ngp, name: mednafen_ngp, fetch: mednafen_ngp, make: "STATIC_LINKING=0 WANT_VFS=1", initial_mem: 128mb, stack: 4mb, method: objects }
@@ -108,7 +108,7 @@ jobs:
             -s INITIAL_MEMORY=${{ matrix.core.initial_mem }} -s STACK_SIZE=${{ matrix.core.stack }} -s FORCE_FILESYSTEM=1 \
             -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap","getValue","setValue"]' \
             -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free","_retro_serialize_size","_retro_serialize","_retro_unserialize","_emux_is_dirty","_emux_render16","_emux_render32","_emux_audio_reset","_emux_audio_process","_emux_audio_get_buffer_l","_emux_audio_get_buffer_r","_emux_audio_set_core_rate"]' \
-            -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 \
+            -s ERROR_ON_UNDEFINED_SYMBOLS=1 -s ASSERTIONS=0 \
             -o arcade.js
           zip -j arcade.zip arcade.js arcade.wasm
         elif [ "${{ matrix.core.method }}" == "objects" ]; then
@@ -123,7 +123,7 @@ jobs:
             -s INITIAL_MEMORY=${{ matrix.core.initial_mem }} -s STACK_SIZE=${{ matrix.core.stack }} -s FORCE_FILESYSTEM=1 \
             -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap","getValue","setValue"]' \
             -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free","_retro_serialize_size","_retro_serialize","_retro_unserialize","_emux_is_dirty","_emux_render16","_emux_render32","_emux_audio_reset","_emux_audio_process","_emux_audio_get_buffer_l","_emux_audio_get_buffer_r","_emux_audio_set_core_rate"]' \
-            -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 \
+            -s ERROR_ON_UNDEFINED_SYMBOLS=1 -s ASSERTIONS=0 \
             -o ${{ matrix.core.id }}.js
           zip -j ${{ matrix.core.id }}.zip ${{ matrix.core.id }}.js ${{ matrix.core.id }}.wasm
         fi
