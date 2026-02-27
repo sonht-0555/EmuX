@@ -42,6 +42,10 @@ const CORE_CONFIG = [
     {ext: '.zip,.7z', script: CORE_BASE + 'arcade.zip', btns: {'btn-1': ['A', 0], 'btn-3': ['B', 8], 'btn-2': ['C', 1], 'btn-4': ['D', 9], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' cn.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/neogeo.zip']},
     {ext: '.nds', script: CORE_BASE + 'nds2021.zip', btns: {'btn-1': ['A', 8], 'btn-2': ['X', 9], 'btn-3': ['B', 0], 'btn-4': ['Y', 1], 'btn-l': [' bl.', 10], 'btn-r': [' br.', 11], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/bios7.bin', './src/utils/bios/bios9.bin', './src/utils/bios/firmware.bin']},
     {ext: '.bin,.iso,.img,.pbp,.chd', script: CORE_BASE + 'ps1.zip', btns: {'btn-1': ['A', 8], 'btn-2': ['X', 9], 'btn-3': ['B', 0], 'btn-4': ['Y', 1], 'btn-l': [' bl.', 10], 'btn-r': [' br.', 11], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/scph5501.bin']},
+    {ext: '.min', script: CORE_BASE + 'pokemini.zip', btns: {'btn-1': [' A', 0], 'btn-3': [' B', 8], 'btn-l': [' C', 1], 'btn-r': [' br.', ''], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}},
+    {ext: '.lnx', script: CORE_BASE + 'handy.zip', btns: {'btn-1': [' A', 0], 'btn-3': [' B', 8], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}},
+    {ext: '.vb', script: CORE_BASE + 'beetle_vb.zip', btns: {'btn-1': ['A', 0], 'btn-3': ['B', 8], 'btn-l': [' L', 10], 'btn-r': [' R', 11], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}},
+    {ext: '.exe,.com,.bat,.conf', script: CORE_BASE + 'dosbox_pure.zip', btns: {'btn-1': ['Spc', 0], 'btn-3': ['Ent', 8], 'btn-l': ['Esc', 10], 'btn-r': ['Alt', 11], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}},
 ];
 var isRunning = false;
 // ===== initCore ====

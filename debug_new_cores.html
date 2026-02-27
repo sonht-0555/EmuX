@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>New Cores Debugger</title>
+        <script src="https://unpkg.com/fflate"></script>
+        <style>
+            body {
+                background: #1a1a1a;
+                color: #eee;
+                font-family: monospace;
+                padding: 20px;
+            }
+
+            #canvas {
+                background: #000;
+                display: block;
+                margin: 20px 0;
+                border: 2px solid #444;
+                max-width: 100%;
+                height: auto;
+                image-rendering: pixelated;
+            }
+
+            .controls {
+                background: #333;
+                padding: 15px;
+                border-radius: 8px;
+                margin-bottom: 20px;
+            }
+
+            #log {
+                background: #000;
+                height: 350px;
+                overflow-y: scroll;
+                padding: 10px;
+                border: 1px solid #444;
+                font-size: 11px;
+            }
+
+            .log-entry {
+                margin-bottom: 4px;
+                border-bottom: 1px solid #222;
+            }
+
+            .log-env {
+                color: #88f;
+            }
+
+            .log-error {
+                color: #f88;
+                font-weight: bold;
+            }
+
+            .log-info {
+                color: #8f8;
+            }
+
+            .log-core {
+                color: #f8f;
+                font-style: italic;
+            }
+
+            select,
+            input,
+            button {
+                padding: 8px;
+                margin: 5px 0;
+                background: #444;
+                color: #fff;
+                border: 1px solid #666;
+                border-radius: 4px;
+            }
+
+            button:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>New Cores Debugger</h1>
+
+        <div class="controls">
+            <label>1. Select Core to Test:</label><br>
+            <select id="coreSelect">
+                <option value="pokemini.zip">Pokemon Mini (pokemini)</option>
+                <option value="handy.zip">Atari Lynx (handy)</option>
+                <option value="beetle_vb.zip">Virtual Boy (beetle_vb)</option>
+                <option value="dosbox_pure.zip">DOS (dosbox_pure)</option>
+            </select><br><br>
+
+            <label>2. Select ROM File:</label><br>
+            <input type="file" id="romInput"><br><br>
+
+            <button id="startButton" disabled>Initialize & Start</button>
+        </div>
+
+        <canvas id="canvas"></canvas>
+        <h3>Debug Console Logs:</h3>
+        <div id="log"></div>
+
+        <script>
+            const log = document.getElementById('log');
+            const startBtn = document.getElementById('startButton');
+            const coreSelect = document.getElementById('coreSelect');
+            let romData = null, romName = "";
+
+            const CORE_BASE = 'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/';
+
+            function addLog(msg, type = 'info') {
+                const entry = document.createElement('div');
+                entry.className = `log-entry log-${type}`;
+                entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+                log.appendChild(entry);
+                log.scrollTop = log.scrollHeight;
+            }
+
+            document.getElementById('romInput').onchange = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                romData = new Uint8Array(await file.arrayBuffer());
+                romName = file.name;
+                addLog(`ROM loaded: ${romName} (${romData.length} bytes)`);
+                startBtn.disabled = false;
+            };
+
+            startBtn.onclick = async () => {
+                addLog("Starting Core Setup...");
+                startBtn.disabled = true;
+
+                const coreUrl = CORE_BASE + coreSelect.value;
+                addLog(`Fetching Core: ${coreUrl}...`);
+
+                try {
+                    const response = await fetch(coreUrl);
+                    if (!response.ok) throw new Error("Core fetch failed.");
+                    const coreBuffer = await response.arrayBuffer();
+
+                    const files = fflate.unzipSync(new Uint8Array(coreBuffer));
+                    let jsContent = "", wasmBuffer = null;
+                    for (const name in files) {
+                        if (name.endsWith('.js')) jsContent = new TextDecoder().decode(files[name]);
+                        if (name.endsWith('.wasm')) wasmBuffer = files[name];
+                    }
+
+                    if (!wasmBuffer) throw new Error("WASM not found in core zip.");
+                    const wasmUrl = URL.createObjectURL(new Blob([wasmBuffer], {type: 'application/wasm'}));
+
+                    window.Module = {
+                        wasmBinary: wasmBuffer,
+                        canvas: document.getElementById('canvas'),
+                        print: (text) => addLog("STDOUT: " + text),
+                        printErr: (text) => addLog("STDERR: " + text, "error"),
+                        locateFile: () => wasmUrl,
+                        getFunc: (name) => {
+                            const n = name.startsWith("_") ? name : "_" + name;
+                            return Module[n] || Module[name] || (Module.asm ? Module.asm[n] || Module.asm[name] : null);
+                        },
+                        onRuntimeInitialized: () => {
+                            addLog("WASM Runtime Initialized", "info");
+                            runCore();
+                        }
+                    };
+
+                    const script = document.createElement('script');
+                    script.textContent = jsContent;
+                    document.body.appendChild(script);
+
+                } catch (e) {
+                    addLog("Startup Error: " + e.message, "error");
+                    startBtn.disabled = false;
+                }
+            };
+
+            function runCore() {
+                try {
+                    const callbacks = [
+                        ["retro_set_environment", env_cb, "iii"],
+                        ["retro_set_video_refresh", video_cb, "viiii"],
+                        ["retro_set_audio_sample", (l, r) => { }, "vii"],
+                        ["retro_set_audio_sample_batch", (data, frames) => frames, "iii"],
+                        ["retro_set_input_poll", () => { }, "v"],
+                        ["retro_set_input_state", () => 0, "iiiii"]
+                    ];
+
+                    if (!window._callbackPtrs) window._callbackPtrs = {};
+                    callbacks.forEach(([name, fn, sig]) => {
+                        const func = Module.getFunc(name);
+                        if (func) {
+                            if (!window._callbackPtrs[name]) window._callbackPtrs[name] = Module.addFunction(fn, sig);
+                            func(window._callbackPtrs[name]);
+                            addLog(`Callback ${name} registered.`);
+                        }
+                    });
+
+                    const retro_init = Module.getFunc("retro_init");
+                    if (retro_init) {retro_init(); addLog("retro_init() called");}
+
+                    const romPath = "/" + romName;
+                    Module.FS.writeFile(romPath, romData);
+
+                    const romPtr = Module._malloc(romData.length);
+                    Module.HEAPU8.set(romData, romPtr);
+
+                    const loadGameFunc = Module.getFunc("retro_load_game");
+                    const infoPtr = Module._malloc(16);
+                    const pathPtr = Module._malloc(romPath.length + 1);
+                    Module.stringToUTF8(romPath, pathPtr, romPath.length + 1);
+
+                    Module.HEAPU32[infoPtr >> 2] = pathPtr;
+                    Module.HEAPU32[(infoPtr >> 2) + 1] = romPtr;
+                    Module.HEAPU32[(infoPtr >> 2) + 2] = romData.length;
+                    Module.HEAPU32[(infoPtr >> 2) + 3] = 0;
+
+                    addLog("Calling retro_load_game...");
+                    const success = loadGameFunc(infoPtr);
+                    addLog("retro_load_game result: " + success);
+
+                    if (success) {
+                        const retro_run = Module.getFunc("retro_run");
+                        const loop = () => {if (retro_run) retro_run(); requestAnimationFrame(loop);};
+                        loop();
+                        addLog("Execution loop started.");
+                    } else {
+                        addLog("Core rejected the ROM!", "error");
+                    }
+
+                } catch (e) {addLog("Crash: " + e.message, "error");}
+            }
+
+            function env_cb(cmd, data) {
+                if (cmd === 14) { // GET_LOG_INTERFACE
+                    if (!window._logPtr) window._logPtr = Module.addFunction((level, fmt, args) => {
+                        // Very basic log extraction
+                        addLog("CORE LOG: " + level, "log-core");
+                    }, "viii");
+                    const ptr = Module._malloc(4);
+                    Module.HEAP32[ptr >> 2] = window._logPtr;
+                    Module.HEAP32[data >> 2] = ptr;
+                    return true;
+                }
+                if (cmd === 1) {Module.pixelFormat = Module.HEAP32[data >> 2]; return true;}
+                if (cmd === 9) { // GET_SYSTEM_DIRECTORY
+                    const ptr = Module._malloc(2);
+                    Module.stringToUTF8(".", ptr, 2);
+                    Module.HEAP32[data >> 2] = ptr;
+                    return true;
+                }
+                if (cmd === 15) { // GET_VARIABLE
+                    const key = Module.UTF8ToString(Module.HEAP32[data >> 2]);
+                    addLog("ENV: GET_VARIABLE: " + key, "log-env");
+                    Module.HEAP32[(data >> 2) + 1] = 0;
+                    return true;
+                }
+                return [10, 21, 27].includes(cmd);
+            }
+
+            function video_cb(data, width, height, pitch) {
+                if (!data) return;
+                const canvas = document.getElementById('canvas');
+                if (canvas.width !== width || canvas.height !== height) {canvas.width = width; canvas.height = height;}
+                const ctx = canvas.getContext('2d');
+                const imgData = ctx.createImageData(width, height);
+                const is32Bit = Module.pixelFormat === 1;
+                const dst32 = new Uint32Array(imgData.data.buffer);
+                const heap = is32Bit ? Module.HEAP32 : Module.HEAPU16;
+                const shift = is32Bit ? 2 : 1;
+
+                for (let y = 0; y < height; y++) {
+                    for (let x = 0; x < width; x++) {
+                        const srcIdx = (y * (pitch >> shift)) + x;
+                        const dstIdx = y * width + x;
+                        if (is32Bit) {
+                            const c = Module.HEAP32[(data >> 2) + srcIdx];
+                            dst32[dstIdx] = 0xFF000000 | (c & 0xFF) << 16 | (c & 0xFF00) | (c >> 16 & 0xFF);
+                        } else {
+                            const c = Module.HEAPU16[(data >> 1) + srcIdx];
+                            const r = ((c >> 11) & 0x1F) << 3, g = ((c >> 5) & 0x3F) << 2, b = (c & 0x1F) << 3;
+                            dst32[dstIdx] = 0xFF000000 | (b << 16) | (g << 8) | r;
+                        }
+                    }
+                }
+                ctx.putImageData(imgData, 0, 0);
+            }
+        </script>
+    </body>
+</html>

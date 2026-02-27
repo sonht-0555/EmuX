@@ -42,6 +42,20 @@ WEAK size_t strlcpy_retro__(char *dest, const char *src, size_t size) {
   return strlen(src);
 }
 
+WEAK size_t strlcat_retro__(char *dest, const char *src, size_t size) {
+  size_t dest_len = strlen(dest);
+  size_t src_len = strlen(src);
+  size_t i;
+
+  if (dest_len >= size) return size + src_len;
+
+  for (i = 0; i < size - dest_len - 1 && src[i] != '\0'; i++) {
+    dest[dest_len + i] = src[i];
+  }
+  dest[dest_len + i] = '\0';
+  return dest_len + src_len;
+}
+
 /* Libretro VFS Constants */
 #define RETRO_VFS_FILE_ACCESS_READ (1 << 0)
 #define RETRO_VFS_FILE_ACCESS_WRITE (1 << 1)
@@ -132,6 +146,29 @@ WEAK void path_remove_extension(char *path) {
   const char *slash = find_last_slash(path);
   if (dot && (!slash || dot > slash))
     *dot = '\0';
+}
+
+WEAK bool path_is_valid(const char *path) {
+  return (path && *path);
+}
+
+WEAK void fill_pathname_join(char *out, const char *dir, const char *path, size_t size) {
+  if (out != dir) strlcpy_retro__(out, dir, size);
+  
+  if (*out) {
+    char last = out[strlen(out) - 1];
+    if (last != '/' && last != '\\') strlcat_retro__(out, "/", size);
+  }
+  
+  strlcat_retro__(out, path, size);
+}
+
+WEAK void fill_pathname_resolve_relative(char *out, const char *dir, const char *path, size_t size) {
+  if (path_is_absolute(path)) {
+    strlcpy_retro__(out, path, size);
+  } else {
+    fill_pathname_join(out, dir, path, size);
+  }
 }
 
 WEAK const char *path_get_extension(const char *path) {
@@ -236,16 +273,81 @@ WEAK int filestream_error(void *stream) {
   return ferror((FILE *)stream);
 }
 
-WEAK void filestream_vfs_init(void) {
-  /* Dummy */
+WEAK void filestream_vfs_init(void) { }
+WEAK void dirent_vfs_init(void) { }
+WEAK void path_vfs_init(void) { }
+
+/* Memstream utilities for cores like Pokemon Mini */
+struct memstream {
+  uint8_t *buf;
+  size_t size;
+  size_t pos;
+  bool writable;
+};
+
+WEAK void *memstream_open(bool writable) {
+  struct memstream *m = (struct memstream *)calloc(1, sizeof(*m));
+  m->writable = writable;
+  return m;
 }
 
-WEAK void dirent_vfs_init(void) {
-  /* Dummy */
+WEAK void memstream_close(void *stream) {
+  free(stream);
 }
 
-WEAK void path_vfs_init(void) {
-  /* Dummy */
+WEAK void memstream_set_buffer(void *stream, uint8_t *buf, size_t size) {
+  struct memstream *m = (struct memstream *)stream;
+  if (!m) return;
+  m->buf = buf;
+  m->size = size;
+  m->pos = 0;
+}
+
+WEAK int64_t memstream_read(void *stream, void *data, int64_t len) {
+  struct memstream *m = (struct memstream *)stream;
+  if (!m || !m->buf || m->pos >= m->size) return 0;
+  if (m->pos + len > m->size) len = m->size - m->pos;
+  memcpy(data, m->buf + m->pos, (size_t)len);
+  m->pos += (size_t)len;
+  return len;
+}
+
+WEAK int64_t memstream_write(void *stream, const void *data, int64_t len) {
+  struct memstream *m = (struct memstream *)stream;
+  if (!m || !m->buf || !m->writable || m->pos >= m->size) return 0;
+  if (m->pos + len > m->size) len = m->size - m->pos;
+  memcpy(m->buf + m->pos, data, (size_t)len);
+  m->pos += (size_t)len;
+  return len;
+}
+
+WEAK int64_t memstream_seek(void *stream, int64_t offset, int whence) {
+  struct memstream *m = (struct memstream *)stream;
+  if (!m) return -1;
+  size_t new_pos = m->pos;
+  switch (whence) {
+    case SEEK_SET: new_pos = (size_t)offset; break;
+    case SEEK_CUR: new_pos += (size_t)offset; break;
+    case SEEK_END: new_pos = m->size + (size_t)offset; break;
+  }
+  if (new_pos > m->size) return -1;
+  m->pos = new_pos;
+  return (int64_t)m->pos;
+}
+
+WEAK int64_t memstream_tell(void *stream) {
+  return stream ? (int64_t)((struct memstream *)stream)->pos : -1;
+}
+
+WEAK uint64_t memstream_pos(void *stream) {
+  return stream ? (uint64_t)((struct memstream *)stream)->pos : 0;
+}
+
+WEAK uint8_t *memstream_get_ptr(void *stream, size_t *size) {
+  struct memstream *m = (struct memstream *)stream;
+  if (!m) return NULL;
+  if (size) *size = m->size;
+  return m->buf;
 }
 
 WEAK EMSCRIPTEN_KEEPALIVE int64_t filestream_seek(void *stream, int64_t offset,
