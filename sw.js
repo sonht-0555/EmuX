@@ -1,4 +1,4 @@
-let revision = 'EmuX_4.84';
+let revision = 'EmuX_4.89';
 var urlsToCache = [
     './',
     './index.html',
@@ -20,12 +20,16 @@ var urlsToCache = [
     'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/ps1.zip',
     'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/wswan.zip',
     'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/a26.zip',
+    'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/pokemini.zip',
+    'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/lynx.zip',
+    'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/vboy.zip',
     './src/utils/bios/neogeo.zip',
     './src/utils/bios/scph5501.bin',
     './src/utils/bios/bios7.bin',
     './src/utils/bios/bios9.bin',
     './src/utils/bios/firmware.bin',
     './src/utils/bios/syscard3.pce',
+    './src/utils/bios/lynxboot.img',
     './src/utils/zip.js',
     './src/utils/s3mini.js',
     './src/core/loader.js',

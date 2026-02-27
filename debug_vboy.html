@@ -1,3 +1,4 @@
+@ -0,0 +1,288 @@
 <!DOCTYPE html>
 <html lang="en">
     <head>
@@ -84,10 +85,7 @@
         <div class="controls">
             <label>1. Select Core to Test:</label><br>
             <select id="coreSelect">
-                <option value="pokemini.zip">Pokemon Mini (pokemini)</option>
-                <option value="handy.zip">Atari Lynx (handy)</option>
-                <option value="beetle_vb.zip">Virtual Boy (beetle_vb)</option>
-                <option value="dosbox_pure.zip">DOS (dosbox_pure)</option>
+                <option value="vboy.zip">Virtual Boy (beetle_vb)</option>
             </select><br><br>
 
             <label>2. Select ROM File:</label><br>
@@ -256,32 +254,54 @@
                 return [10, 21, 27].includes(cmd);
             }
 
+            let autoX = 0, autoY = 0, calibrated = false;
             function video_cb(data, width, height, pitch) {
                 if (!data) return;
-                const canvas = document.getElementById('canvas');
-                if (canvas.width !== width || canvas.height !== height) {canvas.width = width; canvas.height = height;}
-                const ctx = canvas.getContext('2d');
-                const imgData = ctx.createImageData(width, height);
                 const is32Bit = Module.pixelFormat === 1;
-                const dst32 = new Uint32Array(imgData.data.buffer);
                 const heap = is32Bit ? Module.HEAP32 : Module.HEAPU16;
                 const shift = is32Bit ? 2 : 1;
+                const totalWidth = pitch >> shift;
+                const skip = 2;
 
-                for (let y = 0; y < height; y++) {
-                    for (let x = 0; x < width; x++) {
-                        const srcIdx = (y * (pitch >> shift)) + x;
-                        const dstIdx = y * width + x;
-                        if (is32Bit) {
-                            const c = Module.HEAP32[(data >> 2) + srcIdx];
-                            dst32[dstIdx] = 0xFF000000 | (c & 0xFF) << 16 | (c & 0xFF00) | (c >> 16 & 0xFF);
-                        } else {
-                            const c = Module.HEAPU16[(data >> 1) + srcIdx];
-                            const r = ((c >> 11) & 0x1F) << 3, g = ((c >> 5) & 0x3F) << 2, b = (c & 0x1F) << 3;
-                            dst32[dstIdx] = 0xFF000000 | (b << 16) | (g << 8) | r;
+                if (!calibrated) {
+                    let minX = 9999, maxX = 0, minY = 9999, maxY = 0;
+                    for (let y = 0; y < height; y++) {
+                        const row = y * totalWidth;
+                        for (let x = 0; x < Math.min(totalWidth, 1024); x++) {
+                            if (heap[(data >> shift) + row + x] !== 0) {
+                                if (x < minX) minX = x; if (x > maxX) maxX = x;
+                                if (y < minY) minY = y; if (y > maxY) maxY = y;
+                            }
                         }
                     }
+                    if (minX !== 9999) {
+                        const contentW = (maxX - minX) / skip;
+                        const contentH = (maxY - minY);
+                        autoX = minX - Math.floor((384 - contentW) / 2) * skip;
+                        autoY = minY - Math.floor((224 - contentH) / 2);
+                        calibrated = true;
+                        addLog(`Perfect Centering Active`);
+                    }
                 }
-                ctx.putImageData(imgData, 0, 0);
+
+                const canvas = document.getElementById('canvas');
+                if (canvas.width !== 384 || canvas.height !== 224) {canvas.width = 384; canvas.height = 224;}
+                const ctx = canvas.getContext('2d'), img = ctx.createImageData(384, 224), d32 = new Uint32Array(img.data.buffer);
+
+                for (let y = 0; y < 224; y++) {
+                    const sy = y + autoY;
+                    if (sy < 0 || sy >= height) continue;
+                    const rB = (data >> shift) + sy * totalWidth;
+                    for (let x = 0; x < 384; x++) {
+                        const sx = autoX + x * skip;
+                        if (sx < 0 || sx >= totalWidth) continue;
+                        const c = heap[rB + sx];
+                        // Standard 0RGB1555
+                        const r = ((c >> 10) & 0x1F) << 3, g = ((c >> 5) & 0x1F) << 3, b = (c & 0x1F) << 3;
+                        d32[y * 384 + x] = 0xFF000000 | (b << 16) | (g << 8) | r;
+                    }
+                }
+                ctx.putImageData(img, 0, 0);
             }
         </script>
     </body>

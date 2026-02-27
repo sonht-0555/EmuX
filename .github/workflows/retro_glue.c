@@ -286,16 +286,19 @@ struct memstream {
 };
 
 WEAK void *memstream_open(bool writable) {
+  printf("[C-Debug] memstream_open writable:%d\n", writable);
   struct memstream *m = (struct memstream *)calloc(1, sizeof(*m));
   m->writable = writable;
   return m;
 }
 
 WEAK void memstream_close(void *stream) {
+  printf("[C-Debug] memstream_close\n");
   free(stream);
 }
 
 WEAK void memstream_set_buffer(void *stream, uint8_t *buf, size_t size) {
+  printf("[C-Debug] memstream_set_buffer ptr:%p size:%zu\n", buf, size);
   struct memstream *m = (struct memstream *)stream;
   if (!m) return;
   m->buf = buf;
@@ -313,6 +316,7 @@ WEAK int64_t memstream_read(void *stream, void *data, int64_t len) {
 }
 
 WEAK int64_t memstream_write(void *stream, const void *data, int64_t len) {
+  printf("[C-Debug] memstream_write len:%lld pos:%zu\n", (long long)len, stream ? ((struct memstream *)stream)->pos : 0);
   struct memstream *m = (struct memstream *)stream;
   if (!m || !m->buf || !m->writable || m->pos >= m->size) return 0;
   if (m->pos + len > m->size) len = m->size - m->pos;
@@ -322,6 +326,7 @@ WEAK int64_t memstream_write(void *stream, const void *data, int64_t len) {
 }
 
 WEAK int64_t memstream_seek(void *stream, int64_t offset, int whence) {
+  printf("[C-Debug] memstream_seek offset:%lld whence:%d\n", (long long)offset, whence);
   struct memstream *m = (struct memstream *)stream;
   if (!m) return -1;
   size_t new_pos = m->pos;
@@ -352,6 +357,7 @@ WEAK uint8_t *memstream_get_ptr(void *stream, size_t *size) {
 
 WEAK EMSCRIPTEN_KEEPALIVE int64_t filestream_seek(void *stream, int64_t offset,
                                               int seek_position) {
+  printf("[C-Debug] filestream_seek offset:%lld pos:%d\n", (long long)offset, seek_position);
   if (fseeko((FILE *)stream, offset, seek_position) == 0)
     return ftello((FILE *)stream);
   return -1;

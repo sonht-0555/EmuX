@@ -11,7 +11,7 @@ function findCore(name, data) {
         const extension = getExtension(fileName), consoleCore = CORE_CONFIG.find(core => core.ext !== '.zip' && core.ext.split(',').includes(extension));
         if (consoleCore) {
             if (extension === '.bin' && filenames.length > 5) continue;
-            if (['.nes', '.fds', '.unif', '.gba', '.gbc', '.gb', '.sgb', '.md', '.gen', '.smd', '.sms', '.gg', '.a26', '.ws', '.wsc', '.smc', '.sfc', '.fig', '.swc', '.ngp', '.ngc', '.nds', '.pce', '.sgx', '.chd', '.cue'].includes(extension)) {
+            if (['.nes', '.fds', '.unif', '.gba', '.gbc', '.gb', '.sgb', '.md', '.gen', '.smd', '.sms', '.gg', '.a26', '.ws', '.wsc', '.smc', '.sfc', '.fig', '.swc', '.ngp', '.ngc', '.nds', '.pce', '.sgx', '.chd', '.cue', '.min', '.lnx', '.vb'].includes(extension)) {
                 const unzipped = fflate.unzipSync(data, {filter: (file) => file.name === fileName});
                 return {config: consoleCore, data: unzipped[fileName], name: fileName};
             }
