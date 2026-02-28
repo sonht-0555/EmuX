@@ -14,6 +14,10 @@ const getPointer = (string, pointer) => {
 // ===== env_cb =====
 function env_cb(command, data) {
     const data32 = Number(data) >> 2;
+    if (command > 10) console.log("ENV_CB CMD:", command);
+    if (command === 60) { // RETRO_ENVIRONMENT_GET_VFS_INTERFACE
+        return false; // For now, let's see if it tries to use VFS
+    }
     if (command === 1) Module.pixelFormat = Module.HEAP32[data32];
     if (command === 15) {
         const key = Module.UTF8ToString(Module.HEAP32[data32]);
@@ -80,7 +84,7 @@ async function initCore(romFile) {
         await showNotification("", "##", "-", "", true);
         window.Module = {
             isArcade, isNDS, canvas: document.getElementById("canvas"),
-            print: () => { }, printErr: () => { },
+            print: (text) => console.log(text), printErr: (text) => console.error(text),
             locateFile: path => path.endsWith('.wasm') ? (window.wasmUrl || path) : path,
             async onRuntimeInitialized() {
                 // Step 5: Core engine setup
