@@ -79,7 +79,9 @@ jobs:
         
         cd $GITHUB_WORKSPACE/libretro-super/libretro-${{ matrix.core.fetch }}
         emcc -c $GITHUB_WORKSPACE/emux/.github/workflows/retro_utils.c -o $GITHUB_WORKSPACE/retro_utils.o $OPT_FLAGS
-        emcc -c $GITHUB_WORKSPACE/emux/.github/workflows/retro_glue.c -o $GITHUB_WORKSPACE/retro_glue.o $OPT_FLAGS -s USE_ZLIB=1
+        GLUE_NAME="retro_glue.c"
+        if [ "${{ matrix.core.id }}" == "pokemini" ]; then GLUE_NAME="retro_pokemini.c"; fi
+        emcc -c $GITHUB_WORKSPACE/emux/.github/workflows/$GLUE_NAME -o $GITHUB_WORKSPACE/retro_glue.o $OPT_FLAGS -s USE_ZLIB=1
         
         EXTRA_GLUE=""
         if [[ "${{ matrix.core.id }}" == "pce" || "${{ matrix.core.id }}" == "wswan" || "${{ matrix.core.method }}" == "arcade" || "${{ matrix.core.id }}" == "pokemini" || "${{ matrix.core.id }}" == "lynx" || "${{ matrix.core.id }}" == "vboy" ]]; then

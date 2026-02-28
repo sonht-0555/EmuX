@@ -36,15 +36,15 @@ const CORE_CONFIG = [
     {ext: '.gba,.gb,.gbc,.sgb', script: CORE_BASE + 'gba.zip', btns: {'btn-1': ['A', 8], 'btn-3': ['B', 0], 'btn-l': [' bl.', 10], 'btn-r': [' br.', 11], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}},
     {ext: '.pce,.sgx,.chd,.cue', script: CORE_BASE + 'pce.zip', btns: {'btn-1': [' I', 0], 'btn-3': [' II', 8], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/syscard3.pce']},
     {ext: '.md,.gen,.smd,.sms,.gg', script: CORE_BASE + 'genesis.zip', btns: {'btn-1': ['A', 1], 'btn-3': ['B', 0], 'btn-4': ['C', 8], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}},
-    {ext: '.a26', script: CORE_BASE + 'a26.zip', btns: {'btn-1': [' F', 0], 'btn-3': [' S', ''], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}},
-    {ext: '.ws,.wsc', script: CORE_BASE + 'wswan.zip', btns: {'btn-1': [' A', 0], 'btn-3': [' B', 8], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', ''], 'btn-start': [' st.', 3]}},
+    {ext: '.a26', script: CORE_BASE + 'a26.zip', btns: {'btn-1': ['F', 0], 'btn-3': ['S', ''], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}},
+    {ext: '.ws,.wsc', script: CORE_BASE + 'wswan.zip', btns: {'btn-1': ['A', 0], 'btn-3': ['B', 8], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', ''], 'btn-start': [' st.', 3]}},
     {ext: '.smc,.sfc,.fig,.swc', script: CORE_BASE + 'snes2010.zip', btns: {'btn-1': ['A', 8], 'btn-2': ['X', 9], 'btn-3': ['B', 0], 'btn-4': ['Y', 1], 'btn-l': [' bl.', 10], 'btn-r': [' br.', 11], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}},
     {ext: '.zip,.7z', script: CORE_BASE + 'arcade.zip', btns: {'btn-1': ['A', 0], 'btn-3': ['B', 8], 'btn-2': ['C', 1], 'btn-4': ['D', 9], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' cn.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/neogeo.zip']},
     {ext: '.nds', script: CORE_BASE + 'nds2021.zip', btns: {'btn-1': ['A', 8], 'btn-2': ['X', 9], 'btn-3': ['B', 0], 'btn-4': ['Y', 1], 'btn-l': [' bl.', 10], 'btn-r': [' br.', 11], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/bios7.bin', './src/utils/bios/bios9.bin', './src/utils/bios/firmware.bin']},
     {ext: '.bin,.iso,.img,.pbp,.chd', script: CORE_BASE + 'ps1.zip', btns: {'btn-1': ['A', 8], 'btn-2': ['X', 9], 'btn-3': ['B', 0], 'btn-4': ['Y', 1], 'btn-l': [' bl.', 10], 'btn-r': [' br.', 11], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/scph5501.bin']},
-    {ext: '.min', script: CORE_BASE + 'pokemini.zip', btns: {'btn-1': [' A', 0], 'btn-3': [' B', 8], 'btn-l': [' C', 1], 'btn-r': [' br.', ''], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}},
-    {ext: '.lnx', script: CORE_BASE + 'lynx.zip', btns: {'btn-1': [' A', 0], 'btn-3': [' B', 8], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/lynxboot.img']},
-    {ext: '.vb', script: CORE_BASE + 'vboy.zip', btns: {'btn-1': ['A', 0], 'btn-3': ['B', 8], 'btn-l': [' L', 10], 'btn-r': [' R', 11], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}},
+    {ext: '.min', script: CORE_BASE + 'pokemini.zip', btns: {'btn-1': ['A', 8], 'btn-3': ['B', 0], 'btn-l': [' bc.', 1], 'btn-r': [' be.', 2], 'btn-select': [' sc.', ''], 'btn-start': [' st.', 3]}},
+    {ext: '.lnx', script: CORE_BASE + 'lynx.zip', btns: {'btn-1': ['A', 0], 'btn-3': ['B', 8], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/lynxboot.img']},
+    {ext: '.vb', script: CORE_BASE + 'vboy.zip', btns: {'btn-1': ['A', 0], 'btn-3': ['B', 8], 'btn-l': [' bl.', 10], 'btn-r': [' br.', 11], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}},
 ];
 var isRunning = false;
 // ===== initCore ====
