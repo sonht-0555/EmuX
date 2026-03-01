@@ -34,8 +34,11 @@ jobs:
       with:
         path: emux
 
-    - name: Install ccache
-      run: sudo apt-get update && sudo apt-get install -y ccache
+    - name: Set up CCache
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        key: ccache-v5-${{ matrix.core.id }}
+        max-size: "1G"
 
     - name: Cache EMSDK
       id: cache-emsdk
@@ -48,14 +51,6 @@ jobs:
       with:
         version: 3.1.46
         actions-cache-folder: 'emscripten-sdk'
-
-    - name: Cache CCache files
-      uses: actions/cache@v4
-      with:
-        path: ~/.ccache
-        key: ccache-${{ matrix.core.id }}-${{ github.run_id }}
-        restore-keys: |
-          ccache-${{ matrix.core.id }}-
 
     - name: Cache Emscripten Ports
       uses: actions/cache@v4
@@ -70,7 +65,6 @@ jobs:
         key: lib-v4-${{ matrix.core.fetch }}-${{ hashFiles('emux/sw.js') }}
         restore-keys: |
           lib-v4-${{ matrix.core.fetch }}-
-
     - name: Fetch
       run: |
         if [ ! -d "libretro-super" ]; then
@@ -84,27 +78,24 @@ jobs:
             ./libretro-fetch.sh ${{ matrix.core.fetch }}
           fi
         fi
-
     - name: Pre-build Ports
       run: embuilder build zlib
 
     - name: Build Core
       run: |
-        export CCACHE_DIR=$HOME/.ccache
-        export CCACHE_MAXSIZE=1G
+        # Extreme CCache Config
+        export CCACHE_BASEDIR=$GITHUB_WORKSPACE
+        export CCACHE_NOHASHDIR=1
         export CCACHE_COMPRESS=1
-        ccache -z
-
+        export CCACHE_COMPRESSLEVEL=1
+        
         export CC="ccache emcc"
         export CXX="ccache em++"
+        export EM_CACHE=$HOME/.emscripten_cache
+        
+        # Full LTO and Parallel builds for ALL cores
         export OPT_FLAGS="-Os -ffast-math -fno-tree-vectorize -ffunction-sections -fdata-sections -flto -DNDEBUG"
         export JOBS="$(nproc)"
-        
-        if [ "${{ matrix.core.id }}" == "neogeo" ]; then
-          # Full Arcade Build needs careful resources
-          export OPT_FLAGS="-Os -ffast-math -fno-tree-vectorize -ffunction-sections -fdata-sections -DNDEBUG"
-          export JOBS="2"
-        fi
         
         export CFLAGS="$OPT_FLAGS"
         export CXXFLAGS="$OPT_FLAGS"
@@ -119,8 +110,7 @@ jobs:
         fi
         
         emmake make ${{ matrix.core.make }} platform=emscripten -j$JOBS || true
-        ccache -s
-
+        # Final glue and link with LTO
         cd $GITHUB_WORKSPACE/libretro-super/libretro-${{ matrix.core.fetch }}
         emcc -c $GITHUB_WORKSPACE/emux/.github/workflows/retro_utils.c -o $GITHUB_WORKSPACE/retro_utils.o $OPT_FLAGS
         GLUE="retro_glue.c"
@@ -131,7 +121,6 @@ jobs:
         if [[ "${{ matrix.core.id }}" == "pce" || "${{ matrix.core.id }}" == "wswan" || "${{ matrix.core.method }}" == "arcade" || "${{ matrix.core.id }}" == "pokemini" || "${{ matrix.core.id }}" == "lynx" ]]; then
           EXTRA="$GITHUB_WORKSPACE/retro_glue.o"
         fi
-
         emcc $(find . -name "*.o") $EXTRA $GITHUB_WORKSPACE/retro_utils.o $OPT_FLAGS \
           -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web -s MALLOC=emmalloc \
           -s ALLOW_MEMORY_GROWTH=1 -s WASM_BIGINT=1 --no-heap-copy -s ALLOW_TABLE_GROWTH=1 \
@@ -140,7 +129,6 @@ jobs:
           -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free","_retro_serialize_size","_retro_serialize","_retro_unserialize","_emux_is_dirty","_emux_render16","_emux_render32","_emux_audio_reset","_emux_audio_process","_emux_audio_get_buffer_l","_emux_audio_get_buffer_r","_emux_audio_set_core_rate"]' \
           -s ERROR_ON_UNDEFINED_SYMBOLS=1 -s ASSERTIONS=0 \
           -o ${{ matrix.core.id }}.js
-
         rm -f *.zip
         if [ "${{ matrix.core.method }}" == "arcade" ]; then
           mv ${{ matrix.core.id }}.js arcade.js && mv ${{ matrix.core.id }}.wasm arcade.wasm
@@ -148,7 +136,6 @@ jobs:
         else
           zip -j ${{ matrix.core.id }}.zip ${{ matrix.core.id }}.js ${{ matrix.core.id }}.wasm
         fi
-
     - uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.core.id }}-core

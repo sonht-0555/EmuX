@@ -1,4 +1,4 @@
-let revision = 'EmuX_4.99';
+let revision = 'EmuX_5.00';
 var urlsToCache = [
     './',
     './index.html',
@@ -22,7 +22,6 @@ var urlsToCache = [
     'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/a26.zip',
     'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/pokemini.zip',
     'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/lynx.zip',
-    'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/vboy.zip',
     './src/utils/bios/neogeo.zip',
     './src/utils/bios/scph5501.bin',
     './src/utils/bios/bios7.bin',
