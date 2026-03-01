@@ -1,13 +1,14 @@
 #define _FILE_OFFSET_BITS 64
-#ifdef __EMSCRIPTEN__
-#include <emscripten.h>
-#endif
-#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 #include <zlib.h>
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
 
 #ifndef EMSCRIPTEN_KEEPALIVE
 #define EMSCRIPTEN_KEEPALIVE
@@ -15,37 +16,96 @@
 
 #define WEAK __attribute__((weak))
 
-/* Static storage for legacy memstream (PokeMini 2-arg style) */
-static uint8_t  *g_memstream_buf  = NULL;
-static uint64_t  g_memstream_size = 0;
+static uint8_t  *g_buf  = NULL;
+static uint32_t  g_size = 0;
 
 struct memstream {
   uint8_t  *buf;
-  uint64_t  size;
-  uint64_t  pos;
-  bool      writable;
+  uint32_t  size;
+  uint32_t  pos;
+  int       writing;
 };
 
-/* PokeMini calls memstream_set_buffer(buf, size) — 2 args, global buffer */
 WEAK void memstream_set_buffer(uint8_t *buf, uint64_t size) {
-  printf("MEMSTREAM_SET_BUFFER: buf=%p, size=%llu\n", (void*)buf, (unsigned long long)size);
-  g_memstream_buf  = buf;
-  g_memstream_size = size;
+  printf("C: memstream_set_buffer(buf=%p, size=%llu)\n", (void*)buf, (unsigned long long)size);
+  g_buf  = buf;
+  g_size = (uint32_t)size;
 }
 
-WEAK void *memstream_open(int writable) {
+WEAK void *memstream_open(int writing) {
   struct memstream *m = (struct memstream *)calloc(1, sizeof(*m));
   if (!m) return NULL;
-  m->buf      = g_memstream_buf;
-  m->size     = g_memstream_size;
-  m->pos      = 0;
-  m->writable = (bool)writable;
-  printf("MEMSTREAM_OPEN: stream=%p, writable=%d, buf=%p, size=%llu\n", (void*)m, writable, (void*)m->buf, (unsigned long long)m->size);
+  m->buf     = g_buf;
+  m->size    = g_size;
+  m->pos     = 0;
+  m->writing = writing;
+  printf("C: memstream_open(stream=%p, write=%d)\n", (void*)m, writing);
   return m;
 }
 
 WEAK void memstream_close(void *stream) {
+  printf("C: memstream_close(stream=%p)\n", stream);
   if (stream) free(stream);
+}
+
+WEAK uint64_t memstream_read(void *stream, void *data, uint64_t len) {
+  struct memstream *m = (struct memstream *)stream;
+  if (!m || !m->buf) return 0;
+  uint32_t to_read = (uint32_t)len;
+  if (m->pos + to_read > m->size) to_read = m->size - m->pos;
+  memcpy(data, m->buf + m->pos, to_read);
+  m->pos += to_read;
+  // Luôn log để xem nó đọc cái gì
+  printf("C: memstream_read(pos=%u, len=%u)\n", m->pos - to_read, to_read);
+  return (uint64_t)to_read;
+}
+
+WEAK uint64_t memstream_write(void *stream, const void *data, uint64_t len) {
+  struct memstream *m = (struct memstream *)stream;
+  if (!m || !m->buf || !m->writing) return 0;
+  uint32_t to_write = (uint32_t)len;
+  if (m->pos + to_write > m->size) to_write = m->size - m->pos;
+  memcpy(m->buf + m->pos, data, to_write);
+  m->pos += to_write;
+  // Luôn log để xem nó có thực sự ghi hình ảnh (VRAM) không
+  printf("C: memstream_write(pos=%u, len=%u)\n", m->pos - to_write, to_write);
+  return (uint64_t)to_write;
+}
+
+WEAK int memstream_putc(void *stream, int c) {
+  struct memstream *m = (struct memstream *)stream;
+  if (!m || !m->buf || !m->writing || m->pos >= m->size) return EOF;
+  m->buf[m->pos++] = (uint8_t)c;
+  return c;
+}
+
+WEAK int memstream_getc(void *stream) {
+  struct memstream *m = (struct memstream *)stream;
+  if (!m || !m->buf || m->pos >= m->size) return EOF;
+  return m->buf[m->pos++];
+}
+
+WEAK int64_t memstream_seek(void *stream, int64_t offset, int whence) {
+  struct memstream *m = (struct memstream *)stream;
+  if (!m) return -1;
+  uint32_t new_pos = m->pos;
+  if (whence == SEEK_SET)      new_pos = (uint32_t)offset;
+  else if (whence == SEEK_CUR) new_pos += (uint32_t)offset;
+  else if (whence == SEEK_END) new_pos = m->size + (uint32_t)offset;
+  if (new_pos > m->size) return -1;
+  m->pos = new_pos;
+  printf("C: memstream_seek(pos=%u) -> OK(0)\n", m->pos);
+  return 0; // Trả về 0 để báo thành công đúng chuẩn Libretro
+}
+
+WEAK int64_t memstream_tell(void *stream) {
+  struct memstream *m = (struct memstream *)stream;
+  return m ? (int64_t)m->pos : -1;
+}
+
+WEAK uint64_t memstream_pos(void *stream) {
+  struct memstream *m = (struct memstream *)stream;
+  return m ? (uint64_t)m->pos : 0;
 }
 
 WEAK void memstream_rewind(void *stream) {
@@ -53,70 +113,26 @@ WEAK void memstream_rewind(void *stream) {
   if (m) m->pos = 0;
 }
 
-WEAK uint64_t memstream_read(void *stream, void *data, uint64_t len) {
-  struct memstream *m = (struct memstream *)stream;
-  if (!m || !m->buf) return 0;
-  if (m->pos >= m->size) {
-    printf("MEMSTREAM_READ: EOS (pos=%llu, size=%llu)\n", (unsigned long long)m->pos, (unsigned long long)m->size);
-    return 0;
-  }
-  if (m->pos + len > m->size) len = m->size - m->pos;
-  printf("MEMSTREAM_READ: stream=%p, pos=%llu, len=%llu\n", (void*)m, (unsigned long long)m->pos, (unsigned long long)len);
-  memcpy(data, m->buf + m->pos, (size_t)len);
-  m->pos += len;
-  return len;
-}
-
-WEAK uint64_t memstream_write(void *stream, const void *data, uint64_t len) {
-  struct memstream *m = (struct memstream *)stream;
-  if (!m || !m->buf || !m->writable) return 0;
-  if (m->pos >= m->size) return 0;
-  if (m->pos + len > m->size) len = m->size - m->pos;
-  printf("MEMSTREAM_WRITE: stream=%p, pos=%llu, len=%llu\n", (void*)m, (unsigned long long)m->pos, (unsigned long long)len);
-  memcpy(m->buf + m->pos, data, (size_t)len);
-  m->pos += len;
-  return len;
-}
-
-WEAK int64_t memstream_seek(void *stream, int64_t offset, int whence) {
-  struct memstream *m = (struct memstream *)stream;
-  if (!m) return -1;
-  uint64_t new_pos = m->pos;
-  if (whence == SEEK_SET) new_pos = (uint64_t)offset;
-  else if (whence == SEEK_CUR) new_pos += offset;
-  else if (whence == SEEK_END) new_pos = m->size + offset;
-  if (new_pos > m->size) return -1;
-  m->pos = new_pos;
-  return (int64_t)m->pos;
-}
-
-WEAK int64_t memstream_tell(void *stream) {
-  return stream ? (int64_t)((struct memstream *)stream)->pos : -1;
-}
-
-WEAK uint64_t memstream_pos(void *stream) {
-  return stream ? ((struct memstream *)stream)->pos : 0;
-}
-
+/* 
+   Đổi về chuẩn 2 tham số: Có thể PokeMini check size bằng tham số thứ 2.
+   Nếu hàm này trả về NULL hoặc sai tham số, PokeMini sẽ đình chỉ Save.
+*/
 WEAK uint8_t *memstream_get_ptr(void *stream, size_t *size) {
   struct memstream *m = (struct memstream *)stream;
   if (!m) return NULL;
   if (size) *size = (size_t)m->size;
+  printf("C: memstream_get_ptr(stream=%p, size_out=%zu)\n", (void*)m, m->size);
   return m->buf;
 }
 
-/* --- Base Fallbacks for PokeMini Linkage --- */
+/* --- Fallbacks --- */
 WEAK bool path_is_valid(const char *path) { return (path && *path); }
 WEAK void filestream_vfs_init(void) { }
 WEAK void *filestream_open(const char *path, unsigned mode, unsigned hints) {
   return (void *)fopen(path, (mode & 2) ? "wb" : "rb");
 }
-WEAK int64_t filestream_read(void *stream, void *data, int64_t len) {
-  return (int64_t)fread(data, 1, (size_t)len, (FILE *)stream);
-}
-WEAK int64_t filestream_close(void *stream) {
-  return (int64_t)fclose((FILE *)stream);
-}
+WEAK int64_t filestream_read(void *stream, void *data, int64_t len) { return (int64_t)fread(data, 1, (size_t)len, (FILE *)stream); }
+WEAK int64_t filestream_close(void *stream) { return (int64_t)fclose((FILE *)stream); }
 WEAK uint32_t encoding_crc32(uint32_t crc, const uint8_t *data, size_t len) {
   return (uint32_t)crc32((unsigned long)crc, (const unsigned char *)data, (unsigned int)len);
 }

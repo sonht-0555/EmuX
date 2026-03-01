@@ -20,7 +20,7 @@ var urlsToCache = [
     'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/ps1.zip',
     'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/wswan.zip',
     'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/a26.zip',
-    'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/pokemini.zip',
+    'https://raw.githubusercontent.com/sonht-0555/EmuX/builds-test/pokemini.zip',
     'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/lynx.zip',
     'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/vboy.zip',
     './src/utils/bios/neogeo.zip',
