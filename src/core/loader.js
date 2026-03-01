@@ -128,7 +128,7 @@ async function initCore(romFile) {
                 window.startLoop = () => {if (window.mainRafId) cancelAnimationFrame(window.mainRafId); mainLoop();};
                 window.stopLoop = () => {isRunning = false;};
                 startLoop();
-                if (!romFile.name.toLowerCase().endsWith('.min')) await loadState();
+                await loadState();
                 await timer(true);
                 if (window.wasmUrl && window.wasmUrl.startsWith('blob:')) URL.revokeObjectURL(window.wasmUrl);
                 resolve();

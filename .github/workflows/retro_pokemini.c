@@ -28,6 +28,7 @@ struct memstream {
 
 /* PokeMini calls memstream_set_buffer(buf, size) — 2 args, global buffer */
 WEAK void memstream_set_buffer(uint8_t *buf, uint64_t size) {
+  printf("MEMSTREAM_SET_BUFFER: buf=%p, size=%llu\n", (void*)buf, (unsigned long long)size);
   g_memstream_buf  = buf;
   g_memstream_size = size;
 }
@@ -39,6 +40,7 @@ WEAK void *memstream_open(int writable) {
   m->size     = g_memstream_size;
   m->pos      = 0;
   m->writable = (bool)writable;
+  printf("MEMSTREAM_OPEN: stream=%p, writable=%d, buf=%p, size=%llu\n", (void*)m, writable, (void*)m->buf, (unsigned long long)m->size);
   return m;
 }
 
@@ -53,8 +55,13 @@ WEAK void memstream_rewind(void *stream) {
 
 WEAK uint64_t memstream_read(void *stream, void *data, uint64_t len) {
   struct memstream *m = (struct memstream *)stream;
-  if (!m || !m->buf || m->pos >= m->size) return 0;
+  if (!m || !m->buf) return 0;
+  if (m->pos >= m->size) {
+    printf("MEMSTREAM_READ: EOS (pos=%llu, size=%llu)\n", (unsigned long long)m->pos, (unsigned long long)m->size);
+    return 0;
+  }
   if (m->pos + len > m->size) len = m->size - m->pos;
+  printf("MEMSTREAM_READ: stream=%p, pos=%llu, len=%llu\n", (void*)m, (unsigned long long)m->pos, (unsigned long long)len);
   memcpy(data, m->buf + m->pos, (size_t)len);
   m->pos += len;
   return len;
@@ -62,8 +69,10 @@ WEAK uint64_t memstream_read(void *stream, void *data, uint64_t len) {
 
 WEAK uint64_t memstream_write(void *stream, const void *data, uint64_t len) {
   struct memstream *m = (struct memstream *)stream;
-  if (!m || !m->buf || !m->writable || m->pos >= m->size) return 0;
+  if (!m || !m->buf || !m->writable) return 0;
+  if (m->pos >= m->size) return 0;
   if (m->pos + len > m->size) len = m->size - m->pos;
+  printf("MEMSTREAM_WRITE: stream=%p, pos=%llu, len=%llu\n", (void*)m, (unsigned long long)m->pos, (unsigned long long)len);
   memcpy(m->buf + m->pos, data, (size_t)len);
   m->pos += len;
   return len;

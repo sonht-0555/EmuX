@@ -1,0 +1,90 @@
+name: Build Test (PokeMini)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: build-pokemini
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        path: emux
+
+    - uses: mymindstorm/setup-emsdk@v14
+      with:
+        version: 3.1.46
+
+    - uses: actions/cache@v3
+      with:
+        path: libretro-super
+        key: libretro-super-pokemini
+
+    - name: Fetch
+      run: |
+        if [ ! -d "libretro-super" ]; then
+          git clone --depth 1 https://github.com/libretro/libretro-super.git
+        fi
+        cd libretro-super && ./libretro-fetch.sh pokemini
+
+    - name: Pre-build Emscripten Ports
+      run: |
+        for i in {1..5}; do embuilder build zlib && break || (echo "Retry $i..." && sleep 5); done
+
+    - name: Build
+      run: |
+        export OPT_FLAGS="-Os -ffast-math -fno-tree-vectorize -ffunction-sections -fdata-sections -flto -DNDEBUG"
+        export CFLAGS="$OPT_FLAGS"
+        export CXXFLAGS="$OPT_FLAGS"
+        export LDFLAGS="$OPT_FLAGS"
+
+        cd libretro-super/libretro-pokemini
+
+        emmake make platform=emscripten -j$(nproc) || true
+
+        cd $GITHUB_WORKSPACE/libretro-super/libretro-pokemini
+        emcc -c $GITHUB_WORKSPACE/emux/.github/workflows/retro_utils.c -o $GITHUB_WORKSPACE/retro_utils.o $OPT_FLAGS
+        emcc -c $GITHUB_WORKSPACE/emux/.github/workflows/retro_pokemini.c -o $GITHUB_WORKSPACE/retro_glue.o $OPT_FLAGS -s USE_ZLIB=1
+
+        ALL_OBJS=$(find . -name "*.o")
+
+        emcc $ALL_OBJS $GITHUB_WORKSPACE/retro_glue.o $GITHUB_WORKSPACE/retro_utils.o $OPT_FLAGS \
+          -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web -s MALLOC=emmalloc \
+          -s ALLOW_MEMORY_GROWTH=1 -s WASM_BIGINT=1 --no-heap-copy -s ALLOW_TABLE_GROWTH=1 \
+          -s INITIAL_MEMORY=128mb -s STACK_SIZE=2mb -s FORCE_FILESYSTEM=1 \
+          -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap","getValue","setValue"]' \
+          -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free","_retro_serialize_size","_retro_serialize","_retro_unserialize","_emux_is_dirty","_emux_render16","_emux_render32","_emux_audio_reset","_emux_audio_process","_emux_audio_get_buffer_l","_emux_audio_get_buffer_r","_emux_audio_set_core_rate"]' \
+          -s ERROR_ON_UNDEFINED_SYMBOLS=1 -s ASSERTIONS=0 \
+          -o pokemini.js
+
+        zip -j pokemini.zip pokemini.js pokemini.wasm
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: pokemini-test-core
+        path: libretro-super/libretro-pokemini/pokemini.zip
+
+  deploy-test:
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Download pokemini core
+        uses: actions/download-artifact@v4
+        with:
+          name: pokemini-test-core
+          path: cores
+
+      - name: Deploy to builds-test branch
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: builds-test
+          folder: cores
+          token: ${{ secrets.GITHUB_TOKEN }}
+          clean: true

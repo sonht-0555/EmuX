@@ -49,6 +49,7 @@ async function loadState(slot = 1) {
     if (stateData) {
         const statePointer = Module._malloc(stateData.length);
         Module.HEAPU8.set(stateData, statePointer);
+        console.log("JS: Calling _retro_unserialize, size =", stateData.length, "pointer =", statePointer);
         Module._retro_unserialize(statePointer, stateData.length);
         Module._free(statePointer);
         await message(`[ss${slot}]_Loaded!`, 1000);
@@ -65,7 +66,7 @@ async function timer(isStart) {
             const renderPct = (frameCount > 0) ? ((frameCount - skippedFrames) * 100 / frameCount) | 0 : 0;
             time1Element.textContent = `W${renderPct.toString().padStart(2, '0')}_${hours ? hours + '.' : ''}${minutes.toString().padStart(2, '0')}.${(seconds % 60).toString().padStart(2, '0')}`;
             window._runCount = 0; frameCount = skippedFrames = 0;
-            if (++count1 === 60) {if (!romFile.name.toLowerCase().endsWith('.min')) saveState(); count1 = 0;}
+            if (++count1 === 60) {saveState(); count1 = 0;}
         }, 1000);
     } else if (!isStart && timerId) {
         clearInterval(timerId); timerId = null;
