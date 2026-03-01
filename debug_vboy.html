@@ -1,304 +1,155 @@
-@ -0,0 +1,288 @@
 <!DOCTYPE html>
 <html lang="en">
     <head>
         <meta charset="UTF-8">
-        <title>New Cores Debugger</title>
+        <title>EmuX VBoy Debugger - Minimal</title>
         <script src="https://unpkg.com/fflate"></script>
         <style>
             body {
-                background: #1a1a1a;
-                color: #eee;
+                background: #111;
+                color: #888;
                 font-family: monospace;
-                padding: 20px;
+                text-align: center;
             }
 
             #canvas {
                 background: #000;
-                display: block;
-                margin: 20px 0;
-                border: 2px solid #444;
-                max-width: 100%;
-                height: auto;
+                border: 4px solid #333;
                 image-rendering: pixelated;
+                max-width: 90vw;
+                margin: 20px auto;
+                display: block;
             }
 
-            .controls {
-                background: #333;
+            .ui {
+                background: #222;
                 padding: 15px;
+                display: inline-block;
                 border-radius: 8px;
-                margin-bottom: 20px;
             }
 
-            #log {
-                background: #000;
-                height: 350px;
-                overflow-y: scroll;
-                padding: 10px;
-                border: 1px solid #444;
-                font-size: 11px;
-            }
-
-            .log-entry {
-                margin-bottom: 4px;
-                border-bottom: 1px solid #222;
-            }
-
-            .log-env {
-                color: #88f;
-            }
-
-            .log-error {
-                color: #f88;
-                font-weight: bold;
-            }
-
-            .log-info {
-                color: #8f8;
-            }
-
-            .log-core {
-                color: #f8f;
-                font-style: italic;
-            }
-
-            select,
             input,
             button {
-                padding: 8px;
-                margin: 5px 0;
                 background: #444;
                 color: #fff;
-                border: 1px solid #666;
-                border-radius: 4px;
-            }
-
-            button:disabled {
-                opacity: 0.5;
-                cursor: not-allowed;
+                border: 1px solid #555;
+                padding: 8px;
+                cursor: pointer;
             }
         </style>
     </head>
     <body>
-        <h1>New Cores Debugger</h1>
-
-        <div class="controls">
-            <label>1. Select Core to Test:</label><br>
-            <select id="coreSelect">
-                <option value="vboy.zip">Virtual Boy (beetle_vb)</option>
-            </select><br><br>
-
-            <label>2. Select ROM File:</label><br>
-            <input type="file" id="romInput"><br><br>
-
-            <button id="startButton" disabled>Initialize & Start</button>
+        <h2>VBoy Debugger (Pure 2D)</h2>
+        <div class="ui">
+            <input type="file" id="romInput">
+            <button id="startBtn" disabled>Start Core</button>
         </div>
-
         <canvas id="canvas"></canvas>
-        <h3>Debug Console Logs:</h3>
-        <div id="log"></div>
 
         <script>
-            const log = document.getElementById('log');
-            const startBtn = document.getElementById('startButton');
-            const coreSelect = document.getElementById('coreSelect');
-            let romData = null, romName = "";
-
-            const CORE_BASE = 'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/';
-
-            function addLog(msg, type = 'info') {
-                const entry = document.createElement('div');
-                entry.className = `log-entry log-${type}`;
-                entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-                log.appendChild(entry);
-                log.scrollTop = log.scrollHeight;
-            }
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d', {alpha: false});
+            let romData = null;
 
             document.getElementById('romInput').onchange = async (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                romData = new Uint8Array(await file.arrayBuffer());
-                romName = file.name;
-                addLog(`ROM loaded: ${romName} (${romData.length} bytes)`);
-                startBtn.disabled = false;
+                romData = new Uint8Array(await e.target.files[0].arrayBuffer());
+                document.getElementById('startBtn').disabled = false;
             };
 
-            startBtn.onclick = async () => {
-                addLog("Starting Core Setup...");
-                startBtn.disabled = true;
+            document.getElementById('startBtn').onclick = async () => {
+                const resp = await fetch('https://raw.githubusercontent.com/sonht-0555/EmuX/builds/vboy.zip');
+                const files = fflate.unzipSync(new Uint8Array(await resp.arrayBuffer()));
+                let js, wasm;
+                for (let f in files) {if (f.endsWith('.js')) js = new TextDecoder().decode(files[f]); if (f.endsWith('.wasm')) wasm = files[f];}
 
-                const coreUrl = CORE_BASE + coreSelect.value;
-                addLog(`Fetching Core: ${coreUrl}...`);
+                window.Module = {
+                    wasmBinary: wasm, canvas: canvas,
+                    locateFile: () => URL.createObjectURL(new Blob([wasm], {type: 'application/wasm'})),
+                    onRuntimeInitialized: () => {
+                        console.log("WASM Ready");
+                        const setup = [
+                            ["retro_set_environment", env_cb, "iii"],
+                            ["retro_set_video_refresh", video_cb, "viiii"],
+                            ["retro_set_audio_sample", (l, r) => { }, "vii"],
+                            ["retro_set_audio_sample_batch", (d, f) => f, "iii"],
+                            ["retro_set_input_poll", () => { }, "v"],
+                            ["retro_set_input_state", () => 0, "iiiii"]
+                        ];
+                        setup.forEach(([n, f, s]) => {
+                            const func = Module[n] || Module["_" + n] || (Module.asm && Module.asm[n]);
+                            if (func) func(Module.addFunction(f, s));
+                        });
 
-                try {
-                    const response = await fetch(coreUrl);
-                    if (!response.ok) throw new Error("Core fetch failed.");
-                    const coreBuffer = await response.arrayBuffer();
+                        Module._retro_init();
+                        const path = "/game.vb";
+                        Module.FS.writeFile(path, romData);
 
-                    const files = fflate.unzipSync(new Uint8Array(coreBuffer));
-                    let jsContent = "", wasmBuffer = null;
-                    for (const name in files) {
-                        if (name.endsWith('.js')) jsContent = new TextDecoder().decode(files[name]);
-                        if (name.endsWith('.wasm')) wasmBuffer = files[name];
-                    }
+                        // Fix: Allocate memory for ROM and Game Info
+                        const rPtr = Module._malloc(romData.length);
+                        Module.HEAPU8.set(romData, rPtr);
 
-                    if (!wasmBuffer) throw new Error("WASM not found in core zip.");
-                    const wasmUrl = URL.createObjectURL(new Blob([wasmBuffer], {type: 'application/wasm'}));
+                        const info = Module._malloc(16);
+                        const pPtr = Module._malloc(path.length + 1);
+                        Module.stringToUTF8(path, pPtr, path.length + 1);
 
-                    window.Module = {
-                        wasmBinary: wasmBuffer,
-                        canvas: document.getElementById('canvas'),
-                        print: (text) => addLog("STDOUT: " + text),
-                        printErr: (text) => addLog("STDERR: " + text, "error"),
-                        locateFile: () => wasmUrl,
-                        getFunc: (name) => {
-                            const n = name.startsWith("_") ? name : "_" + name;
-                            return Module[n] || Module[name] || (Module.asm ? Module.asm[n] || Module.asm[name] : null);
-                        },
-                        onRuntimeInitialized: () => {
-                            addLog("WASM Runtime Initialized", "info");
-                            runCore();
+                        // [path, data, size, meta]
+                        Module.HEAPU32.set([pPtr, rPtr, romData.length, 0], info >> 2);
+
+                        console.log("Loading ROM...");
+                        if (Module._retro_load_game(info)) {
+                            console.log("ROM Loaded!");
+                            const run = Module._retro_run || (Module.asm && Module.asm.retro_run);
+                            const loop = () => {run(); requestAnimationFrame(loop);};
+                            loop();
                         }
-                    };
-
-                    const script = document.createElement('script');
-                    script.textContent = jsContent;
-                    document.body.appendChild(script);
-
-                } catch (e) {
-                    addLog("Startup Error: " + e.message, "error");
-                    startBtn.disabled = false;
-                }
+                    }
+                };
+                const s = document.createElement('script'); s.textContent = js; document.body.appendChild(s);
             };
-
-            function runCore() {
-                try {
-                    const callbacks = [
-                        ["retro_set_environment", env_cb, "iii"],
-                        ["retro_set_video_refresh", video_cb, "viiii"],
-                        ["retro_set_audio_sample", (l, r) => { }, "vii"],
-                        ["retro_set_audio_sample_batch", (data, frames) => frames, "iii"],
-                        ["retro_set_input_poll", () => { }, "v"],
-                        ["retro_set_input_state", () => 0, "iiiii"]
-                    ];
-
-                    if (!window._callbackPtrs) window._callbackPtrs = {};
-                    callbacks.forEach(([name, fn, sig]) => {
-                        const func = Module.getFunc(name);
-                        if (func) {
-                            if (!window._callbackPtrs[name]) window._callbackPtrs[name] = Module.addFunction(fn, sig);
-                            func(window._callbackPtrs[name]);
-                            addLog(`Callback ${name} registered.`);
-                        }
-                    });
-
-                    const retro_init = Module.getFunc("retro_init");
-                    if (retro_init) {retro_init(); addLog("retro_init() called");}
-
-                    const romPath = "/" + romName;
-                    Module.FS.writeFile(romPath, romData);
-
-                    const romPtr = Module._malloc(romData.length);
-                    Module.HEAPU8.set(romData, romPtr);
-
-                    const loadGameFunc = Module.getFunc("retro_load_game");
-                    const infoPtr = Module._malloc(16);
-                    const pathPtr = Module._malloc(romPath.length + 1);
-                    Module.stringToUTF8(romPath, pathPtr, romPath.length + 1);
-
-                    Module.HEAPU32[infoPtr >> 2] = pathPtr;
-                    Module.HEAPU32[(infoPtr >> 2) + 1] = romPtr;
-                    Module.HEAPU32[(infoPtr >> 2) + 2] = romData.length;
-                    Module.HEAPU32[(infoPtr >> 2) + 3] = 0;
-
-                    addLog("Calling retro_load_game...");
-                    const success = loadGameFunc(infoPtr);
-                    addLog("retro_load_game result: " + success);
-
-                    if (success) {
-                        const retro_run = Module.getFunc("retro_run");
-                        const loop = () => {if (retro_run) retro_run(); requestAnimationFrame(loop);};
-                        loop();
-                        addLog("Execution loop started.");
-                    } else {
-                        addLog("Core rejected the ROM!", "error");
-                    }
-
-                } catch (e) {addLog("Crash: " + e.message, "error");}
-            }
 
             function env_cb(cmd, data) {
-                if (cmd === 14) { // GET_LOG_INTERFACE
-                    if (!window._logPtr) window._logPtr = Module.addFunction((level, fmt, args) => {
-                        // Very basic log extraction
-                        addLog("CORE LOG: " + level, "log-core");
-                    }, "viii");
-                    const ptr = Module._malloc(4);
-                    Module.HEAP32[ptr >> 2] = window._logPtr;
-                    Module.HEAP32[data >> 2] = ptr;
-                    return true;
-                }
-                if (cmd === 1) {Module.pixelFormat = Module.HEAP32[data >> 2]; return true;}
-                if (cmd === 9) { // GET_SYSTEM_DIRECTORY
-                    const ptr = Module._malloc(2);
-                    Module.stringToUTF8(".", ptr, 2);
-                    Module.HEAP32[data >> 2] = ptr;
-                    return true;
-                }
-                if (cmd === 15) { // GET_VARIABLE
-                    const key = Module.UTF8ToString(Module.HEAP32[data >> 2]);
-                    addLog("ENV: GET_VARIABLE: " + key, "log-env");
-                    Module.HEAP32[(data >> 2) + 1] = 0;
-                    return true;
-                }
-                return [10, 21, 27].includes(cmd);
+                if (cmd === 1) {Module.pixelFormat = Module.HEAP32[data >> 2]; return 1;}
+                if (cmd === 15) {Module.HEAP32[(data >> 2) + 1] = 0; return 1;}
+                return [9, 10, 21].includes(cmd) ? 1 : 0;
             }
 
-            let autoX = 0, autoY = 0, calibrated = false;
-            function video_cb(data, width, height, pitch) {
+            let autoX = 0, autoY = 0, calib = false;
+            function video_cb(data, w, h, pitch) {
                 if (!data) return;
-                const is32Bit = Module.pixelFormat === 1;
-                const heap = is32Bit ? Module.HEAP32 : Module.HEAPU16;
-                const shift = is32Bit ? 2 : 1;
-                const totalWidth = pitch >> shift;
-                const skip = 2;
+                const shift = Module.pixelFormat === 1 ? 2 : 1;
+                const heap = shift === 2 ? Module.HEAP32 : Module.HEAPU16;
+                const line = pitch >> shift;
+                const skip = 2; // [Logic 1]: Filter left eye only
 
-                if (!calibrated) {
-                    let minX = 9999, maxX = 0, minY = 9999, maxY = 0;
-                    for (let y = 0; y < height; y++) {
-                        const row = y * totalWidth;
-                        for (let x = 0; x < Math.min(totalWidth, 1024); x++) {
-                            if (heap[(data >> shift) + row + x] !== 0) {
+                // [Logic 2]: Smart Centering
+                if (!calib) {
+                    let maxX = 0, minX = 9999;
+                    for (let y = 40; y < h - 40; y++) {
+                        const row = (data >> shift) + y * line;
+                        for (let x = 0; x < Math.min(line, 1024); x++) {
+                            if (heap[row + x] !== 0) {
                                 if (x < minX) minX = x; if (x > maxX) maxX = x;
-                                if (y < minY) minY = y; if (y > maxY) maxY = y;
                             }
                         }
                     }
                     if (minX !== 9999) {
                         const contentW = (maxX - minX) / skip;
-                        const contentH = (maxY - minY);
                         autoX = minX - Math.floor((384 - contentW) / 2) * skip;
-                        autoY = minY - Math.floor((224 - contentH) / 2);
-                        calibrated = true;
-                        addLog(`Perfect Centering Active`);
+                        calib = true;
                     }
                 }
 
-                const canvas = document.getElementById('canvas');
-                if (canvas.width !== 384 || canvas.height !== 224) {canvas.width = 384; canvas.height = 224;}
-                const ctx = canvas.getContext('2d'), img = ctx.createImageData(384, 224), d32 = new Uint32Array(img.data.buffer);
+                if (canvas.width !== 384) {canvas.width = 384; canvas.height = 224;}
+                const img = ctx.createImageData(384, 224), d32 = new Uint32Array(img.data.buffer);
 
                 for (let y = 0; y < 224; y++) {
-                    const sy = y + autoY;
-                    if (sy < 0 || sy >= height) continue;
-                    const rB = (data >> shift) + sy * totalWidth;
+                    const r = (data >> shift) + (y + autoY) * line;
+                    const row = y * 384;
                     for (let x = 0; x < 384; x++) {
-                        const sx = autoX + x * skip;
-                        if (sx < 0 || sx >= totalWidth) continue;
-                        const c = heap[rB + sx];
-                        // Standard 0RGB1555
-                        const r = ((c >> 10) & 0x1F) << 3, g = ((c >> 5) & 0x1F) << 3, b = (c & 0x1F) << 3;
-                        d32[y * 384 + x] = 0xFF000000 | (b << 16) | (g << 8) | r;
+                        const c = heap[r + autoX + x * skip];
+                        // [Logic 3]: 0RGB1555 Original Palette
+                        const r1 = ((c >> 10) & 0x1F) << 3, g1 = ((c >> 5) & 0x1F) << 3, b1 = (c & 0x1F) << 3;
+                        d32[row + x] = 0xFF000000 | (b1 << 16) | (g1 << 8) | r1;
                     }
                 }
                 ctx.putImageData(img, 0, 0);
