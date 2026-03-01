@@ -30,36 +30,18 @@ jobs:
           - { id: lynx, name: handy, fetch: handy, make: "-f Makefile", initial_mem: 128mb, stack: 4mb, method: objects }
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v3
       with:
         path: emux
-
-    - name: Cache EMSDK
-      id: cache-emsdk
-      uses: actions/cache@v4
-      with:
-        path: emscripten-sdk
-        key: emsdk-${{ runner.os }}-3.1.46
 
     - uses: mymindstorm/setup-emsdk@v14
       with:
         version: 3.1.46
-        # Use our cached folder
-        actions-cache-folder: 'emscripten-sdk'
 
-    - name: Cache Emscripten Ports
-      uses: actions/cache@v4
-      with:
-        path: ~/.emscripten_cache
-        key: emscripten-ports-${{ runner.os }}-${{ hashFiles('emux/.github/workflows/build-all-cores.yml') }}
-
-    - name: Cache Libretro Cores
-      uses: actions/cache@v4
+    - uses: actions/cache@v3
       with:
         path: libretro-super
-        key: libretro-v3-${{ matrix.core.fetch }}-${{ hashFiles('emux/sw.js') }}
-        restore-keys: |
-          libretro-v3-${{ matrix.core.fetch }}-
+        key: libretro-super-${{ matrix.core.fetch }}
 
     - name: Fetch
       run: |
@@ -69,18 +51,11 @@ jobs:
         if [ "${{ matrix.core.id }}" == "nds2021" ]; then
           [ ! -d "libretro-super/libretro-melonds2021" ] && git clone --depth 1 --branch before-rebase-20210922 https://github.com/libretro/melonDS.git libretro-super/libretro-melonds2021 || true
         else
-          cd libretro-super 
-          # Only fetch if the core directory doesn't exist
-          if [ ! -d "libretro-${{ matrix.core.fetch }}" ]; then
-            ./libretro-fetch.sh ${{ matrix.core.fetch }}
-          fi
+          cd libretro-super && ./libretro-fetch.sh ${{ matrix.core.fetch }}
         fi
-
     - name: Pre-build Emscripten Ports
       run: |
-        # If cache hit, this will be very fast
-        embuilder build zlib
-
+        for i in {1..5}; do embuilder build zlib && break || (echo "Retry $i..." && sleep 5); done
     - name: Build
       run: |
         export OPT_FLAGS="-Os -ffast-math -fno-tree-vectorize -ffunction-sections -fdata-sections -flto -DNDEBUG"
@@ -109,9 +84,7 @@ jobs:
         if [[ "${{ matrix.core.id }}" == "pce" || "${{ matrix.core.id }}" == "wswan" || "${{ matrix.core.method }}" == "arcade" || "${{ matrix.core.id }}" == "pokemini" || "${{ matrix.core.id }}" == "lynx" ]]; then
           EXTRA_GLUE="$GITHUB_WORKSPACE/retro_glue.o"
         fi
-
         ALL_OBJS=$(find . -name "*.o")
-
         emcc $ALL_OBJS $EXTRA_GLUE $GITHUB_WORKSPACE/retro_utils.o $OPT_FLAGS \
           -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web -s MALLOC=emmalloc \
           -s ALLOW_MEMORY_GROWTH=1 -s WASM_BIGINT=1 --no-heap-copy -s ALLOW_TABLE_GROWTH=1 \
@@ -120,8 +93,7 @@ jobs:
           -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free","_retro_serialize_size","_retro_serialize","_retro_unserialize","_emux_is_dirty","_emux_render16","_emux_render32","_emux_audio_reset","_emux_audio_process","_emux_audio_get_buffer_l","_emux_audio_get_buffer_r","_emux_audio_set_core_rate"]' \
           -s ERROR_ON_UNDEFINED_SYMBOLS=1 -s ASSERTIONS=0 \
           -o ${{ matrix.core.id }}.js
-
-        # Clean up any existing zips to avoid duplicates
+        # Clean up any existing zips to avoid duplicates (like handy.zip vs lynx.zip)
         rm -f *.zip
         if [ "${{ matrix.core.method }}" == "arcade" ]; then
           mv ${{ matrix.core.id }}.js arcade.js && mv ${{ matrix.core.id }}.wasm arcade.wasm
@@ -129,7 +101,6 @@ jobs:
         else
           zip -j ${{ matrix.core.id }}.zip ${{ matrix.core.id }}.js ${{ matrix.core.id }}.wasm
         fi
-
     - uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.core.id }}-core
@@ -155,7 +126,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
       - name: Download all cores
         uses: actions/download-artifact@v4
