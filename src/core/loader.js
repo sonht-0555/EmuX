@@ -44,7 +44,6 @@ const CORE_CONFIG = [
     {ext: '.bin,.iso,.img,.pbp,.chd', script: CORE_BASE + 'ps1.zip', btns: {'btn-1': ['A', 8], 'btn-2': ['X', 9], 'btn-3': ['B', 0], 'btn-4': ['Y', 1], 'btn-l': [' bl.', 10], 'btn-r': [' br.', 11], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/scph5501.bin']},
     {ext: '.min', script: CORE_BASE + 'pokemini.zip', btns: {'btn-1': ['A', 8], 'btn-3': ['B', 0], 'btn-l': [' bc.', 1], 'btn-r': [' be.', 2], 'btn-select': [' sc.', ''], 'btn-start': [' st.', 3]}},
     {ext: '.lnx', script: CORE_BASE + 'lynx.zip', btns: {'btn-1': ['A', 0], 'btn-3': ['B', 8], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/lynxboot.img']},
-    {ext: '.vb', script: CORE_BASE + 'vboy.zip', btns: {'btn-1': ['A', 0], 'btn-3': ['B', 8], 'btn-l': [' bl.', 10], 'btn-r': [' br.', 11], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}},
 ];
 var isRunning = false;
 // ===== initCore ====

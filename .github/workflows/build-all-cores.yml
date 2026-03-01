@@ -28,21 +28,38 @@ jobs:
           - { id: wswan, name: mednafen_wswan, fetch: mednafen_wswan, make: "-f Makefile", initial_mem: 128mb, stack: 4mb, method: objects }
           - { id: pokemini, name: pokemini, fetch: pokemini, initial_mem: 128mb, stack: 2mb, method: objects }
           - { id: lynx, name: handy, fetch: handy, make: "-f Makefile", initial_mem: 128mb, stack: 4mb, method: objects }
-          - { id: vboy, name: mednafen_vb, fetch: mednafen_vb, make: "-f Makefile", initial_mem: 128mb, stack: 4mb, method: objects }
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         path: emux
+
+    - name: Cache EMSDK
+      id: cache-emsdk
+      uses: actions/cache@v4
+      with:
+        path: emscripten-sdk
+        key: emsdk-${{ runner.os }}-3.1.46
 
     - uses: mymindstorm/setup-emsdk@v14
       with:
         version: 3.1.46
+        # Use our cached folder
+        actions-cache-folder: 'emscripten-sdk'
 
-    - uses: actions/cache@v3
+    - name: Cache Emscripten Ports
+      uses: actions/cache@v4
+      with:
+        path: ~/.emscripten_cache
+        key: emscripten-ports-${{ runner.os }}-${{ hashFiles('emux/.github/workflows/build-all-cores.yml') }}
+
+    - name: Cache Libretro Cores
+      uses: actions/cache@v4
       with:
         path: libretro-super
-        key: libretro-super-${{ matrix.core.fetch }}
+        key: libretro-v3-${{ matrix.core.fetch }}-${{ hashFiles('emux/sw.js') }}
+        restore-keys: |
+          libretro-v3-${{ matrix.core.fetch }}-
 
     - name: Fetch
       run: |
@@ -52,12 +69,17 @@ jobs:
         if [ "${{ matrix.core.id }}" == "nds2021" ]; then
           [ ! -d "libretro-super/libretro-melonds2021" ] && git clone --depth 1 --branch before-rebase-20210922 https://github.com/libretro/melonDS.git libretro-super/libretro-melonds2021 || true
         else
-          cd libretro-super && ./libretro-fetch.sh ${{ matrix.core.fetch }}
+          cd libretro-super 
+          # Only fetch if the core directory doesn't exist
+          if [ ! -d "libretro-${{ matrix.core.fetch }}" ]; then
+            ./libretro-fetch.sh ${{ matrix.core.fetch }}
+          fi
         fi
 
     - name: Pre-build Emscripten Ports
       run: |
-        for i in {1..5}; do embuilder build zlib && break || (echo "Retry $i..." && sleep 5); done
+        # If cache hit, this will be very fast
+        embuilder build zlib
 
     - name: Build
       run: |
@@ -84,7 +106,7 @@ jobs:
         emcc -c $GITHUB_WORKSPACE/emux/.github/workflows/$GLUE_NAME -o $GITHUB_WORKSPACE/retro_glue.o $OPT_FLAGS -s USE_ZLIB=1
         
         EXTRA_GLUE=""
-        if [[ "${{ matrix.core.id }}" == "pce" || "${{ matrix.core.id }}" == "wswan" || "${{ matrix.core.method }}" == "arcade" || "${{ matrix.core.id }}" == "pokemini" || "${{ matrix.core.id }}" == "lynx" || "${{ matrix.core.id }}" == "vboy" ]]; then
+        if [[ "${{ matrix.core.id }}" == "pce" || "${{ matrix.core.id }}" == "wswan" || "${{ matrix.core.method }}" == "arcade" || "${{ matrix.core.id }}" == "pokemini" || "${{ matrix.core.id }}" == "lynx" ]]; then
           EXTRA_GLUE="$GITHUB_WORKSPACE/retro_glue.o"
         fi
 
@@ -99,6 +121,8 @@ jobs:
           -s ERROR_ON_UNDEFINED_SYMBOLS=1 -s ASSERTIONS=0 \
           -o ${{ matrix.core.id }}.js
 
+        # Clean up any existing zips to avoid duplicates
+        rm -f *.zip
         if [ "${{ matrix.core.method }}" == "arcade" ]; then
           mv ${{ matrix.core.id }}.js arcade.js && mv ${{ matrix.core.id }}.wasm arcade.wasm
           zip -j arcade.zip arcade.js arcade.wasm
@@ -131,7 +155,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Download all cores
         uses: actions/download-artifact@v4
