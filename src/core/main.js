@@ -49,7 +49,6 @@ async function loadState(slot = 1) {
     if (stateData) {
         const statePointer = Module._malloc(stateData.length);
         Module.HEAPU8.set(stateData, statePointer);
-        console.log("JS: Calling _retro_unserialize, size =", stateData.length, "pointer =", statePointer);
         Module._retro_unserialize(statePointer, stateData.length);
         Module._free(statePointer);
         await message(`[ss${slot}]_Loaded!`, 1000);

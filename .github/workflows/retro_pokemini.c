@@ -26,8 +26,9 @@ struct memstream {
   int       writing;
 };
 
+/* --- Memstream API Standard (ABI Compatible) --- */
+
 WEAK void memstream_set_buffer(uint8_t *buf, uint64_t size) {
-  printf("C: memstream_set_buffer(buf=%p, size=%llu)\n", (void*)buf, (unsigned long long)size);
   g_buf  = buf;
   g_size = (uint32_t)size;
 }
@@ -39,36 +40,35 @@ WEAK void *memstream_open(int writing) {
   m->size    = g_size;
   m->pos     = 0;
   m->writing = writing;
-  printf("C: memstream_open(stream=%p, write=%d)\n", (void*)m, writing);
   return m;
 }
 
 WEAK void memstream_close(void *stream) {
-  printf("C: memstream_close(stream=%p)\n", stream);
   if (stream) free(stream);
+}
+
+WEAK void memstream_rewind(void *stream) {
+  struct memstream *m = (struct memstream *)stream;
+  if (m) m->pos = 0;
 }
 
 WEAK uint64_t memstream_read(void *stream, void *data, uint64_t len) {
   struct memstream *m = (struct memstream *)stream;
-  if (!m || !m->buf) return 0;
+  if (!m || !m->buf || m->pos >= m->size) return 0;
   uint32_t to_read = (uint32_t)len;
   if (m->pos + to_read > m->size) to_read = m->size - m->pos;
   memcpy(data, m->buf + m->pos, to_read);
   m->pos += to_read;
-  // Luôn log để xem nó đọc cái gì
-  printf("C: memstream_read(pos=%u, len=%u)\n", m->pos - to_read, to_read);
   return (uint64_t)to_read;
 }
 
 WEAK uint64_t memstream_write(void *stream, const void *data, uint64_t len) {
   struct memstream *m = (struct memstream *)stream;
-  if (!m || !m->buf || !m->writing) return 0;
+  if (!m || !m->buf || !m->writing || m->pos >= m->size) return 0;
   uint32_t to_write = (uint32_t)len;
   if (m->pos + to_write > m->size) to_write = m->size - m->pos;
   memcpy(m->buf + m->pos, data, to_write);
   m->pos += to_write;
-  // Luôn log để xem nó có thực sự ghi hình ảnh (VRAM) không
-  printf("C: memstream_write(pos=%u, len=%u)\n", m->pos - to_write, to_write);
   return (uint64_t)to_write;
 }
 
@@ -94,8 +94,7 @@ WEAK int64_t memstream_seek(void *stream, int64_t offset, int whence) {
   else if (whence == SEEK_END) new_pos = m->size + (uint32_t)offset;
   if (new_pos > m->size) return -1;
   m->pos = new_pos;
-  printf("C: memstream_seek(pos=%u) -> OK(0)\n", m->pos);
-  return 0; // Trả về 0 để báo thành công đúng chuẩn Libretro
+  return 0; // Success
 }
 
 WEAK int64_t memstream_tell(void *stream) {
@@ -108,24 +107,14 @@ WEAK uint64_t memstream_pos(void *stream) {
   return m ? (uint64_t)m->pos : 0;
 }
 
-WEAK void memstream_rewind(void *stream) {
-  struct memstream *m = (struct memstream *)stream;
-  if (m) m->pos = 0;
-}
-
-/* 
-   Đổi về chuẩn 2 tham số: Có thể PokeMini check size bằng tham số thứ 2.
-   Nếu hàm này trả về NULL hoặc sai tham số, PokeMini sẽ đình chỉ Save.
-*/
 WEAK uint8_t *memstream_get_ptr(void *stream, size_t *size) {
   struct memstream *m = (struct memstream *)stream;
   if (!m) return NULL;
   if (size) *size = (size_t)m->size;
-  printf("C: memstream_get_ptr(stream=%p, size_out=%zu)\n", (void*)m, m->size);
   return m->buf;
 }
 
-/* --- Fallbacks --- */
+/* --- Base Fallbacks --- */
 WEAK bool path_is_valid(const char *path) { return (path && *path); }
 WEAK void filestream_vfs_init(void) { }
 WEAK void *filestream_open(const char *path, unsigned mode, unsigned hints) {
