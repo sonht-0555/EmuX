@@ -34,6 +34,9 @@ jobs:
       with:
         path: emux
 
+    - name: Install ccache
+      run: sudo apt-get update && sudo apt-get install -y ccache
+
     - name: Cache EMSDK
       id: cache-emsdk
       uses: actions/cache@v4
@@ -44,52 +47,65 @@ jobs:
     - uses: mymindstorm/setup-emsdk@v14
       with:
         version: 3.1.46
-        # Use our cached folder
         actions-cache-folder: 'emscripten-sdk'
+
+    - name: Cache CCache files
+      uses: actions/cache@v4
+      with:
+        path: ~/.ccache
+        key: ccache-${{ matrix.core.id }}-${{ github.run_id }}
+        restore-keys: |
+          ccache-${{ matrix.core.id }}-
 
     - name: Cache Emscripten Ports
       uses: actions/cache@v4
       with:
         path: ~/.emscripten_cache
-        key: emscripten-ports-${{ runner.os }}-${{ hashFiles('emux/.github/workflows/build-all-cores.yml') }}
+        key: ports-v4-${{ runner.os }}-${{ hashFiles('emux/.github/workflows/build-all-cores.yml') }}
 
-    - name: Cache Libretro Cores
+    - name: Cache Libretro Sources
       uses: actions/cache@v4
       with:
         path: libretro-super
-        key: libretro-v3-${{ matrix.core.fetch }}-${{ hashFiles('emux/sw.js') }}
+        key: lib-v4-${{ matrix.core.fetch }}-${{ hashFiles('emux/sw.js') }}
         restore-keys: |
-          libretro-v3-${{ matrix.core.fetch }}-
+          lib-v4-${{ matrix.core.fetch }}-
 
     - name: Fetch
       run: |
         if [ ! -d "libretro-super" ]; then
           git clone --depth 1 https://github.com/libretro/libretro-super.git
         fi
-        if [ "${{ matrix.core.id }}" == "nds2021" ]; then
-          [ ! -d "libretro-super/libretro-melonds2021" ] && git clone --depth 1 --branch before-rebase-20210922 https://github.com/libretro/melonDS.git libretro-super/libretro-melonds2021 || true
-        else
-          cd libretro-super 
-          # Only fetch if the core directory doesn't exist
-          if [ ! -d "libretro-${{ matrix.core.fetch }}" ]; then
-            ./libretro-fetch.sh ${{ matrix.core.fetch }}
-          fi
+        cd libretro-super
+        if [ ! -d "libretro-${{ matrix.core.fetch }}" ]; then
+          ./libretro-fetch.sh ${{ matrix.core.fetch }}
         fi
 
-    - name: Pre-build Emscripten Ports
-      run: |
-        # If cache hit, this will be very fast
-        embuilder build zlib
+    - name: Pre-build Ports
+      run: embuilder build zlib
 
-    - name: Build
+    - name: Build Core
       run: |
+        export CCACHE_DIR=$HOME/.ccache
+        export CCACHE_MAXSIZE=1G
+        export CCACHE_COMPRESS=1
+        ccache -z
+
+        export CC="ccache emcc"
+        export CXX="ccache em++"
         export OPT_FLAGS="-Os -ffast-math -fno-tree-vectorize -ffunction-sections -fdata-sections -flto -DNDEBUG"
+        export JOBS="$(nproc)"
+        
+        if [ "${{ matrix.core.id }}" == "neogeo" ]; then
+          export OPT_FLAGS="-Os -ffast-math -fno-tree-vectorize -ffunction-sections -fdata-sections -DNDEBUG"
+          export JOBS="2"
+        fi
+        
         export CFLAGS="$OPT_FLAGS"
         export CXXFLAGS="$OPT_FLAGS"
         export LDFLAGS="$OPT_FLAGS"
         
         cd libretro-super/libretro-${{ matrix.core.fetch }}
-        
         if [ -n "${{ matrix.core.subdir }}" ]; then cd ${{ matrix.core.subdir }}; fi
         
         if [ "${{ matrix.core.id }}" == "nds2021" ]; then
@@ -97,22 +113,21 @@ jobs:
           sed -i 's/-Wl,--version-script=[^ ]*//g' Makefile
         fi
         
-        emmake make ${{ matrix.core.make }} platform=emscripten -j$(nproc) || true
-        
+        emmake make ${{ matrix.core.make }} platform=emscripten -j$JOBS || true
+        ccache -s
+
         cd $GITHUB_WORKSPACE/libretro-super/libretro-${{ matrix.core.fetch }}
         emcc -c $GITHUB_WORKSPACE/emux/.github/workflows/retro_utils.c -o $GITHUB_WORKSPACE/retro_utils.o $OPT_FLAGS
-        GLUE_NAME="retro_glue.c"
-        if [ "${{ matrix.core.id }}" == "pokemini" ]; then GLUE_NAME="retro_pokemini.c"; fi
-        emcc -c $GITHUB_WORKSPACE/emux/.github/workflows/$GLUE_NAME -o $GITHUB_WORKSPACE/retro_glue.o $OPT_FLAGS -s USE_ZLIB=1
+        GLUE="retro_glue.c"
+        if [ "${{ matrix.core.id }}" == "pokemini" ]; then GLUE="retro_pokemini.c"; fi
+        emcc -c $GITHUB_WORKSPACE/emux/.github/workflows/$GLUE -o $GITHUB_WORKSPACE/retro_glue.o $OPT_FLAGS -s USE_ZLIB=1
         
-        EXTRA_GLUE=""
+        EXTRA=""
         if [[ "${{ matrix.core.id }}" == "pce" || "${{ matrix.core.id }}" == "wswan" || "${{ matrix.core.method }}" == "arcade" || "${{ matrix.core.id }}" == "pokemini" || "${{ matrix.core.id }}" == "lynx" ]]; then
-          EXTRA_GLUE="$GITHUB_WORKSPACE/retro_glue.o"
+          EXTRA="$GITHUB_WORKSPACE/retro_glue.o"
         fi
 
-        ALL_OBJS=$(find . -name "*.o")
-
-        emcc $ALL_OBJS $EXTRA_GLUE $GITHUB_WORKSPACE/retro_utils.o $OPT_FLAGS \
+        emcc $(find . -name "*.o") $EXTRA $GITHUB_WORKSPACE/retro_utils.o $OPT_FLAGS \
           -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web -s MALLOC=emmalloc \
           -s ALLOW_MEMORY_GROWTH=1 -s WASM_BIGINT=1 --no-heap-copy -s ALLOW_TABLE_GROWTH=1 \
           -s INITIAL_MEMORY=${{ matrix.core.initial_mem }} -s STACK_SIZE=${{ matrix.core.stack }} -s FORCE_FILESYSTEM=1 \
@@ -121,7 +136,6 @@ jobs:
           -s ERROR_ON_UNDEFINED_SYMBOLS=1 -s ASSERTIONS=0 \
           -o ${{ matrix.core.id }}.js
 
-        # Clean up any existing zips to avoid duplicates
         rm -f *.zip
         if [ "${{ matrix.core.method }}" == "arcade" ]; then
           mv ${{ matrix.core.id }}.js arcade.js && mv ${{ matrix.core.id }}.wasm arcade.wasm
@@ -154,17 +168,12 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Download all cores
-        uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
         with:
           path: cores
           merge-multiple: true
-
-      - name: Deploy to builds branch
-        uses: JamesIves/github-pages-deploy-action@v4
+      - uses: JamesIves/github-pages-deploy-action@v4
         with:
           branch: builds
           folder: cores
