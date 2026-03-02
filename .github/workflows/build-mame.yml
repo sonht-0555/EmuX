@@ -1,4 +1,4 @@
-name: Build All Cores
+name: Build MAME Core
 
 on:
   push:
@@ -14,21 +14,6 @@ jobs:
       fail-fast: false
       matrix:
         core:
-          - { id: gba,      repo: mgba,              initial_mem: 256mb, stack: 8mb,  make: "STATIC_LINKING=0 -f Makefile.libretro" }
-          - { id: nes,      repo: quicknes,          initial_mem: 128mb, stack: 4mb,  make: "STATIC_LINKING=0" }
-          - { id: snes,     repo: snes9x,            initial_mem: 256mb, stack: 8mb,  make: "STATIC_LINKING=0 -C libretro" }
-          - { id: pce,      repo: mednafen_pce_fast, initial_mem: 128mb, stack: 4mb,  make: "STATIC_LINKING=0 -f Makefile WANT_VFS=1" }
-          - { id: arcade,   repo: fbneo,             initial_mem: 256mb, stack: 8mb,  make: "STATIC_LINKING=0 LTO=1", subdir: "src/burner/libretro" }
-          - { id: genesis,  repo: genesis_plus_gx,   initial_mem: 256mb, stack: 8mb,  make: "STATIC_LINKING=0 -f Makefile.libretro WANT_ZLIB=1 WANT_VFS=1" }
-          - { id: ngp,      repo: mednafen_ngp,      initial_mem: 128mb, stack: 4mb,  make: "STATIC_LINKING=0 WANT_VFS=1" }
-          - { id: ps1,      repo: pcsx_rearmed,      initial_mem: 512mb, stack: 16mb, make: "STATIC_LINKING=0 -f Makefile.libretro DYNAREC='' GPU_PEOPS=1 WANT_ZLIB=1 GLES=1 WANT_VFS=1" }
-          - { id: snes2010, repo: snes9x2010,        initial_mem: 128mb, stack: 4mb,  make: "STATIC_LINKING=0 -f Makefile.libretro" }
-          - { id: nds,      repo: melonds,           initial_mem: 512mb, stack: 32mb, make: "STATIC_LINKING=0" }
-          - { id: nds2021,  repo: melonds2021,       initial_mem: 512mb, stack: 32mb, make: "STATIC_LINKING=0" }
-          - { id: a26,      repo: stella2014,        initial_mem: 64mb,  stack: 2mb,  make: "STATIC_LINKING=0 -f Makefile" }
-          - { id: wswan,    repo: mednafen_wswan,    initial_mem: 128mb, stack: 4mb,  make: "STATIC_LINKING=0 -f Makefile" }
-          - { id: pokemini, repo: pokemini,          initial_mem: 128mb, stack: 2mb,  make: "STATIC_LINKING=0" }
-          - { id: lynx,     repo: handy,             initial_mem: 128mb, stack: 4mb,  make: "STATIC_LINKING=0 -f Makefile" }
           - { id: mame078,  repo: mame2003_plus,     initial_mem: 256mb, stack: 8mb,  make: "STATIC_LINKING=0" }
 
     steps:
@@ -110,7 +95,7 @@ jobs:
       - name: Deploy to builds branch
         uses: JamesIves/github-pages-deploy-action@v4
         with:
-          branch: builds
+          branch: builds-test
           folder: cores
           token: ${{ secrets.GITHUB_TOKEN }}
           clean: true
