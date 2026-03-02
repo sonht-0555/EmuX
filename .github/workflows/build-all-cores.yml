@@ -151,7 +151,7 @@ jobs:
       - name: Build
         run: |
           export OPT_FLAGS="-Os -ffast-math -fno-tree-vectorize -ffunction-sections -fdata-sections -flto -DNDEBUG -fno-rtti"
-          export CFLAGS="$OPT_FLAGS" CXXFLAGS="$OPT_FLAGS" LDFLAGS="$OPT_FLAGS -Wl,--gc-sections"
+          export CFLAGS="$OPT_FLAGS -s USE_ZLIB=1" CXXFLAGS="$OPT_FLAGS -s USE_ZLIB=1" LDFLAGS="$OPT_FLAGS -Wl,--gc-sections -s USE_ZLIB=1"
           EMUX="$GITHUB_WORKSPACE/emux/.github/workflows/retro"
           CORE="$GITHUB_WORKSPACE/libretro-super/libretro-${{ matrix.core.repo }}"
           cd $CORE
@@ -173,7 +173,7 @@ jobs:
           esac
           ALL_OBJS=$(find . -name "*.o" -not -path "*/test*" -not -path "*/example*" -not -path "*/tools*")
           echo "=== CHECKING GLUE FUNCTIONS FOR ${{ matrix.core.id }} ==="
-          GLUE_FUNCS=$(grep -E "WEAK EMSCRIPTEN_KEEPALIVE" $EMUX/$GLUE_NAME | sed -E 's/.*EMSCRIPTEN_KEEPALIVE [^ ]+ \*?([A-Za-z0-9_]+)\(.*/\1/')
+          GLUE_FUNCS=$(grep -E "WEAK (EMSCRIPTEN_KEEPALIVE )?" $EMUX/$GLUE_NAME | sed -E 's/.*WEAK (EMSCRIPTEN_KEEPALIVE )?//; s/\*?([A-Za-z0-9_]+)\(.*/\1/; s/.* //')
           for func in $GLUE_FUNCS; do
             if nm $ALL_OBJS 2>/dev/null | grep -q " U $func$"; then
               echo "[USED] $func"
@@ -201,7 +201,6 @@ jobs:
   deploy-static:
     runs-on: ubuntu-latest
     needs: build
-    if: always()
     permissions:
       contents: write
     steps:
