@@ -151,7 +151,12 @@ jobs:
       - name: Build
         run: |
           export OPT_FLAGS="-Os -ffast-math -fno-tree-vectorize -ffunction-sections -fdata-sections -flto -DNDEBUG -fno-rtti"
-          export CFLAGS="$OPT_FLAGS -s USE_ZLIB=1" CXXFLAGS="$OPT_FLAGS -s USE_ZLIB=1" LDFLAGS="$OPT_FLAGS -Wl,--gc-sections -s USE_ZLIB=1"
+          
+          # "Salt" for speed: Don't force global LTO during 'make' for Arcade, its Makefile (LTO=1) handles it better
+          MAKE_CFLAGS="$OPT_FLAGS -s USE_ZLIB=1"
+          if [ "${{ matrix.core.id }}" == "arcade" ]; then MAKE_CFLAGS="-Os -ffast-math -DNDEBUG -fno-rtti -s USE_ZLIB=1"; fi
+          
+          export CFLAGS="$MAKE_CFLAGS" CXXFLAGS="$MAKE_CFLAGS" LDFLAGS="$OPT_FLAGS -Wl,--gc-sections -s USE_ZLIB=1"
           EMUX="$GITHUB_WORKSPACE/emux/.github/workflows/retro"
           CORE="$GITHUB_WORKSPACE/libretro-super/libretro-${{ matrix.core.repo }}"
           cd $CORE
@@ -168,12 +173,12 @@ jobs:
           if [ "${{ matrix.core.id }}" == "arcade"   ]; then GLUE_NAME="retro_neogeo.c";  fi
           emcc -c $EMUX/$GLUE_NAME -o $GITHUB_WORKSPACE/retro_glue.o $OPT_FLAGS -s USE_ZLIB=1
           EXTRA_GLUE=""
-          case "${{ matrix.core.id }}" in pce|wswan|arcade|pokemini|lynx)
+          case "${{ matrix.core.id }}" in pce|wswan|arcade|pokemini|lynx|mame078)
             EXTRA_GLUE="$GITHUB_WORKSPACE/retro_glue.o" ;;
           esac
           ALL_OBJS=$(find . -name "*.o" -not -path "*/test*" -not -path "*/example*" -not -path "*/tools*")
           echo "=== CHECKING GLUE FUNCTIONS FOR ${{ matrix.core.id }} ==="
-          GLUE_FUNCS=$(grep -E "WEAK (EMSCRIPTEN_KEEPALIVE )?" $EMUX/$GLUE_NAME | sed -E 's/.*WEAK (EMSCRIPTEN_KEEPALIVE )?//; s/\*?([A-Za-z0-9_]+)\(.*/\1/; s/.* //')
+          GLUE_FUNCS=$(sed -nE 's/^WEAK (EMSCRIPTEN_KEEPALIVE )?[^ (]+ \**([A-Za-z0-9_]+)\(.*/\2/p' $EMUX/$GLUE_NAME)
           for func in $GLUE_FUNCS; do
             if nm $ALL_OBJS 2>/dev/null | grep -q " U $func$"; then
               echo "[USED] $func"
@@ -182,6 +187,13 @@ jobs:
             fi
           done
           echo "=========================================="
+          # 5. Final Linking
+          echo "::group::Final Linking & Packaging"
+          EXTRA_GLUE=""
+          case "${{ matrix.core.id }}" in pce|wswan|arcade|pokemini|lynx|mame078)
+            EXTRA_GLUE="$GITHUB_WORKSPACE/retro_glue.o" ;;
+          esac
+
           emcc $ALL_OBJS $EXTRA_GLUE $GITHUB_WORKSPACE/retro_utils.o $OPT_FLAGS \
             -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web -s MALLOC=emmalloc \
             -s ALLOW_MEMORY_GROWTH=1 -s WASM_BIGINT=1 --no-heap-copy -s ALLOW_TABLE_GROWTH=1 \
@@ -192,7 +204,8 @@ jobs:
             -o ${{ matrix.core.id }}.js
           rm -f *.zip
           zip -j ${{ matrix.core.id }}.zip ${{ matrix.core.id }}.js ${{ matrix.core.id }}.wasm
-          mv $CORE/${{ matrix.core.id }}.zip $GITHUB_WORKSPACE/
+          mv "$CORE/${{ matrix.core.id }}.zip" "$GITHUB_WORKSPACE/"
+          echo "::endgroup::"
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.core.id }}-core
