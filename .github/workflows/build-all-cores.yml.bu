@@ -53,14 +53,10 @@ jobs:
 
       - name: Build
         run: |
-          echo "::group::Initialize environment"
           export OPT_FLAGS="-Os -ffast-math -fno-tree-vectorize -ffunction-sections -fdata-sections -flto -DNDEBUG -fno-rtti"
           export CFLAGS="$OPT_FLAGS -s USE_ZLIB=1" CXXFLAGS="$OPT_FLAGS -s USE_ZLIB=1" LDFLAGS="$OPT_FLAGS -Wl,--gc-sections -s USE_ZLIB=1"
           EMUX="$GITHUB_WORKSPACE/emux/.github/workflows/retro"
           CORE="$GITHUB_WORKSPACE/libretro-super/libretro-${{ matrix.core.repo }}"
-          echo "::endgroup::"
-          # ===================================================================================
-          echo "::group::Compile Core"
           cd $CORE
           if [ -n "${{ matrix.core.subdir }}" ]; then cd ${{ matrix.core.subdir }}; fi
           if [ "${{ matrix.core.id }}" == "nds2021" ]; then
@@ -68,9 +64,6 @@ jobs:
             sed -i 's/-Wl,--version-script=[^ ]*//g' Makefile
           fi
           emmake make ${{ matrix.core.make }} platform=emscripten -j$(nproc) || true
-          echo "::endgroup::"
-          # ===================================================================================
-          echo "::group::Compile Glue"
           cd $CORE
           emcc -c $EMUX/retro_utils.c -o $GITHUB_WORKSPACE/retro_utils.o $OPT_FLAGS
           GLUE_NAME="retro_glue.c"
@@ -81,10 +74,8 @@ jobs:
           case "${{ matrix.core.id }}" in pce|wswan|arcade|pokemini|lynx|mame078)
             EXTRA_GLUE="$GITHUB_WORKSPACE/retro_glue.o" ;;
           esac
-          echo "::endgroup::"
-          # ===================================================================================
-          echo "::group::Analyze Symbols"
           ALL_OBJS=$(find . -name "*.o" -not -path "*/test*" -not -path "*/example*" -not -path "*/tools*")
+          echo "=== CHECKING GLUE FUNCTIONS FOR ${{ matrix.core.id }} ==="
           GLUE_FUNCS=$(sed -nE 's/^WEAK (EMSCRIPTEN_KEEPALIVE )?[^ (]+ \**([A-Za-z0-9_]+)\(.*/\2/p' $EMUX/$GLUE_NAME)
           for func in $GLUE_FUNCS; do
             if nm $ALL_OBJS 2>/dev/null | grep -q " U $func$"; then
@@ -93,9 +84,7 @@ jobs:
               echo "[    ] $func (unused)"
             fi
           done
-          echo "::endgroup::"
-          # ===================================================================================
-          echo "::group::Link WebAssembly"
+          echo "=========================================="
           emcc $ALL_OBJS $EXTRA_GLUE $GITHUB_WORKSPACE/retro_utils.o $OPT_FLAGS \
             -s WASM=1 -s USE_ZLIB=1 -s ENVIRONMENT=web -s MALLOC=emmalloc \
             -s ALLOW_MEMORY_GROWTH=1 -s WASM_BIGINT=1 --no-heap-copy -s ALLOW_TABLE_GROWTH=1 \
@@ -104,13 +93,9 @@ jobs:
             -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free","_retro_serialize_size","_retro_serialize","_retro_unserialize","_emux_is_dirty","_emux_render16","_emux_render32","_emux_audio_reset","_emux_audio_process","_emux_audio_get_buffer_l","_emux_audio_get_buffer_r","_emux_audio_set_core_rate"]' \
             -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 -s TEXTDECODER=2 \
             -o ${{ matrix.core.id }}.js
-          echo "::endgroup::"
-          # ===================================================================================
-          echo "::group::Package"
           rm -f *.zip
           zip -j ${{ matrix.core.id }}.zip ${{ matrix.core.id }}.js ${{ matrix.core.id }}.wasm
           mv $CORE/${{ matrix.core.id }}.zip $GITHUB_WORKSPACE/
-          echo "::endgroup::"
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.core.id }}-core
