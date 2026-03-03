@@ -13,23 +13,120 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-       core:
-          - { id: gba,      repo: mgba,              initial_mem: 256mb, stack: 8mb,  make: "STATIC_LINKING=0 -f Makefile.libretro" }
-          - { id: nes,      repo: quicknes,          initial_mem: 128mb, stack: 4mb,  make: "STATIC_LINKING=0" }
-          - { id: snes,     repo: snes9x,            initial_mem: 256mb, stack: 8mb,  make: "STATIC_LINKING=0 -C libretro" }
-          - { id: pce,      repo: mednafen_pce_fast, initial_mem: 128mb, stack: 4mb,  make: "STATIC_LINKING=0 -f Makefile WANT_VFS=1" }
-          - { id: arcade,   repo: fbneo,             initial_mem: 256mb, stack: 8mb,  make: "STATIC_LINKING=0 LTO=1", subdir: "src/burner/libretro" }
-          - { id: genesis,  repo: genesis_plus_gx,   initial_mem: 256mb, stack: 8mb,  make: "STATIC_LINKING=0 -f Makefile.libretro WANT_ZLIB=1 WANT_VFS=1" }
-          - { id: ngp,      repo: mednafen_ngp,      initial_mem: 128mb, stack: 4mb,  make: "STATIC_LINKING=0 WANT_VFS=1" }
-          - { id: ps1,      repo: pcsx_rearmed,      initial_mem: 512mb, stack: 16mb, make: "STATIC_LINKING=0 -f Makefile.libretro DYNAREC='' GPU_PEOPS=1 WANT_ZLIB=1 GLES=1 WANT_VFS=1" }
-          - { id: snes2010, repo: snes9x2010,        initial_mem: 128mb, stack: 4mb,  make: "STATIC_LINKING=0 -f Makefile.libretro" }
-          - { id: nds,      repo: melonds,           initial_mem: 512mb, stack: 32mb, make: "STATIC_LINKING=0" }
-          - { id: nds2021,  repo: melonds2021,       initial_mem: 512mb, stack: 32mb, make: "STATIC_LINKING=0" }
-          - { id: a26,      repo: stella2014,        initial_mem: 64mb,  stack: 2mb,  make: "STATIC_LINKING=0 -f Makefile" }
-          - { id: wswan,    repo: mednafen_wswan,    initial_mem: 128mb, stack: 4mb,  make: "STATIC_LINKING=0 -f Makefile" }
-          - { id: pokemini, repo: pokemini,          initial_mem: 128mb, stack: 2mb,  make: "STATIC_LINKING=0" }
-          - { id: lynx,     repo: handy,             initial_mem: 128mb, stack: 4mb,  make: "STATIC_LINKING=0 -f Makefile" }
-          - { id: mame078,  repo: mame2003_plus,     initial_mem: 256mb, stack: 8mb,  make: "STATIC_LINKING=0" }
+        core:
+          - {
+              id: gba,
+              repo: mgba,
+              initial_mem: 256mb,
+              stack: 8mb,
+              make: "-f Makefile.libretro",
+            }
+          - {
+              id: nes,
+              repo: quicknes,
+              initial_mem: 128mb,
+              stack: 4mb,
+              make: "",
+            }
+          - {
+              id: snes,
+              repo: snes9x,
+              initial_mem: 256mb,
+              stack: 8mb,
+              make: "-C libretro",
+            }
+          - {
+              id: pce,
+              repo: mednafen_pce_fast,
+              initial_mem: 128mb,
+              stack: 4mb,
+              make: "-f Makefile",
+            }
+          - {
+              id: arcade,
+              repo: fbneo,
+              initial_mem: 256mb,
+              stack: 8mb,
+              make: "",
+              subdir: "src/burner/libretro",
+            }
+          - {
+              id: genesis,
+              repo: genesis_plus_gx,
+              initial_mem: 256mb,
+              stack: 8mb,
+              make: "-f Makefile.libretro",
+            }
+          - {
+              id: ngp,
+              repo: mednafen_ngp,
+              initial_mem: 128mb,
+              stack: 4mb,
+              make: "",
+            }
+          - {
+              id: ps1,
+              repo: pcsx_rearmed,
+              initial_mem: 512mb,
+              stack: 16mb,
+              make: "-f Makefile.libretro DYNAREC='' GPU_PEOPS=1 GLES=1",
+            }
+          - {
+              id: snes2010,
+              repo: snes9x2010,
+              initial_mem: 128mb,
+              stack: 4mb,
+              make: "-f Makefile.libretro",
+            }
+          - {
+              id: nds,
+              repo: melonds,
+              initial_mem: 512mb,
+              stack: 32mb,
+              make: "",
+            }
+          - {
+              id: nds2021,
+              repo: melonds2021,
+              initial_mem: 512mb,
+              stack: 32mb,
+              make: "",
+            }
+          - {
+              id: a26,
+              repo: stella2014,
+              initial_mem: 64mb,
+              stack: 2mb,
+              make: "-f Makefile",
+            }
+          - {
+              id: wswan,
+              repo: mednafen_wswan,
+              initial_mem: 128mb,
+              stack: 4mb,
+              make: "-f Makefile",
+            }
+          - {
+              id: pokemini,
+              repo: pokemini,
+              initial_mem: 128mb,
+              stack: 2mb,
+              make: "",
+            }
+          - {
+              id: lynx,
+              repo: handy,
+              initial_mem: 128mb,
+              stack: 4mb,
+              make: "-f Makefile",
+            }
+          - {
+              id: mame078,
+              repo: mame2003_plus,
+              initial_mem: 256mb,
+              stack: 8mb,
+              make: "",
+            }
 
     steps:
       - uses: actions/checkout@v4
@@ -67,7 +164,7 @@ jobs:
             sed -i 's/-Wl,--no-undefined//g' Makefile
             sed -i 's/-Wl,--version-script=[^ ]*//g' Makefile
           fi
-          emmake make ${{ matrix.core.make }} platform=emscripten -j$(nproc) || true
+          emmake make ${{ matrix.core.make }} platform=emscripten STATIC_LINKING=0 LTO=1 WANT_ZLIB=1 WANT_VFS=1 -j$(nproc) || true
           echo "::endgroup::"
           # ===================================================================================
           echo "::group::Compile Glue"
@@ -77,15 +174,12 @@ jobs:
           if [ "${{ matrix.core.id }}" == "pokemini" ]; then GLUE_NAME="retro_pokemini.c"; fi
           if [ "${{ matrix.core.id }}" == "arcade"   ]; then GLUE_NAME="retro_neogeo.c";  fi
           emcc -c $EMUX/$GLUE_NAME -o $GITHUB_WORKSPACE/retro_glue.o $OPT_FLAGS -s USE_ZLIB=1
-          EXTRA_GLUE=""
-          case "${{ matrix.core.id }}" in pce|wswan|arcade|pokemini|lynx|mame078)
-            EXTRA_GLUE="$GITHUB_WORKSPACE/retro_glue.o" ;;
-          esac
+          EXTRA_GLUE="$GITHUB_WORKSPACE/retro_glue.o"
           echo "::endgroup::"
           # ===================================================================================
           echo "::group::Analyze Symbols"
           ALL_OBJS=$(find . -name "*.o" -not -path "*/test*" -not -path "*/example*" -not -path "*/tools*")
-          GLUE_FUNCS=$(sed -nE 's/^WEAK (EMSCRIPTEN_KEEPALIVE )?[^ (]+ \**([A-Za-z0-9_]+)\(.*/\2/p' $EMUX/$GLUE_NAME)
+          GLUE_FUNCS=$(sed -nE 's/^(WEAK|W) (EMSCRIPTEN_KEEPALIVE )?[^ (]+ \**([A-Za-z0-9_]+)\(.*/\3/p' $EMUX/$GLUE_NAME)
           for func in $GLUE_FUNCS; do
             if nm $ALL_OBJS 2>/dev/null | grep -q " U $func$"; then
               echo "[USED] $func"
@@ -102,7 +196,7 @@ jobs:
             -s INITIAL_MEMORY=${{ matrix.core.initial_mem }} -s STACK_SIZE=${{ matrix.core.stack }} -s FORCE_FILESYSTEM=1 \
             -s EXPORTED_RUNTIME_METHODS='["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap","getValue","setValue"]' \
             -s EXPORTED_FUNCTIONS='["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free","_retro_serialize_size","_retro_serialize","_retro_unserialize","_emux_is_dirty","_emux_render16","_emux_render32","_emux_audio_reset","_emux_audio_process","_emux_audio_get_buffer_l","_emux_audio_get_buffer_r","_emux_audio_set_core_rate"]' \
-            -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 -s TEXTDECODER=2 \
+            -s ERROR_ON_UNDEFINED_SYMBOLS=0 -s ASSERTIONS=0 -s TEXTDECODER=2 -Wno-error=undefined \
             -o ${{ matrix.core.id }}.js
           echo "::endgroup::"
           # ===================================================================================

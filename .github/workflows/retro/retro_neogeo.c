@@ -9,217 +9,92 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-
-/* Fix for IDE/IntelliSense red squiggly lines */
 #ifndef EMSCRIPTEN_KEEPALIVE
 #define EMSCRIPTEN_KEEPALIVE
 #endif
-
-/* Weak attribute to avoid "multiple definition" errors when linking with cores that already have these functions */
 #define WEAK __attribute__((weak))
-
-
-/* Libretro VFS Constants */
-#define RETRO_VFS_FILE_ACCESS_READ (1 << 0)
-#define RETRO_VFS_FILE_ACCESS_WRITE (1 << 1)
-#define RETRO_VFS_FILE_ACCESS_READ_WRITE                                       \
-  (RETRO_VFS_FILE_ACCESS_READ | RETRO_VFS_FILE_ACCESS_WRITE)
-#define RETRO_VFS_FILE_ACCESS_UPDATE_EXISTING (1 << 2)
-
-#define RETRO_VFS_FILE_ACCESS_HINT_NONE (0)
-#define RETRO_VFS_FILE_ACCESS_HINT_FREQUENT_ACCESS (1 << 0)
-
-/* String utilities - Kept for core logic compatibility */
-WEAK EMSCRIPTEN_KEEPALIVE char *string_to_lower(const char *str) {
-  if (!str)
-    return NULL;
-  char *lower = strdup(str);
-  for (int i = 0; lower[i]; i++)
-    if (lower[i] >= 'A' && lower[i] <= 'Z')
-      lower[i] += 32;
-  return lower;
+#define W    WEAK EMSCRIPTEN_KEEPALIVE
+#define RETRO_VFS_FILE_ACCESS_READ             (1 << 0)
+#define RETRO_VFS_FILE_ACCESS_WRITE            (1 << 1)
+#define RETRO_VFS_FILE_ACCESS_READ_WRITE       (RETRO_VFS_FILE_ACCESS_READ | RETRO_VFS_FILE_ACCESS_WRITE)
+#define RETRO_VFS_FILE_ACCESS_UPDATE_EXISTING  (1 << 2)
+#define RETRO_VFS_FILE_ACCESS_HINT_NONE              (0)
+#define RETRO_VFS_FILE_ACCESS_HINT_FREQUENT_ACCESS   (1 << 0)
+/* ── String ── */
+W char *string_to_lower(const char *str) {
+  if (!str) return NULL;
+  char *l = strdup(str);
+  for (int i = 0; l[i]; i++) if (l[i] >= 'A' && l[i] <= 'Z') l[i] |= 0x20;
+  return l;
 }
-
-
-/* Path utilities */
-WEAK EMSCRIPTEN_KEEPALIVE const char *find_last_slash(const char *str) {
-  const char *s1 = strrchr(str, '/'), *s2 = strrchr(str, '\\');
-  return (s1 > s2) ? s1 : (s2 ? s2 : s1);
+/* ── Path ── */
+W const char *find_last_slash(const char *s) {
+  const char *a = strrchr(s, '/'), *b = strrchr(s, '\\');
+  return a > b ? a : (b ? b : a);
 }
-
-
-WEAK EMSCRIPTEN_KEEPALIVE void path_parent_dir(char *path) {
-  char *last = (char *)find_last_slash(path);
-  if (last)
-    *last = '\0';
-  else
-    *path = '\0';
+W void path_parent_dir(char *p) {
+  char *l = (char *)find_last_slash(p);
+  *(l ? l : p) = '\0';
 }
-
-
-
-/* Directory utilities */
-struct RDIR {
-  DIR *d;
-  struct dirent *e;
-};
-
-WEAK EMSCRIPTEN_KEEPALIVE struct RDIR *
-retro_opendir_include_hidden(const char *name, bool include_hidden) {
+/* ── Directory ── */
+struct RDIR { DIR *d; struct dirent *e; };
+W struct RDIR *retro_opendir_include_hidden(const char *name, bool ih) {
   DIR *d = opendir(name);
-  if (!d)
-    return NULL;
-  struct RDIR *r = malloc(sizeof(struct RDIR));
-  r->d = d;
-  r->e = NULL;
+  if (!d) return NULL;
+  struct RDIR *r = malloc(sizeof(*r));
+  r->d = d; r->e = NULL;
   return r;
 }
-
-WEAK EMSCRIPTEN_KEEPALIVE bool retro_readdir(struct RDIR *r) {
-  return r && (r->e = readdir(r->d)) != NULL;
+W bool retro_readdir(struct RDIR *r)                      { return r && (r->e = readdir(r->d)); }
+W bool retro_dirent_is_dir(struct RDIR *r, const char *p) {
+  if (!r || !r->e) return false;
+  if (r->e->d_type == DT_DIR) return true;
+  char fp[1024]; snprintf(fp, sizeof(fp), "%s/%s", p, r->e->d_name);
+  struct stat st; return stat(fp, &st) == 0 && S_ISDIR(st.st_mode);
 }
-
-
-WEAK EMSCRIPTEN_KEEPALIVE bool retro_dirent_is_dir(struct RDIR *r,
-                                              const char *path) {
-  if (!r || !r->e)
-    return false;
-  if (r->e->d_type == DT_DIR)
-    return true;
-  char fp[1024];
-  snprintf(fp, 1024, "%s/%s", path, r->e->d_name);
-  struct stat st;
-  return (stat(fp, &st) == 0 && S_ISDIR(st.st_mode));
-}
-
-WEAK EMSCRIPTEN_KEEPALIVE void retro_closedir(struct RDIR *r) {
-  if (r) {
-    closedir(r->d);
-    free(r);
-  }
-}
-
-/* File I/O utilities */
-static const char *vfs_mode_to_string(unsigned mode) {
-  if (mode == RETRO_VFS_FILE_ACCESS_READ)
-    return "rb";
-  if (mode == RETRO_VFS_FILE_ACCESS_WRITE)
-    return "wb";
-  if (mode == RETRO_VFS_FILE_ACCESS_READ_WRITE)
-    return "w+b";
-  if (mode == (RETRO_VFS_FILE_ACCESS_READ_WRITE |
-               RETRO_VFS_FILE_ACCESS_UPDATE_EXISTING))
-    return "r+b";
+W void retro_closedir(struct RDIR *r) { if (r) { closedir(r->d); free(r); } }
+/* ── File mode ── */
+static const char *vfs_mode(unsigned m) {
+  if (m & RETRO_VFS_FILE_ACCESS_UPDATE_EXISTING) return "r+b";
+  if ((m & RETRO_VFS_FILE_ACCESS_READ_WRITE) == RETRO_VFS_FILE_ACCESS_READ_WRITE) return "w+b";
+  if (m & RETRO_VFS_FILE_ACCESS_WRITE) return "wb";
   return "rb";
 }
-
-WEAK EMSCRIPTEN_KEEPALIVE void *filestream_open(const char *path, unsigned mode,
-                                           unsigned hints) {
-  return (void *)fopen(path, vfs_mode_to_string(mode));
+/* ── Filestream ── */
+W void   *filestream_open (const char *p, unsigned m, unsigned h) { return fopen(p, vfs_mode(m)); }
+W int64_t filestream_read (void *s, void *d, int64_t n)          { return (int64_t)fread(d, 1, (size_t)n, s); }
+W int64_t filestream_write(void *s, const void *d, int64_t n)    { return (int64_t)fwrite(d, 1, (size_t)n, s); }
+W int64_t filestream_tell (void *s)                              { return (int64_t)ftello(s); }
+W int     filestream_close(void *s)                              { return s ? fclose(s) : -1; }
+W int64_t filestream_seek (void *s, int64_t off, int wh) {
+  return fseeko(s, off, wh) == 0 ? ftello(s) : -1;
 }
-
-WEAK EMSCRIPTEN_KEEPALIVE int64_t filestream_read(void *stream, void *data,
-                                             int64_t len) {
-  return (int64_t)fread(data, 1, (size_t)len, (FILE *)stream);
+W int64_t filestream_get_size(void *s) {
+  if (!s) return 0;
+  int64_t c = ftello(s); fseeko(s, 0, SEEK_END);
+  int64_t sz = ftello(s); fseeko(s, c, SEEK_SET);
+  return sz;
 }
-
-WEAK EMSCRIPTEN_KEEPALIVE int64_t filestream_write(void *stream, const void *data,
-                                              int64_t len) {
-  return (int64_t)fwrite(data, 1, (size_t)len, (FILE *)stream);
+/* ── rf* aliases ── */
+W void   *rfopen (const char *p, const char *m)                   { return fopen(p, m); }
+W int64_t rfread (void *b, size_t sz, size_t n, void *s)          { return (int64_t)fread(b, sz, n, s); }
+W int64_t rfwrite(const void *b, size_t sz, size_t n, void *s)    { return (int64_t)fwrite(b, sz, n, s); }
+W int64_t rfseek (void *s, int64_t off, int o)                    { return (int64_t)fseeko(s, off, o); }
+W int64_t rftell (void *s)                                        { return (int64_t)ftello(s); }
+W int     rfclose(void *s)                                        { return s ? fclose(s) : -1; }
+/* ── VFS handle ── */
+struct retro_vfs_file_handle { FILE *fp; };
+W struct retro_vfs_file_handle *retro_vfs_file_open_impl(const char *p, unsigned m, unsigned h) {
+  FILE *fp = fopen(p, vfs_mode(m));
+  if (!fp) return NULL;
+  struct retro_vfs_file_handle *v = malloc(sizeof(*v));
+  v->fp = fp; return v;
 }
-
-WEAK EMSCRIPTEN_KEEPALIVE int64_t filestream_seek(void *stream, int64_t offset,
-                                             int seek_position) {
-  return (int64_t)fseeko((FILE *)stream, offset, seek_position);
-}
-
-WEAK EMSCRIPTEN_KEEPALIVE int64_t filestream_tell(void *stream) {
-  return (int64_t)ftello((FILE *)stream);
-}
-
-WEAK EMSCRIPTEN_KEEPALIVE int filestream_close(void *stream) {
-  return fclose((FILE *)stream);
-}
-
-
-/* Libretro Common Aliases */
-WEAK EMSCRIPTEN_KEEPALIVE void *rfopen(const char *path, const char *mode) {
-  return (void *)fopen(path, mode);
-}
-WEAK EMSCRIPTEN_KEEPALIVE int64_t rfread(void *buffer, size_t size, size_t count,
-                                    void *stream) {
-  return (int64_t)fread(buffer, size, count, (FILE *)stream);
-}
-WEAK EMSCRIPTEN_KEEPALIVE int64_t rfwrite(const void *buffer, size_t size,
-                                     size_t count, void *stream) {
-  return (int64_t)fwrite(buffer, size, count, (FILE *)stream);
-}
-WEAK EMSCRIPTEN_KEEPALIVE int64_t rfseek(void *stream, int64_t offset, int origin) {
-  return (int64_t)fseeko((FILE *)stream, offset, origin);
-}
-WEAK EMSCRIPTEN_KEEPALIVE int64_t rftell(void *stream) {
-  return (int64_t)ftello((FILE *)stream);
-}
-WEAK EMSCRIPTEN_KEEPALIVE int rfclose(void *stream) {
-  return fclose((FILE *)stream);
-}
-
-WEAK EMSCRIPTEN_KEEPALIVE int64_t filestream_get_size(void *stream) {
-  FILE *fp = (FILE *)stream;
-  if (!fp)
-    return 0;
-  int64_t curr = ftello(fp);
-  fseeko(fp, 0, SEEK_END);
-  int64_t size = ftello(fp);
-  fseeko(fp, curr, SEEK_SET);
-  return size;
-}
-
-/* VFS Callbacks Wrapper */
-struct retro_vfs_file_handle {
-  FILE *fp;
-};
-
-WEAK EMSCRIPTEN_KEEPALIVE struct retro_vfs_file_handle *
-retro_vfs_file_open_impl(const char *path, unsigned mode, unsigned hints) {
-  FILE *fp = fopen(path, vfs_mode_to_string(mode));
-  if (!fp)
-    return NULL;
-  struct retro_vfs_file_handle *handle = malloc(sizeof(*handle));
-  handle->fp = fp;
-  return handle;
-}
-
-WEAK EMSCRIPTEN_KEEPALIVE int
-retro_vfs_file_close_impl(struct retro_vfs_file_handle *stream) {
-  if (stream) {
-    fclose(stream->fp);
-    free(stream);
-  }
-  return 0;
-}
-
-WEAK EMSCRIPTEN_KEEPALIVE int64_t
-retro_vfs_file_get_size_impl(struct retro_vfs_file_handle *stream) {
-  return filestream_get_size(stream ? stream->fp : NULL);
-}
-
-WEAK EMSCRIPTEN_KEEPALIVE int64_t retro_vfs_file_read_impl(
-    struct retro_vfs_file_handle *stream, void *data, int64_t len) {
-  return (int64_t)fread(data, 1, (size_t)len, stream->fp);
-}
-
-WEAK EMSCRIPTEN_KEEPALIVE int64_t retro_vfs_file_write_impl(
-    struct retro_vfs_file_handle *stream, const void *data, int64_t len) {
-  return (int64_t)fwrite(data, 1, (size_t)len, stream->fp);
-}
-
-WEAK EMSCRIPTEN_KEEPALIVE int64_t retro_vfs_file_seek_impl(
-    struct retro_vfs_file_handle *stream, int64_t offset, int seek_position) {
-  return (int64_t)fseeko(stream->fp, offset, seek_position);
-}
-
-WEAK EMSCRIPTEN_KEEPALIVE int64_t
-retro_vfs_file_tell_impl(struct retro_vfs_file_handle *stream) {
-  return (int64_t)ftello(stream->fp);
+W int     retro_vfs_file_close_impl   (struct retro_vfs_file_handle *s) { if (s) { fclose(s->fp); free(s); } return 0; }
+W int64_t retro_vfs_file_get_size_impl(struct retro_vfs_file_handle *s) { return filestream_get_size(s ? s->fp : NULL); }
+W int64_t retro_vfs_file_read_impl    (struct retro_vfs_file_handle *s, void *d, int64_t n)       { return s ? (int64_t)fread(d, 1, (size_t)n, s->fp)  : -1; }
+W int64_t retro_vfs_file_write_impl   (struct retro_vfs_file_handle *s, const void *d, int64_t n) { return s ? (int64_t)fwrite(d, 1, (size_t)n, s->fp) : -1; }
+W int64_t retro_vfs_file_tell_impl    (struct retro_vfs_file_handle *s) { return s ? (int64_t)ftello(s->fp) : -1; }
+W int64_t retro_vfs_file_seek_impl    (struct retro_vfs_file_handle *s, int64_t off, int wh) {
+  return s && fseeko(s->fp, off, wh) == 0 ? ftello(s->fp) : -1;
 }

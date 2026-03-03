@@ -6,7 +6,7 @@
 #include <emscripten.h>
 
 // ===== Video Utilities =====
-EMSCRIPTEN_KEEPALIVE int emux_is_dirty(const uint32_t * restrict buf1, uint32_t * restrict buf2, size_t size) {
+EMSCRIPTEN_KEEPALIVE __attribute__((used)) int emux_is_dirty(const uint32_t * restrict buf1, uint32_t * restrict buf2, size_t size) {
     size_t len = size >> 2;
     size_t step = len >> 8;
     if (step) {
@@ -21,7 +21,7 @@ dirty:
     return 1;
 }
 
-EMSCRIPTEN_KEEPALIVE int emux_render16(const uint16_t * restrict src, uint16_t * restrict cache, uint32_t * restrict dst, int width, int height, int stride, const uint32_t * restrict lut) {
+EMSCRIPTEN_KEEPALIVE __attribute__((used)) int emux_render16(const uint16_t * restrict src, uint16_t * restrict cache, uint32_t * restrict dst, int width, int height, int stride, const uint32_t * restrict lut) {
     size_t total_px = stride * height;
     size_t step = total_px >> 8;
     if (step) {
@@ -43,7 +43,7 @@ dirty16:
     return 1;
 }
 
-EMSCRIPTEN_KEEPALIVE int emux_render32(const uint32_t * restrict src, uint32_t * restrict cache, uint32_t * restrict dst, int length) {
+EMSCRIPTEN_KEEPALIVE __attribute__((used)) int emux_render32(const uint32_t * restrict src, uint32_t * restrict cache, uint32_t * restrict dst, int length) {
     size_t step = length >> 8;
     if (step) {
         const uint32_t *p1 = src, *p2 = cache;
@@ -73,20 +73,20 @@ static float audio_frac = 0.0f;
 static float prev_l = 0.0f;
 static float prev_r = 0.0f;
 
-EMSCRIPTEN_KEEPALIVE float* emux_audio_get_buffer_l() { return audio_out_l; }
-EMSCRIPTEN_KEEPALIVE float* emux_audio_get_buffer_r() { return audio_out_r; }
+EMSCRIPTEN_KEEPALIVE __attribute__((used)) float* emux_audio_get_buffer_l() { return audio_out_l; }
+EMSCRIPTEN_KEEPALIVE __attribute__((used)) float* emux_audio_get_buffer_r() { return audio_out_r; }
 
-EMSCRIPTEN_KEEPALIVE void emux_audio_set_core_rate(float core_rate) {
+EMSCRIPTEN_KEEPALIVE __attribute__((used)) void emux_audio_set_core_rate(float core_rate) {
     audio_ratio = core_rate / 48000.0f;
 }
 
-EMSCRIPTEN_KEEPALIVE void emux_audio_reset() {
+EMSCRIPTEN_KEEPALIVE __attribute__((used)) void emux_audio_reset() {
     audio_frac = 0.0f;
     prev_l = 0.0f;
     prev_r = 0.0f;
 }
 
-EMSCRIPTEN_KEEPALIVE int emux_audio_process(const int16_t *src, int frames) {
+EMSCRIPTEN_KEEPALIVE __attribute__((used)) int emux_audio_process(const int16_t *src, int frames) {
     if (frames <= 0) return 0;
 
     const float inv = 1.0f / 32768.0f;
