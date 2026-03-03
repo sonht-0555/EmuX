@@ -14,19 +14,17 @@ const getPointer = (string, pointer) => {
 // ===== env_cb =====
 function env_cb(command, data) {
     const data32 = Number(data) >> 2;
-    if (command === 1) Module.pixelFormat = Module.HEAP32[data32];
-    if (command === 15) {
-        const key = Module.UTF8ToString(Module.HEAP32[data32]);
-        if (activeVars[key]) {
-            Module.HEAP32[data32 + 1] = getPointer(activeVars[key]);
-            return true;
-        }
+    switch (command) {
+        case 1: return (Module.pixelFormat = Module.HEAP32[data32], 1);
+        case 3: return (data && (Module.HEAP8[data] = 1), 1);
+        case 27: return window._logFnPtr ? (Module.HEAP32[data32] = window._logFnPtr, 1) : 0;
+        case 9: case 10: case 31: return (Module.HEAP32[data32] = getPointer('.'), 1);
+        case 15:
+            const key = Module.UTF8ToString(Module.HEAP32[data32]),
+                val = activeVars[key] || (key.includes('skip_disclaimer') ? "enabled" : (key.includes('sample_rate') ? "48000" : (key.includes('brightness') || key.includes('gamma') ? "1.0" : "")));
+            return val ? (Module.HEAP32[data32 + 1] = getPointer(val), 1) : 0;
     }
-    if (command === 9) {
-        Module.HEAP32[data32] = getPointer('.');
-        return true;
-    }
-    return command === 10;
+    return 0;
 }
 // ===== CORE_CONFIG =====
 const CORE_BASE = 'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/';
@@ -39,7 +37,7 @@ const CORE_CONFIG = [
     {ext: '.a26', script: CORE_BASE + 'a26.zip', btns: {'btn-1': ['F', 0], 'btn-3': ['S', ''], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}},
     {ext: '.ws,.wsc', script: CORE_BASE + 'wswan.zip', btns: {'btn-1': ['A', 0], 'btn-3': ['B', 8], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', ''], 'btn-start': [' st.', 3]}},
     {ext: '.smc,.sfc,.fig,.swc', script: CORE_BASE + 'snes2010.zip', btns: {'btn-1': ['A', 8], 'btn-2': ['X', 9], 'btn-3': ['B', 0], 'btn-4': ['Y', 1], 'btn-l': [' bl.', 10], 'btn-r': [' br.', 11], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}},
-    {ext: '.zip', script: CORE_BASE + 'arcade.zip', btns: {'btn-1': ['A', 0], 'btn-3': ['B', 8], 'btn-2': ['C', 1], 'btn-4': ['D', 9], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' cn.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/neogeo.zip']},
+    {ext: '.zip', script: CORE_BASE + 'mame078.zip', btns: {'btn-1': ['A', 0], 'btn-3': ['B', 8], 'btn-2': ['C', 1], 'btn-4': ['D', 9], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' cn.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/neogeo.zip']},
     {ext: '.nds', script: CORE_BASE + 'nds2021.zip', btns: {'btn-1': ['A', 8], 'btn-2': ['X', 9], 'btn-3': ['B', 0], 'btn-4': ['Y', 1], 'btn-l': [' bl.', 10], 'btn-r': [' br.', 11], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/bios7.bin', './src/utils/bios/bios9.bin', './src/utils/bios/firmware.bin']},
     {ext: '.bin,.iso,.img,.pbp,.chd', script: CORE_BASE + 'ps1.zip', btns: {'btn-1': ['A', 8], 'btn-2': ['X', 9], 'btn-3': ['B', 0], 'btn-4': ['Y', 1], 'btn-l': [' bl.', 10], 'btn-r': [' br.', 11], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/scph5501.bin']},
     {ext: '.min', script: CORE_BASE + 'pokemini.zip', btns: {'btn-1': ['A', 8], 'btn-3': ['B', 0], 'btn-l': [' bc.', 1], 'btn-r': [' be.', 2], 'btn-select': [' sc.', ''], 'btn-start': [' st.', 3]}},
@@ -60,7 +58,7 @@ async function initCore(romFile) {
     // Step 2: Setup State
     activeVars = config.vars || {};
     updateButtons(config.btns);
-    const isArcade = config.script.includes('arcade'), isNDS = config.script.includes('nds');
+    const isMame = config.script.includes('mame'), isArcade = config.script.includes('arcade') || isMame, isNDS = config.script.includes('nds');
     let scriptSource = config.script;
     // Step 3: Prepare Core Engine
     await showNotification("", "#", "--", "", true);
@@ -83,9 +81,16 @@ async function initCore(romFile) {
             locateFile: path => path.endsWith('.wasm') ? (window.wasmUrl || path) : path,
             async onRuntimeInitialized() {
                 // Step 5: Core engine setup
-                const romPointer = Module._malloc(finalRomData.length), infoPointer = Module._malloc(16);
-                const callbacks = [[Module._retro_set_environment, env_cb, "iii"], [Module._retro_set_video_refresh, video_cb, "viiii"], [Module._retro_set_audio_sample, audio_cb, "vii"], [Module._retro_set_audio_sample_batch, audio_batch_cb, "iii"], [Module._retro_set_input_poll, input_poll_cb, "v"], [Module._retro_set_input_state, input_state_cb, "iiiii"]];
-                callbacks.forEach(([functionPointer, callback, signature]) => functionPointer(Module.addFunction(callback, signature)));
+                let romPointer = 0;
+                if (!isMame) romPointer = Module._malloc(finalRomData.length);
+                const infoPointer = Module._malloc(16);
+                window._logFnPtr = Module.addFunction((level, fmt, arg) => 0, "viii");
+                if (Module._retro_set_environment) Module._retro_set_environment(Module.addFunction(env_cb, "iii"));
+                if (Module._retro_set_video_refresh) Module._retro_set_video_refresh(Module.addFunction(video_cb, "viiii"));
+                if (Module._retro_set_audio_sample) Module._retro_set_audio_sample(Module.addFunction((l, r) => { }, "vii"));
+                if (Module._retro_set_audio_sample_batch) Module._retro_set_audio_sample_batch(Module.addFunction(audio_batch_cb, "iii"));
+                if (Module._retro_set_input_poll) Module._retro_set_input_poll(Module.addFunction(input_poll_cb, "v"));
+                if (Module._retro_set_input_state) Module._retro_set_input_state(Module.addFunction(input_state_cb, "iiiii"));
                 Module._retro_init();
                 // Step 6: BIOS management
                 if (biosFetches.length > 0) {
@@ -98,7 +103,7 @@ async function initCore(romFile) {
                 let romPath = isArcade ? `/${finalRomName}` : (isNDS ? '/game.nds' : `/game.${finalRomName.toLowerCase().split('.').pop()}`);
                 Module.FS.writeFile(romPath, finalRomData);
                 const loadInfo = [getPointer(romPath), 0, 0, 0];
-                if (!isArcade) {
+                if (!isMame && romPointer) {
                     Module.HEAPU8.set(finalRomData, romPointer);
                     loadInfo[1] = romPointer;
                     loadInfo[2] = finalRomData.length;
@@ -139,6 +144,6 @@ async function initCore(romFile) {
         script.src = scriptSource;
         script.onload = () => {if (scriptSource.startsWith('blob:')) URL.revokeObjectURL(scriptSource);};
         document.body.appendChild(script);
-        gameName = romFile.name.charAt(0).toUpperCase() + romFile.name.slice(1);
+        gameName = romFile.name;
     });
 }

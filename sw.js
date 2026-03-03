@@ -1,4 +1,4 @@
-let revision = 'EmuX_6.02';
+let revision = 'EmuX_6.05';
 var urlsToCache = [
     './',
     './index.html',
@@ -16,6 +16,7 @@ var urlsToCache = [
     'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/genesis.zip',
     'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/ngp.zip',
     'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/arcade.zip',
+    'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/mame078.zip',
     'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/nds2021.zip',
     'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/ps1.zip',
     'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/wswan.zip',

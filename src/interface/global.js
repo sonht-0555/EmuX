@@ -42,7 +42,7 @@ async function message(text, duration = 2000) {
     if (count) count.cancelled = true;
     const token = {cancelled: false};
     count = token;
-    title1.textContent = text;
+    title1.textContent = text.charAt(0).toUpperCase() + text.slice(1);
     await delay(duration);
     if (!token.cancelled && count === token) {title1.textContent = gameName; count = null;}
 }
