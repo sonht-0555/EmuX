@@ -18,13 +18,13 @@ function env_cb(command, data) {
         case 1: return (Module.pixelFormat = Module.HEAP32[data32], 1);
         case 3: return (data && (Module.HEAP8[data] = 1), 1);
         case 27: return window._logFnPtr ? (Module.HEAP32[data32] = window._logFnPtr, 1) : 0;
-        case 9: case 10: case 31: return (Module.HEAP32[data32] = getPointer('.'), 1);
+        case 9: case 31: return (Module.HEAP32[data32] = getPointer('.'), 1);
         case 15:
             const key = Module.UTF8ToString(Module.HEAP32[data32]),
                 val = activeVars[key] || (key.includes('skip_disclaimer') ? "enabled" : (key.includes('sample_rate') ? "48000" : (key.includes('brightness') || key.includes('gamma') ? "1.0" : "")));
             return val ? (Module.HEAP32[data32 + 1] = getPointer(val), 1) : 0;
     }
-    return 0;
+    return command === 10;
 }
 // ===== CORE_CONFIG =====
 const CORE_BASE = 'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/';
@@ -37,8 +37,8 @@ const CORE_CONFIG = [
     {ext: '.a26', script: CORE_BASE + 'a26.zip', btns: {'btn-1': ['F', 0], 'btn-3': ['S', ''], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}},
     {ext: '.ws,.wsc', script: CORE_BASE + 'wswan.zip', btns: {'btn-1': ['A', 0], 'btn-3': ['B', 8], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', ''], 'btn-start': [' st.', 3]}},
     {ext: '.smc,.sfc,.fig,.swc', script: CORE_BASE + 'snes2010.zip', btns: {'btn-1': ['A', 8], 'btn-2': ['X', 9], 'btn-3': ['B', 0], 'btn-4': ['Y', 1], 'btn-l': [' bl.', 10], 'btn-r': [' br.', 11], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}},
-    {ext: '.zip', script: CORE_BASE + 'mame078.zip', btns: {'btn-1': ['A', 0], 'btn-3': ['B', 8], 'btn-2': ['C', 1], 'btn-4': ['D', 9], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' cn.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/neogeo.zip']},
-    {ext: '.nds', script: CORE_BASE + 'nds2021.zip', btns: {'btn-1': ['A', 8], 'btn-2': ['X', 9], 'btn-3': ['B', 0], 'btn-4': ['Y', 1], 'btn-l': [' bl.', 10], 'btn-r': [' br.', 11], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/bios7.bin', './src/utils/bios/bios9.bin', './src/utils/bios/firmware.bin']},
+    {ext: '.zip', isMame: true, isArcade: true, script: CORE_BASE + 'mame078.zip', btns: {'btn-1': ['A', 0], 'btn-3': ['B', 8], 'btn-2': ['C', 1], 'btn-4': ['D', 9], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' cn.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/neogeo.zip']},
+    {ext: '.nds', isNDS: true, script: CORE_BASE + 'nds2021.zip', btns: {'btn-1': ['A', 8], 'btn-2': ['X', 9], 'btn-3': ['B', 0], 'btn-4': ['Y', 1], 'btn-l': [' bl.', 10], 'btn-r': [' br.', 11], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/bios7.bin', './src/utils/bios/bios9.bin', './src/utils/bios/firmware.bin']},
     {ext: '.bin,.iso,.img,.pbp,.chd', script: CORE_BASE + 'ps1.zip', btns: {'btn-1': ['A', 8], 'btn-2': ['X', 9], 'btn-3': ['B', 0], 'btn-4': ['Y', 1], 'btn-l': [' bl.', 10], 'btn-r': [' br.', 11], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/scph5501.bin']},
     {ext: '.min', script: CORE_BASE + 'pokemini.zip', btns: {'btn-1': ['A', 8], 'btn-3': ['B', 0], 'btn-l': [' bc.', 1], 'btn-r': [' be.', 2], 'btn-select': [' sc.', ''], 'btn-start': [' st.', 3]}},
     {ext: '.lnx', script: CORE_BASE + 'lynx.zip', btns: {'btn-1': ['A', 0], 'btn-3': ['B', 8], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/lynxboot.img']},
@@ -58,7 +58,7 @@ async function initCore(romFile) {
     // Step 2: Setup State
     activeVars = config.vars || {};
     updateButtons(config.btns);
-    const isMame = config.script.includes('mame'), isArcade = config.script.includes('arcade') || isMame, isNDS = config.script.includes('nds');
+    const isMame = config.isMame, isArcade = config.isArcade, isNDS = config.isNDS;
     let scriptSource = config.script;
     // Step 3: Prepare Core Engine
     await showNotification("", "#", "--", "", true);
