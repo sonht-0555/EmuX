@@ -1,8 +1,8 @@
 name: Build All Cores
 
 on:
-  push:
-    branches: [main]
+  #push:
+    #branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -34,9 +34,9 @@ jobs:
           - {id: wswan,    repo: mednafen_wswan,    initial_mem: 128mb, stack: 4mb,  make: "-f Makefile"}
           - {id: lynx,     repo: handy,             initial_mem: 128mb, stack: 4mb,  make: "-f Makefile"}
           - {id: nds,      repo: melonds,           initial_mem: 512mb, stack: 32mb, make: ""}
-          - {id: mame078,  repo: mame2003_plus,     initial_mem: 256mb, stack: 8mb,  make: ""}
+          - {id: mame,     repo: mame2003_plus,     initial_mem: 256mb, stack: 8mb,  make: ""}
           - {id: pokemini, repo: pokemini,          initial_mem: 128mb, stack: 2mb,  make: "", glue: "retro_pokemini.c", zlib: 1}
-          - {id: arcade,   repo: fbneo,             initial_mem: 256mb, stack: 8mb,  make: "", subdir: "src/burner/libretro", glue: "retro_neogeo.c", zlib: 1}
+          - {id: fbneo,    repo: fbneo,             initial_mem: 256mb, stack: 8mb,  make: "", subdir: "src/burner/libretro", glue: "retro_neogeo.c", zlib: 1}
           - {id: ps1,      repo: pcsx_rearmed,      initial_mem: 512mb, stack: 16mb, make: "-f Makefile.libretro DYNAREC=\"\" GPU_PEOPS=1 GLES=1", zlib: 1}
           - {id: nds2021,  repo: melonds2021,       initial_mem: 512mb, stack: 32mb, make: "", fetch: "git clone --depth 1 --branch before-rebase-20210922 https://github.com/libretro/melonDS.git libretro-super/libretro-melonds2021", patch: "sed -i \"s/-Wl,--no-undefined//g\" Makefile; sed -i \"s/-Wl,--version-script=[^ ]*//g\" Makefile"}
     steps:

@@ -47,7 +47,7 @@ async function verticalSetting(values) {
 }
 // ===== optionClick =====
 const optionClick = text => ({
-    'Cloud': () => {const t = prompt("GitHub Token:"); if (t) local('gh_token', t);},
+    'Cloud': () => { },
     'Restore': () => cloudRestore(),
     'Backup': () => cloudBackup()
 }[text]?.());

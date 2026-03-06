@@ -1,4 +1,4 @@
-let revision = 'EmuX_6.12';
+let revision = 'EmuX_6.10';
 var urlsToCache = [
     './',
     './index.html',
@@ -15,8 +15,8 @@ var urlsToCache = [
     'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/nes.zip',
     'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/genesis.zip',
     'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/ngp.zip',
-    'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/arcade.zip',
-    'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/mame078.zip',
+    'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/fbneo.zip',
+    'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/mame.zip',
     'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/nds2021.zip',
     'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/ps1.zip',
     'https://raw.githubusercontent.com/sonht-0555/EmuX/builds/wswan.zip',
@@ -31,7 +31,6 @@ var urlsToCache = [
     './src/utils/bios/syscard3.pce',
     './src/utils/bios/lynxboot.img',
     './src/utils/zip.js',
-    './src/utils/s3mini.js',
     './src/core/loader.js',
     './src/core/audio.js',
     './src/core/video.js',
