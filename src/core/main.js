@@ -1,24 +1,26 @@
 // ===== findCore =====
 function findCore(name, data) {
     const nameLower = name.toLowerCase(), getExtension = fileName => '.' + fileName.split('.').pop().toLowerCase();
+    const tryMatch = (core, ext, fileName, list) => (core.ext && core.ext.split(',').includes(ext) && (core.match ? core.match(data, fileName, list) : true));
     if (!nameLower.endsWith('.zip')) {
-        const extension = getExtension(nameLower), config = CORE_CONFIG.find(core => core.ext.split(',').includes(extension));
+        const extension = getExtension(nameLower), config = CORE_CONFIG.find(core => tryMatch(core, extension, nameLower));
         return {config, data, name};
     }
     const filenames = [];
     fflate.unzipSync(data, {filter: (file) => {filenames.push(file.name); return false;}});
     for (const fileName of filenames) {
-        const extension = getExtension(fileName), consoleCore = CORE_CONFIG.find(core => core.ext !== '.zip' && core.ext.split(',').includes(extension));
+        const extension = getExtension(fileName), consoleCore = CORE_CONFIG.find(core => core.ext !== '.zip' && tryMatch(core, extension, fileName, filenames));
         if (consoleCore) {
             if (extension === '.bin' && filenames.length > 5) continue;
-            if (['.nes', '.fds', '.unif', '.gba', '.gbc', '.gb', '.sgb', '.md', '.gen', '.smd', '.sms', '.gg', '.a26', '.ws', '.wsc', '.smc', '.sfc', '.fig', '.swc', '.ngp', '.ngc', '.nds', '.pce', '.sgx', '.chd', '.cue', '.min', '.lnx', '.vb'].includes(extension)) {
+            if (!['.bin', '.iso', '.img', '.pbp', '.chd', '.cue'].includes(extension)) {
                 const unzipped = fflate.unzipSync(data, {filter: (file) => file.name === fileName});
                 return {config: consoleCore, data: unzipped[fileName], name: fileName};
             }
             return {config: consoleCore, data, name};
         }
     }
-    return {config: CORE_CONFIG.find(core => core.ext === '.zip'), data, name};
+    const id = local(name) === 'mame' ? 'mame' : 'fbneo';
+    return {config: CORE_CONFIG.find(c => c.id === id), data, name};
 }
 // ===== inputGame =====
 async function inputGame(event) {

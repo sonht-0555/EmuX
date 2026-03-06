@@ -40,14 +40,14 @@ async function verticalSetting(values) {
     page02.style.paddingTop = `${list[current]}px`;
     list.forEach((value, index) => {
         const el = document.getElementById(`k${value}`);
-        if (el) el.style.stroke = index === current ? "var(--profile-1)" : "var(--profile-4)";
+        if (el) el.style.stroke = index === current ? "var(--profile-base)" : "var(--profile-3)";
     });
     local('vertical', current);
     current = (current + 1) % list.length;
 }
 // ===== optionClick =====
 const optionClick = text => ({
-    'Cloud': () => {const t = prompt("GitHub Token:"); if (t) local('gh_token', t);},
+    'Cloud': () => { },
     'Restore': () => cloudRestore(),
     'Backup': () => cloudBackup()
 }[text]?.());

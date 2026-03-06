@@ -67,6 +67,7 @@ async function gameView(name) {
     gamepad.style.gridTemplateColumns = `${size}px 1px ${size}px 1px ${size}px 1px ${size}px 1px auto 1px ${size}px 1px ${size}px 1px ${size}px 1px ${size}px`;
     page02.style.gridTemplateRows = `auto ${window.innerWidth - (size * 8 + 30)}px ${size * 4 + 36}px ${window.innerWidth - (size * 8 + 20)}px 1fr 20px`;
     joy.style.width = `${size * 4 + 3}px`;
+    await delay(200);
     [page00, page01, list01, list02, switch0].forEach(page => page.hidden = true);
     [page02, list].forEach(page => page.hidden = false);
     const patternSize = (integer <= 4 || integer % 2 !== 0) ? integer : (integer / 2);

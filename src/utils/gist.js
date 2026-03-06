@@ -5,8 +5,8 @@ const CLOUD_CONFIG = {
 };
 const getHeaders = () => ({'Authorization': `Bearer ${CLOUD_CONFIG.TOKEN}`, 'Content-Type': 'application/json'});
 const cloudCache = (key, value) => {
-    if (value !== undefined) return localStorage.setItem(key, JSON.stringify(value));
-    try {return JSON.parse(localStorage.getItem(key));} catch (error) {return null;}
+    if (value !== undefined) return local(key, JSON.stringify(value));
+    try {return JSON.parse(local(key));} catch (error) {return null;}
 };
 function bytesToBase64(bytes) {
     let binary = "";

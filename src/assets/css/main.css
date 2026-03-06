@@ -21,7 +21,7 @@
     src: url("../font/3x3.ttf");
   }
   body, html, :where(body), :where(html) {
-    -webkit-tap-highlight-color: black !important;
+    -webkit-tap-highlight-color: var(--profile-black) !important;
     -webkit-user-drag: none !important;
     -webkit-touch-callout: none !important;
     -webkit-overflow-scrolling: touch !important;
@@ -30,23 +30,23 @@
     cursor: default !important;
     user-select: none !important;
     text-rendering: optimizeLegibility !important;
-    background-color: black !important;
+    background-color: var(--profile-black) !important;
     transition: opacity 0.3s ease-in-out;
   }
   /*Common-open*/
   :root {
-    --profile-1: rgba(197, 175, 144, 1.00);
-    --profile-2: rgba(197, 175, 144, 0.60);
-    --profile-3: rgba(197, 175, 144, 0.40);
-    --profile-4: rgba(197, 175, 144, 0.32);
-    --profile-5: rgba(197, 175, 144, 0.20);
-    --profile-6: #1D1A15;
-    --profile-bg: rgba(197, 175, 144, 0.04);
-    --profile-black: #000000;
-    --profile-orange: #DD5639;
-    --profile-cyan: #20A5A6;
-    --profile-green: rgba(36, 62, 46, 1);
-    --profile-green-dark: rgba(36, 62, 46, 0.4);
+    --profile-base: oklch(75% 0.05 80);
+    --profile-black: oklch(4% 0 0);
+    --profile-orange: oklch(63% 0.19 32);
+    --profile-cyan: oklch(66% 0.11 200);
+    --profile-green: oklch(33% 0.05 160);
+    --profile-d: oklch(from var(--profile-green) l c h / 0.40);
+    --profile-o: color-mix(in oklch, var(--profile-base) 24%, var(--profile-black));
+    --profile-1: oklch(from var(--profile-base) l c h / 0.60);
+    --profile-2: oklch(from var(--profile-base) l c h / 0.40);
+    --profile-3: oklch(from var(--profile-base) l c h / 0.30);
+    --profile-4: oklch(from var(--profile-base) l c h / 0.20);
+    --profile-5: oklch(from var(--profile-base) l c h / 0.04);
   }
   body::after, page00::after, screen::after {
     content: "";
@@ -66,7 +66,7 @@
   body {
     z-index: 1;
     font-size: 8px;
-    color: var(--profile-1);
+    color: var(--profile-base);
     font-family: "3x3";
     text-align: center;
     width: 100vw;
@@ -79,7 +79,7 @@
 }
 @layer base {
   page00,
-  page01, list, list01, list02, file, cta,
+  page01, list, list01, list02, file, cta, label, setting,
   page02, display, gamepad, notification, joypad, invis, sec-12, sec-34 {
     display: grid;
     width: 100%;
@@ -90,8 +90,8 @@
     height: 100%;
   }
   rom, file, logo, setting, vertical, label, opti, btn-state, btn-l, btn-r, btn-menu, sec-dpad, btn-1, btn-3, btn-2, btn-4, btn-select, btn-start {
-    background-color: var(--profile-bg) !important;
-    outline: 1px solid var(--profile-6);
+    background-color: var(--profile-5) !important;
+    outline: 1px solid var(--profile-o);
   }
   [hidden] {
     display: none !important
@@ -125,7 +125,7 @@
   }
   title0, logo {
     white-space: pre;
-    color: var(--profile-1);
+    color: var(--profile-base);
     line-height: 1;
     display: inline-flex;
     align-items: center;
@@ -143,23 +143,23 @@
   [green]::before {
     content: attr(green);
     color: var(--profile-green);
-    text-shadow: -3px 0px 0px var(--profile-green-dark);
+    text-shadow: -3px 0px 0px var(--profile-d);
   }
   logo[green]::before {
-    text-shadow: -4px 0px 0px var(--profile-green-dark);
+    text-shadow: -4px 0px 0px var(--profile-d);
   }
   [gray]::after {
     content: attr(gray);
-    color: var(--profile-4);
+    color: var(--profile-3);
   }
   message0, switch0 {
-    color: var(--profile-4);
+    color: var(--profile-3);
     padding-left: 2px;
     white-space: pre;
   }
   switch0 {
     padding: 8px 8px 8px 10px;
-    outline: 1px solid var(--profile-6);
+    outline: 1px solid var(--profile-o);
     width: 100px;
     margin-top: 60px;
     display: inline-block;
@@ -187,7 +187,7 @@
   }
   titl {
     padding: 16px 0px 6px 0px;
-    color: var(--profile-4);
+    color: var(--profile-3);
   }
   name, ver, opti {
     flex: 1;
@@ -201,23 +201,20 @@
     gap: 8px;
     grid-row: 2;
   }
-  setting {
-    background: url("data:image/svg+xml,%3Csvg width='14' height='14' viewBox='0 0 14 14' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 5H3V3H5V0M0 9H3V11H5V14M9 14V11H11V9H14' stroke='%23C5AF90' stroke-opacity='0.32' stroke-width='2'/%3E%3Cpath d='M9 0V3H11V5H14' stroke='%23C5AF90' stroke-width='2'/%3E%3C/svg%3E%0A");
-  }
-  label {
-    background: url("data:image/svg+xml,%3Csvg width='64' height='14' viewBox='0 0 64 14' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M14 5H16M17 4V0M23 0V6M31 0V6' stroke='%23243E2E' stroke-opacity='0.6' stroke-width='2'/%3E%3Cpath d='M22 9H19M22 13H19M19 13H17V9H19M19 13V9M30 9H25V13H30M32 9H35M38 9H35M35 9V14M43 0V3M43 3H45V5H47V7M43 3V7M47 7H50M47 7V9H45V11H43M47 7H43M43 11V14M43 11V7' stroke='%23C5AF90' stroke-width='2'/%3E%3Cpath d='M16 5H19V1H22M30 1H27M30 5H27M27 5H25V1H27M27 5V1M33 0V5H38' stroke='%23243E2E' stroke-width='2'/%3E%3C/svg%3E%0A");
-  }
   more {
     width: 40px;
-    background: url("data:image/svg+xml,%3Csvg width='10' height='10' viewBox='0 0 10 10' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 1H2M0 5H2M0 9H2M4 1H6M8 1H10M4 5H6M8 5H10M4 9H6M8 9H10' stroke='%23C5AF90' stroke-opacity='0.32' stroke-width='2'/%3E%3C/svg%3E%0A");
+    background: linear-gradient(var(--profile-3), var(--profile-3));
+    mask: url("data:image/svg+xml,%3Csvg width='10' height='10' viewBox='0 0 10 10' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 1H2M0 5H2M0 9H2M4 1H6M8 1H10M4 5H6M8 5H10M4 9H6M8 9H10' stroke='%23C5AF90' stroke-width='2'/%3E%3C/svg%3E%0A") no-repeat center;
   }
   dele {
     width: 40px;
-    background: url("data:image/svg+xml,%3Csvg width='10' height='10' viewBox='0 0 10 10' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M8 5H10M6 5H4M2 5H0' stroke='%23C5AF90' stroke-opacity='0.32' stroke-width='2'/%3E%3Cpath d='M8 9H10M6 9H4M2 9H0' stroke='%23C5AF90' stroke-opacity='0.08' stroke-width='2'/%3E%3Cpath d='M8 1H10M6 1H4M2 1H0' stroke='%23C5AF90' stroke-opacity='0.08' stroke-width='2'/%3E%3C/svg%3E%0A");
+    background: linear-gradient(var(--profile-3), var(--profile-3));
+    mask: url("data:image/svg+xml,%3Csvg width='10' height='8' viewBox='0 0 10 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M8 4H10M6 4H4M2 4H0' stroke='%23C5AF90' stroke-width='2'/%3E%3C/svg%3E%0A") no-repeat center;
   }
   setting, label, more, down, dele {
     background-position: center;
     background-repeat: no-repeat;
+    place-items: center;
   }
 }
 @layer page-2 {
@@ -250,7 +247,7 @@
     position: relative;
     font-family: "04b";
     grid-template-columns: 1fr auto;
-    color: var(--profile-3);
+    color: var(--profile-2);
     text-align: left;
     align-items: end;
   }
@@ -295,12 +292,6 @@
     grid-row: 01 / 01;
     grid-column: 16 / 18
   }
-  sec-dpad {
-    position: relative;
-    grid-area: sec-dpad;
-    grid-row: 03 / 08;
-    grid-column: 01 / 09
-  }
   sec-12 {
     position: relative;
     grid-area: sec-12;
@@ -331,14 +322,25 @@
     font-size: 8px;
     padding-left: 2px;
     place-items: center;
-    color: var(--profile-3);
+    color: var(--profile-2);
     white-space: pre;
   }
   btn-select, btn-start {
     padding-left: 3px
   }
   sec-dpad {
-    background: url("data:image/svg+xml,%3Csvg width='136' height='136' viewBox='0 0 136 136' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M68 0V6M0 68H6M68 130V136M130 68H136' stroke='%23C5AF90' stroke-width='3'/%3E%3C/svg%3E%0A");
+    position: relative;
+    grid-area: sec-dpad;
+    grid-row: 03 / 08;
+    grid-column: 01 / 09;
+    background-image:
+      linear-gradient(var(--profile-base), var(--profile-base)),
+      linear-gradient(var(--profile-base), var(--profile-base)),
+      linear-gradient(var(--profile-base), var(--profile-base)),
+      linear-gradient(var(--profile-base), var(--profile-base));
+    background-size: 3px 6px, 3px 6px, 6px 3px, 6px 3px;
+    background-position: top 20px center, bottom 20px center, left 20px center, right 20px center;
+    background-repeat: no-repeat;
   }
   sec-12, sec-34 {
     grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
@@ -347,7 +349,7 @@
   joypad svg {
     background: url("data:image/svg+xml,%3Csvg width='175' height='175' viewBox='0 0 175 175' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M88 87H137V88H88V137H87V88H38V87H87V38H88V87Z' fill='%231D1A15'/%3E%3C/svg%3E%0A");
   }
-  btn-state, btn-menu, btn-l, btn-r, sec-dpad, btn-1, btn-2, btn-3, btn-4, btn-select, btn-start, #joypad {
+  btn-state, btn-menu, btn-l, btn-r, btn-1, btn-2, btn-3, btn-4, btn-select, btn-start, #joypad {
     background-position: center !important;
     background-repeat: no-repeat !important;
   }

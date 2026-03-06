@@ -32,15 +32,16 @@ const CORE_CONFIG = [
     {ext: '.nes,.fds,.unif', script: CORE_BASE + 'nes.zip', btns: {'btn-1': ['A', 8], 'btn-3': ['B', 0], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}},
     {ext: '.ngp,.ngc', script: CORE_BASE + 'ngp.zip', btns: {'btn-1': ['A', 0], 'btn-3': ['B', 8], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}},
     {ext: '.gba,.gb,.gbc,.sgb', script: CORE_BASE + 'gba.zip', btns: {'btn-1': ['A', 8], 'btn-3': ['B', 0], 'btn-l': [' bl.', 10], 'btn-r': [' br.', 11], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}},
-    {ext: '.pce,.sgx,.chd,.cue', script: CORE_BASE + 'pce.zip', btns: {'btn-1': [' I', 0], 'btn-3': [' II', 8], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/syscard3.pce']},
+    {ext: '.pce,.sgx,.chd,.cue', script: CORE_BASE + 'pce.zip', btns: {'btn-1': [' I', 0], 'btn-3': [' II', 8], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/syscard3.pce'], match: (data) => data.length < 100 * 1024 * 1024},
     {ext: '.md,.gen,.smd,.sms,.gg', script: CORE_BASE + 'genesis.zip', btns: {'btn-1': ['A', 1], 'btn-3': ['B', 0], 'btn-4': ['C', 8], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}},
     {ext: '.a26', script: CORE_BASE + 'a26.zip', btns: {'btn-1': ['F', 0], 'btn-3': ['S', ''], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}},
     {ext: '.ws,.wsc', script: CORE_BASE + 'wswan.zip', btns: {'btn-1': ['A', 0], 'btn-3': ['B', 8], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', ''], 'btn-start': [' st.', 3]}},
     {ext: '.smc,.sfc,.fig,.swc', script: CORE_BASE + 'snes2010.zip', btns: {'btn-1': ['A', 8], 'btn-2': ['X', 9], 'btn-3': ['B', 0], 'btn-4': ['Y', 1], 'btn-l': [' bl.', 10], 'btn-r': [' br.', 11], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}},
-    {ext: '.zip', isMame: true, isArcade: true, script: CORE_BASE + 'mame078.zip', btns: {'btn-1': ['A', 0], 'btn-3': ['B', 8], 'btn-2': ['C', 1], 'btn-4': ['D', 9], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' cn.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/neogeo.zip']},
+    {id: 'fbneo', ext: '.zip', isMame: true, isFbneo: true, script: CORE_BASE + 'fbneo.zip', btns: {'btn-1': ['A', 0], 'btn-3': ['B', 8], 'btn-2': ['C', 1], 'btn-4': ['D', 9], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' cn.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/neogeo.zip']},
+    {id: 'mame', ext: '.zip', isMame: true, isFbneo: true, script: CORE_BASE + 'mame.zip', btns: {'btn-1': ['A', 0], 'btn-3': ['B', 8], 'btn-2': ['C', 1], 'btn-4': ['D', 9], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' cn.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/neogeo.zip']},
     {ext: '.nds', isNDS: true, script: CORE_BASE + 'nds2021.zip', btns: {'btn-1': ['A', 8], 'btn-2': ['X', 9], 'btn-3': ['B', 0], 'btn-4': ['Y', 1], 'btn-l': [' bl.', 10], 'btn-r': [' br.', 11], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/bios7.bin', './src/utils/bios/bios9.bin', './src/utils/bios/firmware.bin']},
-    {ext: '.bin,.iso,.img,.pbp,.chd', script: CORE_BASE + 'ps1.zip', btns: {'btn-1': ['A', 8], 'btn-2': ['X', 9], 'btn-3': ['B', 0], 'btn-4': ['Y', 1], 'btn-l': [' bl.', 10], 'btn-r': [' br.', 11], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/scph5501.bin']},
-    {ext: '.min', script: CORE_BASE + 'pokemini.zip', btns: {'btn-1': ['A', 8], 'btn-3': ['B', 0], 'btn-l': [' bc.', 1], 'btn-r': [' be.', 2], 'btn-select': [' sc.', ''], 'btn-start': [' st.', 3]}},
+    {ext: '.bin,.iso,.img,.pbp,.chd,.cue', script: CORE_BASE + 'ps1.zip', btns: {'btn-1': ['A', 8], 'btn-2': ['X', 9], 'btn-3': ['B', 0], 'btn-4': ['Y', 1], 'btn-l': [' bl.', 10], 'btn-r': [' br.', 11], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/scph5501.bin']},
+    {ext: '.min', script: CORE_BASE + 'pokemini.zip', btns: {'btn-1': ['A', 8], 'btn-3': ['B', 0], 'btn-l': [' bc.', 1], 'btn-r': [' br.', 2], 'btn-select': [' sc.', ''], 'btn-start': [' st.', 3]}},
     {ext: '.lnx', script: CORE_BASE + 'lynx.zip', btns: {'btn-1': ['A', 0], 'btn-3': ['B', 8], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/lynxboot.img']},
 ];
 var isRunning = false;
@@ -58,7 +59,7 @@ async function initCore(romFile) {
     // Step 2: Setup State
     activeVars = config.vars || {};
     updateButtons(config.btns);
-    const isMame = config.isMame, isArcade = config.isArcade, isNDS = config.isNDS;
+    const isMame = config.isMame, isFbneo = config.isFbneo, isNDS = config.isNDS;
     let scriptSource = config.script;
     // Step 3: Prepare Core Engine
     await showNotification("", "#", "--", "", true);
@@ -76,7 +77,7 @@ async function initCore(romFile) {
     return new Promise(async (resolve) => {
         await showNotification("", "##", "-", "", true);
         window.Module = {
-            isArcade, isNDS, canvas: document.getElementById("canvas"),
+            isFbneo, isNDS, canvas: document.getElementById("canvas"),
             print: () => { }, printErr: () => { },
             locateFile: path => path.endsWith('.wasm') ? (window.wasmUrl || path) : path,
             async onRuntimeInitialized() {
@@ -84,7 +85,13 @@ async function initCore(romFile) {
                 let romPointer = 0;
                 if (!isMame) romPointer = Module._malloc(finalRomData.length);
                 const infoPointer = Module._malloc(16);
-                window._logFnPtr = Module.addFunction((level, fmt, arg) => 0, "viii");
+                window._logFnPtr = Module.addFunction((_, f) => {
+                    const msg = Module.UTF8ToString(f);
+                    if (msg.includes('is required') && config.id === 'fbneo') {
+                        local(finalRomName, 'mame'), location.reload();
+                    }
+                    return 0;
+                }, "viii");
                 if (Module._retro_set_environment) Module._retro_set_environment(Module.addFunction(env_cb, "iii"));
                 if (Module._retro_set_video_refresh) Module._retro_set_video_refresh(Module.addFunction(video_cb, "viiii"));
                 if (Module._retro_set_audio_sample) Module._retro_set_audio_sample(Module.addFunction((l, r) => { }, "vii"));
@@ -100,7 +107,7 @@ async function initCore(romFile) {
                 if (isNDS && Module._retro_set_controller_port_device) Module._retro_set_controller_port_device(0, 6);
                 // Step 7: ROM mapping and game load
                 await showNotification("", "###", "", "", true);
-                let romPath = isArcade ? `/${finalRomName}` : (isNDS ? '/game.nds' : `/game.${finalRomName.toLowerCase().split('.').pop()}`);
+                let romPath = isFbneo ? `/${finalRomName}` : (isNDS ? '/game.nds' : `/game.${finalRomName.toLowerCase().split('.').pop()}`);
                 Module.FS.writeFile(romPath, finalRomData);
                 const loadInfo = [getPointer(romPath), 0, 0, 0];
                 if (!isMame && romPointer) {
