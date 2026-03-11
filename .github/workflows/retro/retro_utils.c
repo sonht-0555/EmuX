@@ -32,12 +32,14 @@ EMSCRIPTEN_KEEPALIVE __attribute__((used)) int emux_render16(const uint16_t * re
     }
     if (memcmp(src, cache, total_px << 1) == 0) return 0;
 dirty16:
-    memcpy(cache, src, total_px << 1);
     for (int y = 0; y < height; y++) {
-        const uint16_t *s = cache + y * stride;
+        const uint16_t *s = src + y * stride;
+        uint16_t *c = cache + y * stride;
         uint32_t *d = dst + y * width;
         for (int x = 0; x < width; x++) {
-            d[x] = lut[s[x]];
+            uint16_t val = s[x];
+            c[x] = val;
+            d[x] = lut[val];
         }
     }
     return 1;
@@ -53,9 +55,9 @@ EMSCRIPTEN_KEEPALIVE __attribute__((used)) int emux_render32(const uint32_t * re
     }
     if (memcmp(src, cache, length << 2) == 0) return 0;
 dirty32:
-    memcpy(cache, src, length << 2);
     for (int i = 0; i < length; i++) {
-        uint32_t c = cache[i];
+        uint32_t c = src[i];
+        cache[i] = c; 
         dst[i] = 0xFF000000 | (c & 0xFF) << 16 | (c & 0xFF00) | (c >> 16 & 0xFF);
     }
     return 1;
@@ -63,8 +65,6 @@ dirty32:
 
 // ===== Audio Engine =====
 #define AUDIO_OUT_MAX 4096
-static inline float clampf(float v) { return v < -1.0f ? -1.0f : (v > 1.0f ? 1.0f : v); }
-
 static float audio_out_l[AUDIO_OUT_MAX];
 static float audio_out_r[AUDIO_OUT_MAX];
 
@@ -100,8 +100,8 @@ EMSCRIPTEN_KEEPALIVE __attribute__((used)) int emux_audio_process(const int16_t 
             if (out_count >= AUDIO_OUT_MAX) goto done;
 
             float t = audio_frac;
-            audio_out_l[out_count] = clampf(prev_l + t * (cur_l - prev_l));
-            audio_out_r[out_count] = clampf(prev_r + t * (cur_r - prev_r));
+            audio_out_l[out_count] = prev_l + t * (cur_l - prev_l);
+            audio_out_r[out_count] = prev_r + t * (cur_r - prev_r);
             out_count++;
             audio_frac += audio_ratio;
         }
