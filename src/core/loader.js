@@ -132,6 +132,7 @@ async function initCore(romFile) {
                     var backlog = window.getAudioBacklog();
                     var targetRuns = backlog > 4000 ? 0 : backlog < 1000 ? 2 : 1;
                     for (var index = 0; index < targetRuns; index++) {
+                        window.skipRender = (index < targetRuns - 1); //del
                         Module._retro_run();
                         window._runCount = (window._runCount || 0) + 1;
                     }
