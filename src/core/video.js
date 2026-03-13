@@ -8,13 +8,11 @@ for (let i = 0; i < 65536; i++) {
 // ===== video_cb =====
 function video_cb(pointer, width, height, pitch) {
     if (!pointer) return 0;
-    //del
     if (window.skipRender) {
         frameCount++;
         skippedFrames++;
-        return 0;
+        return 1; 
     }
-    //del
     if (renderFunction) {
         if (window.Perf) window.Perf.beginGpu();
         const result = renderFunction(pointer, width, height, pitch);
