@@ -53,21 +53,19 @@ function writeAudio(pointer, frames) {
 // ===== getAudioSync =====
 window.getAudioSync = () => {
     if (!audioContext || audioContext.state !== 'running') return 1;
-    const backlog = totalSamplesSent - (audioContext.currentTime - audioStartTime) * audioContext.sampleRate;
-    const current = Math.max(-5000, Math.min(5000, backlog));
-    const now = performance.now();
-    const rafInterval = now - (window._rafLast || now);
-    window._rafLast = now;
-    if (rafInterval > 200) {
+    let backlog = totalSamplesSent - (audioContext.currentTime - audioStartTime) * audioContext.sampleRate;
+    if (Math.abs(backlog) > 4000) {
         audioStartTime = audioContext.currentTime - (totalSamplesSent / audioContext.sampleRate);
-        return 1;
+        backlog = 0;
     }
-    const adj = current / (rafInterval / 16.67 || 1);
-    const runs = adj > 3000 ? 0 : (adj < 1000 ? 2 : 1);
-    // Logging
+    const current = Math.max(-5000, Math.min(5000, backlog));
+    const base = window._base || 1;
+    const runs = current > 3000 ? Math.max(0, base - 1) : (current < 1000 ? base + 1 : base);
+    // Logging & Learning
     window._fc = (window._fc || 0) + 1; window._ct = (window._ct || 0) + runs;
     if (window._fc === 60) {
-        console.log(`B.${adj.toFixed(0)} R.${runs} C.${window._ct}`);
+        window._base = Math.round(window._ct / 60) || 1;
+        console.log(`B.${current.toFixed(0)} R.${runs}/${window._base} C.${window._ct}`);
         window._fc = window._ct = 0;
     }
     // Logging
