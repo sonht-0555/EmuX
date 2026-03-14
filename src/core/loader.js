@@ -129,8 +129,7 @@ async function initCore(romFile) {
                 function mainLoop() {
                     if (!isRunning || window.currentSessionId !== session) return window.mainRafId = 0;
                     window.mainRafId = requestAnimationFrame(mainLoop);
-                    var backlog = window.getAudioBacklog();
-                    var targetRuns = backlog > 4000 ? 0 : backlog < 1000 ? 2 : 1;
+                    var targetRuns = window.getAudioSync();
                     for (var index = 0; index < targetRuns; index++) {
                         window.skipRender = (index < targetRuns - 1);
                         Module._retro_run();

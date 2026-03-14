@@ -362,6 +362,17 @@
   joypad {
     justify-content: end;
   }
+  log {
+    position: absolute;
+    text-align: left;
+    padding: 6px;
+    font-size: 8px;
+    font-family: "04bf";
+    color: var(--profile-4);
+    white-space: pre;
+    transition: opacity 0.2s;
+    pointer-events: auto;
+  }
   invis {
     width: 90%;
     height: 20px;

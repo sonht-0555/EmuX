@@ -58,6 +58,7 @@ document.addEventListener("DOMContentLoaded", () => {
     switch0.onpointerdown = switchRenderer;
     ['pointerup', 'pointercancel'].forEach(type => addEventListener(type, event => {setPointerState(event.pointerId, null); isSwiping = false; joy.style.opacity = "0";}));
     joy.onpointerdown = () => joy.style.opacity = "1";
+    log.onpointerdown = () => log.style.opacity = log.style.opacity == "0" ? "1" : "0";
     invis.onpointermove = () => {page00.hidden = false; showNotification(" pa", "use.", "", " double tap to resume."); pauseGame();};
     page00.onpointerdown = event => {if (doubleTap(event, page00)) {page00.hidden = true; resumeGame();} };
 });

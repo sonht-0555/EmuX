@@ -50,11 +50,28 @@ function writeAudio(pointer, frames) {
     }
     return frames;
 }
-// ===== getAudioBacklog =====
-window.getAudioBacklog = () => {
-    if (!audioContext || audioContext.state !== 'running') return 0;
-    const backlog = totalSamplesSent - (audioContext.currentTime - audioStartTime) * 48000;
-    return Math.max(-5000, Math.min(5000, backlog));
+// ===== getAudioSync =====
+window.getAudioSync = () => {
+    if (!audioContext || audioContext.state !== 'running') return 1;
+    const backlog = totalSamplesSent - (audioContext.currentTime - audioStartTime) * audioContext.sampleRate;
+    const current = Math.max(-5000, Math.min(5000, backlog));
+    const now = performance.now();
+    const rafInterval = now - (window._rafLast || now);
+    window._rafLast = now;
+    if (rafInterval > 200) {
+        audioStartTime = audioContext.currentTime - (totalSamplesSent / audioContext.sampleRate);
+        return 1;
+    }
+    const adj = current / (rafInterval / 16.67 || 1);
+    const runs = adj > 3000 ? 0 : (adj < 1000 ? 2 : 1);
+    // Logging
+    window._fc = (window._fc || 0) + 1; window._ct = (window._ct || 0) + runs;
+    if (window._fc === 60) {
+        console.log(`B.${adj.toFixed(0)} R.${runs} C.${window._ct}`);
+        window._fc = window._ct = 0;
+    }
+    // Logging
+    return runs;
 };
 // ===== resetAudioSync =====
 window.resetAudioSync = () => {

@@ -1,3 +1,12 @@
+// ===== UI Log Hook =====
+var logMessages = [];
+const originalLog = console.log;
+console.log = function (...args) {
+    originalLog.apply(console, args);
+    logMessages.unshift(args.join(' '));
+    if (logMessages.length > 10) logMessages.pop();
+    if (log) log.textContent = logMessages.join('\n--\n');
+};
 // ===== findCore =====
 function findCore(name, data) {
     const nameLower = name.toLowerCase(), getExtension = fileName => '.' + fileName.split('.').pop().toLowerCase();

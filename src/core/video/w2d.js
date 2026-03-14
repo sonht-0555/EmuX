@@ -73,4 +73,3 @@ window.activeRenderFn = function (pointer, width, height, pitch) {
     if (is32Bit) render32(sourceView32, 0, lastMainFramePtr, context2d, imageData, pixelCount, visualBufferPtr);
     else render16(sourceView32, lastMainFramePtr, context2d, imageData, width, height, pitch >> 1);
 };
-console.log("w2d.js loaded");
