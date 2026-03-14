@@ -32,9 +32,13 @@ function writeAudio(pointer, frames) {
     if (!audioWorkletNode || !isRunning || !Module._emux_audio_process) return frames;
     const count = Module._emux_audio_process(pointer, frames);
     if (count > 0) {
+        const writeIndex = Atomics.load(sabViewIndices, 0);
+        const readIndex = Atomics.load(sabViewIndices, 1);
+        const used = (writeIndex - readIndex + sabBufSize) & sabMask;
+        const free = sabBufSize - used - 1;
+        if (count > free) return frames;
         const left = new Float32Array(Module.HEAPU8.buffer, wasmOutL, count);
         const right = new Float32Array(Module.HEAPU8.buffer, wasmOutR, count);
-        const writeIndex = Atomics.load(sabViewIndices, 0);
         const space = sabBufSize - writeIndex;
         if (count <= space) {
             sabViewLeft.set(left, writeIndex);
@@ -58,17 +62,14 @@ window.getAudioSync = () => {
         audioStartTime = audioContext.currentTime - (totalSamplesSent / audioContext.sampleRate);
         backlog = 0;
     }
-    const current = Math.max(-5000, Math.min(5000, backlog));
     const base = window._base || 1;
-    const runs = current > 3000 ? Math.max(0, base - 1) : (current < 1000 ? base + 1 : base);
-    // Logging & Learning
-    window._fc = (window._fc || 0) + 1; window._ct = (window._ct || 0) + runs;
-    if (window._fc === 60) {
-        window._base = Math.round(window._ct / 60) || 1;
-        console.log(`B.${current.toFixed(0)} R.${runs}/${window._base} C.${window._ct}`);
-        window._fc = window._ct = 0;
+    const runs = backlog > 3000 ? base - 1 : (backlog < 1000 ? base + 1 : base);
+    window._tick = (window._tick || 0) + 1; window._total = (window._total || 0) + runs;
+    if (window._tick === 60) {
+        window._base = Math.round(window._total / 60) || 1;
+        console.log(`B.${backlog.toFixed(0)} R.${runs}/${window._base} C.${Math.round(window._total / window._base)}`);
+        window._tick = window._total = 0;
     }
-    // Logging
     return runs;
 };
 // ===== resetAudioSync =====
