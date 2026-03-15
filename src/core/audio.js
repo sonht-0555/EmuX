@@ -60,7 +60,7 @@ window.getAudioSync = () => {
     let backlog = totalSamplesSent - (audioContext.currentTime - audioStartTime) * audioContext.sampleRate;
     if (Math.abs(backlog) > 4000) {
         audioStartTime = audioContext.currentTime - (totalSamplesSent / audioContext.sampleRate);
-        backlog = 0;
+        return window._base || 1;
     }
     const base = window._base || 1;
     const runs = backlog > 3000 ? base - 1 : (backlog < 1000 ? base + 1 : base);
