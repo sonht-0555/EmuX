@@ -31,6 +31,7 @@ async function initAudio(coreRate) {
 function writeAudio(pointer, frames) {
     if (!audioWorkletNode || !isRunning || !Module._emux_audio_process) return frames;
     const count = Module._emux_audio_process(pointer, frames);
+    if (count > 2000) {console.log('Audio Drop', count); return frames;}
     if (count > 0) {
         const writeIndex = Atomics.load(sabViewIndices, 0);
         const readIndex = Atomics.load(sabViewIndices, 1);
@@ -60,14 +61,16 @@ window.getAudioSync = () => {
     let backlog = totalSamplesSent - (audioContext.currentTime - audioStartTime) * audioContext.sampleRate;
     if (Math.abs(backlog) > 4000) {
         audioStartTime = audioContext.currentTime - (totalSamplesSent / audioContext.sampleRate);
-        backlog = 0;
+        window._tick = window._total = 0;
+        console.log('Audio Reset', backlog.toFixed(0));
+        return window._base || 1;
     }
     const base = window._base || 1;
     const runs = backlog > 3000 ? base - 1 : (backlog < 1000 ? base + 1 : base);
     window._tick = (window._tick || 0) + 1; window._total = (window._total || 0) + runs;
     if (window._tick === 60) {
         window._base = Math.round(window._total / 60) || 1;
-        console.log(`B.${backlog.toFixed(0)} R.${runs}/${window._base} C.${Math.round(window._total / window._base)}`);
+        // console.log(`B.${backlog.toFixed(0)} R.${runs}/${window._base} C.${Math.round(window._total / window._base)}`);
         window._tick = window._total = 0;
     }
     return runs;
