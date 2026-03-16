@@ -1,11 +1,13 @@
 // ===== UI Log Hook =====
 var logMessages = [];
 const originalLog = console.log;
-console.log = function (...args) {
-    originalLog.apply(console, args);
-    logMessages.unshift(args.join(' '));
+console.log = (...args) => {
+    originalLog(...args);
+    const msg = args.join(' '), render = () => window.log && (log.textContent = logMessages.join('\n--\n'));
+    logMessages.unshift(msg);
     if (logMessages.length > 10) logMessages.pop();
-    if (log) log.textContent = logMessages.join('\n--\n');
+    render();
+    setTimeout(() => {const i = logMessages.lastIndexOf(msg); if (i > -1) {logMessages.splice(i, 1); render();} }, 20000);
 };
 // ===== findCore =====
 function findCore(name, data) {
@@ -84,19 +86,15 @@ async function timer(isStart) {
 }
 // ===== resumeGame =====
 async function resumeGame() {
-    isRunning = true;
-    if (window.startLoop) window.startLoop();
-    if (audioContext) {await audioContext.resume(); if (window.resetAudioSync) window.resetAudioSync();}
-    timer(true);
-    message("[_] Resumed!");
+    if (audioContext && audioContext.state !== 'running') { await audioContext.resume(); window.resetAudioSync?.(); }
+    isRunning = true; window.startLoop?.();
+    timer(true); message("[_] Resumed!");
 }
 // ===== pauseGame =====
 async function pauseGame() {
-    isRunning = false;
-    if (window.stopLoop) window.stopLoop();
+    isRunning = false; window.stopLoop?.();
     if (audioContext && audioContext.state === 'running') await audioContext.suspend();
-    timer(false);
-    message("[_] Paused!");
+    timer(false); message("[_] Paused!");
 }
 // ===== rebootGame =====
 async function rebootGame() {location.reload();}

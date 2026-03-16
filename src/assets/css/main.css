@@ -347,7 +347,8 @@
     gap: 1px
   }
   joypad svg {
-    background: url("data:image/svg+xml,%3Csvg width='175' height='175' viewBox='0 0 175 175' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M88 87H137V88H88V137H87V88H38V87H87V38H88V87Z' fill='%231D1A15'/%3E%3C/svg%3E%0A");
+    background: linear-gradient(var(--profile-o), var(--profile-o));
+    mask: url("data:image/svg+xml,%3Csvg width='175' height='175' viewBox='0 0 175 175' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M88 87H137V88H88V137H87V88H38V87H87V38H88V87Z' fill='%231D1A15'/%3E%3C/svg%3E%0A") no-repeat center;
   }
   btn-state, btn-menu, btn-l, btn-r, btn-1, btn-2, btn-3, btn-4, btn-select, btn-start, #joypad {
     background-position: center !important;
