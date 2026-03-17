@@ -28,7 +28,6 @@ function env_cb(command, data) {
 }
 // ===== CORE_CONFIG =====
 const getCoreUrl = (name) => `https://raw.githubusercontent.com/sonht-0555/EmuX/${local('core_repo') || 'stable'}/${name}`;
-console.log(`Model...[${local('core_repo') || 'stable'}]`);
 const CORE_CONFIG = [
     {ext: '.nes,.fds,.unif', script: 'nes.zip', btns: {'btn-1': ['A', 8], 'btn-3': ['B', 0], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}},
     {ext: '.ngp,.ngc', script: 'ngp.zip', btns: {'btn-1': ['A', 0], 'btn-3': ['B', 8], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}},
@@ -121,8 +120,7 @@ async function initCore(romFile) {
                 // Step 8: Audio & render loop start
                 const audioVideoPointer = Module._malloc(120);
                 Module._retro_get_system_av_info(audioVideoPointer);
-                const fps = Module.HEAPF64[(Number(audioVideoPointer) + 24) >> 3] || 60;
-                initAudio(Module.HEAPF64[(Number(audioVideoPointer) + 32) >> 3], fps);
+                initAudio(audioVideoPointer);
                 audioContext.resume();
                 Module._free(audioVideoPointer);
                 window.resetAudioSync?.();
@@ -141,5 +139,6 @@ async function initCore(romFile) {
         script.onload = () => {if (scriptSource.startsWith('blob:')) URL.revokeObjectURL(scriptSource);};
         document.body.appendChild(script);
         gameName = romFile.name;
+        console.log(`Core | ${local('core_repo')} | ${gameName}`);
     });
 }

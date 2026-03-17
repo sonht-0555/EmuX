@@ -1,9 +1,11 @@
 // ===== Audio System =====
 const audio_batch_cb = (pointer, frames) => writeAudio(pointer, frames), audio_cb = () => { };
-var audioContext, audioWorkletNode, audioGainNode, totalSamplesSent = 0, audioStartTime = 0, gameFps = 60, rafFps = 60, lastRafTime = 0, acc = 0, smoothedBacklog = 3000, sabL, sabR, sabIndices, sabViewLeft, sabViewRight, sabViewIndices, wasmOutL = 0, wasmOutR = 0, sabBufSize = 0, sabMask = 0;
+var audioContext, audioWorkletNode, audioGainNode, totalSamplesSent = 0, audioStartTime = 0, gameFps = 60, lastRafTime = 0, acc = 0, sabL, sabR, sabIndices, sabViewLeft, sabViewRight, sabViewIndices, wasmOutL = 0, wasmOutR = 0, sabBufSize = 0, sabMask = 0, activeSession = null;
 // ===== initAudio =====
-async function initAudio(coreRate, fps) {
-    gameFps = fps || 60;
+async function initAudio(avInfoPointer) {
+    const p = Number(avInfoPointer);
+    gameFps = Module.HEAPF64[(p + 24) >> 3] || 60;
+    const coreRate = Module.HEAPF64[(p + 32) >> 3] || 48000;
     if (audioContext) return audioContext.resume();
     audioContext = new (window.AudioContext || window.webkitAudioContext)({sampleRate: 48000});
     const code = `class P extends AudioWorkletProcessor{constructor(o){super();const{sabL,sabR,sabIndices,bufSize}=o.processorOptions;this.L=new Float32Array(sabL);this.R=new Float32Array(sabR);this.I=new Uint32Array(sabIndices);this.S=bufSize;this.M=bufSize-1}process(_,o){const u=o[0],l=u[0],r=u[1],n=l.length,w=Atomics.load(this.I,0),i=Atomics.load(this.I,1);if(((w-i+this.S)&this.M)<n){l.fill(0);if(r)r.fill(0);return true}const s=this.S-i;if(n<=s){l.set(this.L.subarray(i,i+n));if(r)r.set(this.R.subarray(i,i+n))}else{l.set(this.L.subarray(i,i+s));l.set(this.L.subarray(0,n-s),s);if(r){r.set(this.R.subarray(i,i+s));r.set(this.R.subarray(0,n-s),s)}}Atomics.store(this.I,1,(i+n)&this.M);return true}}registerProcessor('p',P)`;
@@ -66,24 +68,22 @@ window.getAudioSync = () => {
     let backlog = totalSamplesSent - (audioContext.currentTime - audioStartTime) * audioContext.sampleRate;
     if (Math.abs(backlog) > 5000) {
         audioContext.suspend();
-        console.log(`Burst Fixed...[${backlog.toFixed(0)}]`);
+        console.log(`Burst Fixed | ${backlog.toFixed(0)}`);
         audioStartTime = audioContext.currentTime - (totalSamplesSent / audioContext.sampleRate);
-        backlog = 0;
+        acc = 0; audioContext.resume(); return 1;
     }
-    smoothedBacklog = 0.98 * smoothedBacklog + 0.02 * backlog;
-    let drift = 1.0 + (3000 - smoothedBacklog) / 40000;
-    drift = Math.max(0.8, Math.min(1.2, drift));
+    let drift = 1.0 + (2000 - backlog) / 100000;
     acc += (gameFps * delta / 1000) * drift;
     let runs = Math.floor(acc);
     acc -= runs;
-    const finalRuns = Math.max(0, Math.min(4, runs));
+    // log
     window._tick = (window._tick || 0) + 1;
-    if (window._tick >= 120) {
-        console.log(`Core: ${gameFps} | B: ${backlog.toFixed(0)} | D: ${drift.toFixed(3)} | R: ${finalRuns}`);
+    if (window._tick % 60 === 0) {
+        console.log(`C.${gameFps.toFixed(1)} | S.${(1000 / delta).toFixed(1)} | L.0${runs} | B.${backlog.toFixed(0)}`);
         window._tick = 0;
     }
-    if (finalRuns === 0 && (backlog < -5000 || delta > (1000 / gameFps) * 1.1)) return 1;
-    return finalRuns;
+    // log
+    return Math.max(0, Math.min(4, runs));
 };
 // ===== resetAudioSync =====
 window.resetAudioSync = () => {
@@ -95,5 +95,18 @@ window.resetAudioSync = () => {
         Atomics.store(sabViewIndices, 1, 0);
     }
     lastRafTime = acc = 0;
-    smoothedBacklog = 3000;
+};
+// ===== gameLoop =====
+window.gameLoop = (isLooping) => {
+    if (isLooping === false) return isRunning = false;
+    if (isLooping === true) {isRunning = true; activeSession = window.currentSessionId; if (window.mainRafId) cancelAnimationFrame(window.mainRafId);}
+    if (!isRunning || window.currentSessionId !== activeSession) return window.mainRafId = 0;
+    window.mainRafId = requestAnimationFrame(window.gameLoop);
+    const targetRuns = window.getAudioSync?.() ?? 1;
+    for (let index = 0; index < targetRuns; index++) {
+        window.skipRender = (index < targetRuns - 1);
+        if (window.Module && Module._retro_run) Module._retro_run();
+        window._runCount = (window._runCount || 0) + 1;
+    }
+    window.skipRender = false;
 };
