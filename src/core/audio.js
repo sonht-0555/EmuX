@@ -60,7 +60,7 @@ window.getAudioSync = () => {
     const base = window._base || 1;
     if (!audioContext || audioContext.state !== 'running') return base;
     let backlog = totalSamplesSent - (audioContext.currentTime - audioStartTime) * audioContext.sampleRate;
-    if (Math.abs(backlog) > 4000) {
+    if (Math.abs(backlog) > 5000) {
         audioStartTime = audioContext.currentTime - (totalSamplesSent / audioContext.sampleRate);
         window._tick = window._total = 0;
         console.log(`Burst Fixed...[${backlog.toFixed(0)}]`);

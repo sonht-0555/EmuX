@@ -49,7 +49,9 @@ async function verticalSetting(values) {
 const optionClick = text => ({
     'Cloud': () => { },
     'Restore': () => cloudRestore(),
-    'Backup': () => cloudBackup()
+    'Backup': () => cloudBackup(),
+    'Lated': () => local('core_repo', 'lated'),
+    'Stable': () => local('core_repo', 'stable')
 }[text]?.());
 // ===== Event Listeners =====
 document.addEventListener("DOMContentLoaded", () => {
