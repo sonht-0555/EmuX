@@ -123,23 +123,9 @@ async function initCore(romFile) {
                 initAudio(Module.HEAPF64[(Number(audioVideoPointer) + 32) >> 3]);
                 audioContext.resume();
                 Module._free(audioVideoPointer);
-                if (window.resetAudioSync) window.resetAudioSync();
-                const session = Math.random();
-                window.currentSessionId = session;
-                function mainLoop() {
-                    if (!isRunning || window.currentSessionId !== session) return window.mainRafId = 0;
-                    window.mainRafId = requestAnimationFrame(mainLoop);
-                    var targetRuns = window.getAudioSync();
-                    for (var index = 0; index < targetRuns; index++) {
-                        window.skipRender = (index < targetRuns - 1);
-                        Module._retro_run();
-                        window._runCount = (window._runCount || 0) + 1;
-                    }
-                    window.skipRender = false;
-                }
-                window.startLoop = () => {if (window.mainRafId) cancelAnimationFrame(window.mainRafId); mainLoop();};
-                window.stopLoop = () => {isRunning = false;};
-                startLoop();
+                window.resetAudioSync?.();
+                window.currentSessionId = Math.random();
+                window.gameLoop?.(true);
                 await delay(100);
                 await loadState();
                 await timer(true);

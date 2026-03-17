@@ -1,4 +1,4 @@
-// ===== UI Log Hook =====
+// ===== logHook =====
 var logMessages = [];
 const originalLog = console.log;
 console.log = (...args) => {
@@ -8,6 +8,21 @@ console.log = (...args) => {
     if (logMessages.length > 10) logMessages.pop();
     render();
     setTimeout(() => {const i = logMessages.lastIndexOf(msg); if (i > -1) {logMessages.splice(i, 1); render();} }, 20000);
+};
+// ===== gameLoop =====
+let activeSession = null;
+window.gameLoop = (play) => {
+    if (play === false) return isRunning = false;
+    if (play === true) {isRunning = true; activeSession = window.currentSessionId; if (window.mainRafId) cancelAnimationFrame(window.mainRafId);}
+    if (!isRunning || window.currentSessionId !== activeSession) return window.mainRafId = 0;
+    window.mainRafId = requestAnimationFrame(window.gameLoop);
+    const targetRuns = window.getAudioSync?.() || 1;
+    for (let index = 0; index < targetRuns; index++) {
+        window.skipRender = (index < targetRuns - 1);
+        if (window.Module && Module._retro_run) Module._retro_run();
+        window._runCount = (window._runCount || 0) + 1;
+    }
+    window.skipRender = false;
 };
 // ===== findCore =====
 function findCore(name, data) {
@@ -86,13 +101,13 @@ async function timer(isStart) {
 }
 // ===== resumeGame =====
 async function resumeGame() {
-    if (audioContext && audioContext.state !== 'running') { await audioContext.resume(); window.resetAudioSync?.(); }
-    isRunning = true; window.startLoop?.();
+    if (audioContext && audioContext.state !== 'running') await audioContext.resume(), window.resetAudioSync?.();
+    window.gameLoop?.(true);
     timer(true); message("[_] Resumed!");
 }
 // ===== pauseGame =====
 async function pauseGame() {
-    isRunning = false; window.stopLoop?.();
+    window.gameLoop?.(false);
     if (audioContext && audioContext.state === 'running') await audioContext.suspend();
     timer(false); message("[_] Paused!");
 }
