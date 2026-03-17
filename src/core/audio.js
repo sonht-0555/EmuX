@@ -1,8 +1,9 @@
 // ===== Audio System =====
 const audio_batch_cb = (pointer, frames) => writeAudio(pointer, frames), audio_cb = () => { };
-var audioContext, audioWorkletNode, audioGainNode, totalSamplesSent = 0, audioStartTime = 0, sabL, sabR, sabIndices, sabViewLeft, sabViewRight, sabViewIndices, wasmOutL = 0, wasmOutR = 0, sabBufSize = 0, sabMask = 0;
+var audioContext, audioWorkletNode, audioGainNode, totalSamplesSent = 0, audioStartTime = 0, gameFps = 60, rafFps = 60, lastRafTime = 0, acc = 0, smoothedBacklog = 3000, sabL, sabR, sabIndices, sabViewLeft, sabViewRight, sabViewIndices, wasmOutL = 0, wasmOutR = 0, sabBufSize = 0, sabMask = 0;
 // ===== initAudio =====
-async function initAudio(coreRate) {
+async function initAudio(coreRate, fps) {
+    gameFps = fps || 60;
     if (audioContext) return audioContext.resume();
     audioContext = new (window.AudioContext || window.webkitAudioContext)({sampleRate: 48000});
     const code = `class P extends AudioWorkletProcessor{constructor(o){super();const{sabL,sabR,sabIndices,bufSize}=o.processorOptions;this.L=new Float32Array(sabL);this.R=new Float32Array(sabR);this.I=new Uint32Array(sabIndices);this.S=bufSize;this.M=bufSize-1}process(_,o){const u=o[0],l=u[0],r=u[1],n=l.length,w=Atomics.load(this.I,0),i=Atomics.load(this.I,1);if(((w-i+this.S)&this.M)<n){l.fill(0);if(r)r.fill(0);return true}const s=this.S-i;if(n<=s){l.set(this.L.subarray(i,i+n));if(r)r.set(this.R.subarray(i,i+n))}else{l.set(this.L.subarray(i,i+s));l.set(this.L.subarray(0,n-s),s);if(r){r.set(this.R.subarray(i,i+s));r.set(this.R.subarray(0,n-s),s)}}Atomics.store(this.I,1,(i+n)&this.M);return true}}registerProcessor('p',P)`;
@@ -57,25 +58,32 @@ function writeAudio(pointer, frames) {
 }
 // ===== getAudioSync =====
 window.getAudioSync = () => {
-    const base = window._base || 1;
-    if (!audioContext || audioContext.state !== 'running') return base;
+    const now = performance.now();
+    const delta = now - lastRafTime;
+    lastRafTime = now;
+    if (!audioContext || audioContext.state !== 'running' || !gameFps || delta <= 0 || delta > 100) return 1;
+
     let backlog = totalSamplesSent - (audioContext.currentTime - audioStartTime) * audioContext.sampleRate;
     if (Math.abs(backlog) > 5000) {
-        audioStartTime = audioContext.currentTime - (totalSamplesSent / audioContext.sampleRate);
-        window._tick = window._total = 0;
-        console.log(`Burst Fixed...[${backlog.toFixed(0)}]`);
         audioContext.suspend();
-        //setTimeout(() => audioContext.resume(), 200);
-        return base;
+        console.log(`Burst Fixed...[${backlog.toFixed(0)}]`);
+        audioStartTime = audioContext.currentTime - (totalSamplesSent / audioContext.sampleRate);
+        backlog = 0;
     }
-    const runs = backlog > 3000 ? base - 1 : (backlog < 1000 ? base + 1 : base);
-    window._tick = (window._tick || 0) + 1; window._total = (window._total || 0) + runs;
-    if (window._tick === 60) {
-        window._base = Math.round(window._total / 60) || 1;
-        //console.log(`B.${backlog.toFixed(0)} R.${runs}/${window._base} C.${Math.round(window._total / window._base)}`);
-        window._tick = window._total = 0;
+    smoothedBacklog = 0.98 * smoothedBacklog + 0.02 * backlog;
+    let drift = 1.0 + (3000 - smoothedBacklog) / 40000;
+    drift = Math.max(0.8, Math.min(1.2, drift));
+    acc += (gameFps * delta / 1000) * drift;
+    let runs = Math.floor(acc);
+    acc -= runs;
+    const finalRuns = Math.max(0, Math.min(4, runs));
+    window._tick = (window._tick || 0) + 1;
+    if (window._tick >= 120) {
+        console.log(`Core: ${gameFps} | B: ${backlog.toFixed(0)} | D: ${drift.toFixed(3)} | R: ${finalRuns}`);
+        window._tick = 0;
     }
-    return runs;
+    if (finalRuns === 0 && (backlog < -5000 || delta > (1000 / gameFps) * 1.1)) return 1;
+    return finalRuns;
 };
 // ===== resetAudioSync =====
 window.resetAudioSync = () => {
@@ -86,5 +94,6 @@ window.resetAudioSync = () => {
         Atomics.store(sabViewIndices, 0, 0);
         Atomics.store(sabViewIndices, 1, 0);
     }
-    window._tick = window._total = 0;
+    lastRafTime = acc = 0;
+    smoothedBacklog = 3000;
 };
