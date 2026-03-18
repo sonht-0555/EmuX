@@ -1,6 +1,6 @@
 // ===== Audio System =====
 const audio_batch_cb = (pointer, frames) => writeAudio(pointer, frames), audio_cb = () => { };
-var audioContext, audioWorkletNode, audioGainNode, totalSamplesSent = 0, audioStartTime = 0, gameFps = 60, lastRafTime = 0, acc = 0, sabL, sabR, sabIndices, sabViewLeft, sabViewRight, sabViewIndices, wasmOutL = 0, wasmOutR = 0, sabBufSize = 0, sabMask = 0, activeSession = null;
+var audioContext, audioWorkletNode, audioGainNode, totalSamplesSent = 0, audioStartTime = 0, gameFps = 60, lastRafTime = 0, acc = 0, sDrift = 1, lastLogTime = 0, sabL, sabR, sabIndices, sabViewLeft, sabViewRight, sabViewIndices, wasmOutL = 0, wasmOutR = 0, sabBufSize = 0, sabMask = 0, activeSession = null;
 // ===== initAudio =====
 async function initAudio(avInfoPointer) {
     const p = Number(avInfoPointer);
@@ -70,19 +70,16 @@ window.getAudioSync = () => {
         audioContext.suspend();
         console.log(`Burst Fixed | ${backlog.toFixed(0)}`);
         audioStartTime = audioContext.currentTime - (totalSamplesSent / audioContext.sampleRate);
-        acc = 0; audioContext.resume(); return 1;
+        acc = 0; saveState(); return 1;
     }
     let drift = 1.0 + (2000 - backlog) / 100000;
-    acc += (gameFps * delta / 1000) * drift;
+    acc += (gameFps * delta / 1000) * (sDrift = sDrift * 0.9 + drift * 0.1);
     let runs = Math.floor(acc);
     acc -= runs;
-    // log
-    window._tick = (window._tick || 0) + 1;
-    if (window._tick % 60 === 0) {
-        console.log(`C.${gameFps.toFixed(1)} | S.${(1000 / delta).toFixed(1)} | L.0${runs} | B.${backlog.toFixed(0)}`);
-        window._tick = 0;
+    if (now - time > 1000) {
+        console.log(`C.${gameFps.toFixed(1)} | D.${delta.toFixed(1)} | L.0${runs} | B.${backlog.toFixed(0)}`);
+        time = now;
     }
-    // log
     return Math.max(0, Math.min(4, runs));
 };
 // ===== resetAudioSync =====
@@ -94,7 +91,11 @@ window.resetAudioSync = () => {
         Atomics.store(sabViewIndices, 0, 0);
         Atomics.store(sabViewIndices, 1, 0);
     }
-    lastRafTime = acc = 0;
+    if (window.Module && window.Module._emux_audio_get_buffer_l) {
+        wasmOutL = Module._emux_audio_get_buffer_l();
+        wasmOutR = Module._emux_audio_get_buffer_r();
+    }
+    lastRafTime = acc = time = 0; sDrift = 1;
 };
 // ===== gameLoop =====
 window.gameLoop = (isLooping) => {
