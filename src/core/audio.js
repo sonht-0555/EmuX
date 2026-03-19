@@ -70,16 +70,13 @@ window.getAudioSync = () => {
         audioContext.suspend();
         console.log(`Burst Fixed | ${backlog.toFixed(0)}`);
         audioStartTime = audioContext.currentTime - (totalSamplesSent / audioContext.sampleRate);
-        acc = 0; saveState(); return 1;
+        acc = 0; saveState(); backlog = 0;
     }
     let drift = 1.0 + (2000 - backlog) / 100000;
     acc += (gameFps * delta / 1000) * (sDrift = sDrift * 0.9 + drift * 0.1);
     let runs = Math.floor(acc);
     acc -= runs;
-    if (now - time > 1000) {
-        console.log(`C.${gameFps.toFixed(1)} | D.${delta.toFixed(1)} | L.0${runs} | B.${backlog.toFixed(0)}`);
-        time = now;
-    }
+    // if (now - time > 1000) {console.log(`C.${gameFps.toFixed(1)} | D.${delta.toFixed(1)} | L.0${runs} | B.${backlog.toFixed(0)}`), time = now;}
     return Math.max(0, Math.min(4, runs));
 };
 // ===== resetAudioSync =====
@@ -90,10 +87,6 @@ window.resetAudioSync = () => {
     if (sabViewIndices) {
         Atomics.store(sabViewIndices, 0, 0);
         Atomics.store(sabViewIndices, 1, 0);
-    }
-    if (window.Module && window.Module._emux_audio_get_buffer_l) {
-        wasmOutL = Module._emux_audio_get_buffer_l();
-        wasmOutR = Module._emux_audio_get_buffer_r();
     }
     lastRafTime = acc = time = 0; sDrift = 1;
 };

@@ -5,10 +5,11 @@ console.log = (...args) => {
     originalLog(...args);
     const msg = args.join(' '), render = () => window.log && (log.textContent = logMessages.join('\n--\n'));
     logMessages.unshift(msg);
-    if (logMessages.length > 10) logMessages.pop();
+    if (logMessages.length > 5) logMessages.pop();
     render();
-    setTimeout(() => {const i = logMessages.lastIndexOf(msg); if (i > -1) {logMessages.splice(i, 1); render();} }, 60000);
+    setTimeout(() => {const i = logMessages.lastIndexOf(msg); if (i > -1) {logMessages.splice(i, 1); render();} }, 5000);
 };
+console.error = (...args) => console.log('🍖 |', ...args);
 // ===== findCore =====
 function findCore(name, data) {
     const nameLower = name.toLowerCase(), getExtension = fileName => '.' + fileName.split('.').pop().toLowerCase();

@@ -4,6 +4,7 @@ var buttonMap = {up: 4, down: 5, left: 6, right: 7, 1: 8, 2: 9, 3: 0, 4: 1, l: 1
 var PHYS = [0, 1, 8, 9, 10, 11, -1, -1, 2, 3, -1, -1, 4, 5, 6, 7];
 var KEYS = {ArrowUp: 4, ArrowDown: 5, ArrowLeft: 6, ArrowRight: 7, w: 4, s: 5, a: 6, d: 7, x: 8, z: 9, c: 0, v: 1, q: 10, e: 11, Enter: 3, Shift: 2};
 window._pX = window._pY = window._pD = 0;
+const PICO_M = [16, 32, 64, 64, 4, 8, 1, 2, 16, 32];
 window.addEventListener('gamepadconnected', function () {hasGamepad = true;});
 window.addEventListener('gamepaddisconnected', function () {hasGamepad = false; padMask = 0;});
 // ===== Keyboard =====
@@ -29,12 +30,14 @@ function input_poll_cb() {
 function buttonPress(button) {
     var id = buttonMap[button];
     if (id !== undefined) touchMask |= (1 << id);
+    b = PICO_M[id]; if (window.pico8_buttons && b) pico8_buttons[0] |= b; //pico8
     if (audioContext?.state !== 'running') {audioContext?.resume(); window.resetAudioSync?.();}
 }
 // ===== buttonUnpress =====
 function buttonUnpress(button) {
     var id = buttonMap[button];
     if (id !== undefined) touchMask &= ~(1 << id);
+    b = PICO_M[id]; if (window.pico8_buttons && b) pico8_buttons[0] &= ~b; //pico8
 }
 // ===== input_state_cb =====
 function input_state_cb(port, device, index, id) {

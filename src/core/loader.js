@@ -43,6 +43,7 @@ const CORE_CONFIG = [
     {ext: '.bin,.iso,.img,.pbp,.chd,.cue', script: 'ps1.zip', btns: {'btn-1': ['A', 8], 'btn-2': ['X', 9], 'btn-3': ['B', 0], 'btn-4': ['Y', 1], 'btn-l': [' bl.', 10], 'btn-r': [' br.', 11], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/scph5501.bin']},
     {ext: '.min', script: 'pokemini.zip', btns: {'btn-1': ['A', 8], 'btn-3': ['B', 0], 'btn-l': [' bc.', 1], 'btn-r': [' br.', 2], 'btn-select': [' sc.', ''], 'btn-start': [' st.', 3]}},
     {ext: '.lnx', script: 'lynx.zip', btns: {'btn-1': ['A', 0], 'btn-3': ['B', 8], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/lynxboot.img']},
+    {id: 'pico8', ext: '.js', script: '', btns: {'btn-1': ['O', 8], 'btn-3': ['X', 9], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', ''], 'btn-start': [' st.', 3]}},
 ];
 var isRunning = false;
 // ===== initCore ====
@@ -52,7 +53,17 @@ async function initCore(romFile) {
     await showNotification("", "", "---", "", true);
     let rawData = new Uint8Array(await romFile.arrayBuffer());
     const {config, data: finalRomData, name: finalRomName} = findCore(romFile.name, rawData);
-    if (!config) return;
+    // Pico8
+    if (config.id === 'pico8') {
+        window.pico8_buttons = [0, 0, 0, 0, 0, 0, 0, 0], window.pico8_gpio = new Uint8Array(128);
+        updateButtons(config.btns);
+        window.Module = {canvas: document.getElementById("canvas")};
+        document.body.appendChild(Object.assign(document.createElement('script'), {src: URL.createObjectURL(new Blob([finalRomData], {type: 'application/javascript'}))}));
+        await delay(200);
+        await gameView(finalRomName);
+        await timer(true);
+        return (gameName = finalRomName);
+    }
     rawData = null;
     const coreFetch = fetch(getCoreUrl(config.script)).then(response => response.ok ? response.arrayBuffer() : null);
     const biosFetches = config.bios ? config.bios.map(url => fetch(url).then(response => response.ok ? response.arrayBuffer() : null).catch(() => null)) : [];
