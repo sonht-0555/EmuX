@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>PICO-8 ZIP Runner | EmuX</title>
+        <style>
+            #canvas {
+                width: 512px;
+                height: 512px;
+                background: #000;
+                image-rendering: pixelated;
+                border: 2px solid #444;
+                display: block;
+                margin: 20px auto;
+            }
+        </style>
+        <!-- Thư viện giải nén siêu nhẹ -->
+        <script src="https://unpkg.com/fflate"></script>
+    </head>
+    <body style="background:#222; color:#fff; font-family:sans-serif; text-align:center;">
+        <h3>PICO-8 ZIP Runner</h3>
+        <p style="font-size:11px; color:#aaa;">Nạp 1 tệp .zip chứa tất cả các cart của game</p>
+        <input type="file" id="fileInput" accept=".zip">
+        <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
+
+        <script>
+            const localBBS = new Map(), def = (o, p, v) => Object.defineProperty(o, p, {value: v, configurable: true});
+
+            // --- BBS MOCK: Giả lập server ---
+            const X = XMLHttpRequest.prototype, _op = X.open, _sd = X.send;
+            X.open = function (m, u) {this._u = u; return _op.apply(this, arguments);};
+            X.send = function () {
+                if (this._u?.includes('lid=')) {
+                    const k = this._u.split('lid=')[1].split('&')[0].toLowerCase(), f = [...localBBS.keys()].find(s => s.includes(k));
+                    if (f) {
+                        const isNfo = this._u.includes('nfo=1'), d = isNfo ? new TextEncoder().encode(`lid:${f.split('.')[0]}`).buffer : localBBS.get(f).buffer;
+                        def(this, 'status', 200); def(this, 'readyState', 4); def(this, 'response', d);
+                        def(this, 'responseText', isNfo ? new TextDecoder().decode(d) : "");
+                        ['onload', 'onreadystatechange'].forEach(e => this[e]?.()); return;
+                    }
+                }
+                return _sd.apply(this, arguments);
+            };
+
+            // --- ZIP Loader ---
+            document.getElementById('fileInput').addEventListener('change', async (e) => {
+                const file = e.target.files[0]; if (!file) return;
+                const zipName = file.name.split('.')[0].toLowerCase();
+                localBBS.clear();
+
+                const reader = new FileReader();
+                reader.onload = async (ev) => {
+                    const zipData = new Uint8Array(ev.target.result);
+                    // Giải nén bằng fflate
+                    fflate.unzip(zipData, (err, unzipped) => {
+                        if (err) return alert("Lỗi giải nén ZIP!");
+
+                        let bootFile = null;
+                        let bestScore = -1;
+
+                        Object.keys(unzipped).forEach(name => {
+                            const data = unzipped[name];
+                            const lowerName = name.toLowerCase();
+                            localBBS.set(lowerName, data);
+
+                            // Chỉ xét các tệp game .p8 hoặc .png
+                            if (lowerName.endsWith('.p8') || lowerName.endsWith('.png')) {
+                                let score = 0;
+                                // Nếu tên file giống hệt tên ZIP (không tính đuôi)
+                                if (lowerName === zipName + ".p8" || lowerName === zipName + ".p8.png" || lowerName === zipName + ".png") score = 10;
+                                // Nếu tên file có chứa tên ZIP
+                                else if (lowerName.includes(zipName)) score = 5;
+
+                                // Chọn file có điểm cao nhất, hoặc file có tên ngắn nhất nếu bằng điểm
+                                if (score > bestScore) {
+                                    bestScore = score;
+                                    bootFile = {name, data};
+                                } else if (score === bestScore && bootFile && name.length < bootFile.name.length) {
+                                    bootFile = {name, data};
+                                }
+                            }
+                        });
+
+                        if (!bootFile) {
+                            const firstKey = Object.keys(unzipped).find(k => k.endsWith('.p8') || k.endsWith('.png')) || Object.keys(unzipped)[0];
+                            bootFile = {name: firstKey, data: unzipped[firstKey]};
+                        }
+
+                        // Khởi động PICO-8 dùng Blob URL cho file chính
+                        const blobUrl = URL.createObjectURL(new Blob([bootFile.data]));
+                        window.Module = {
+                            canvas: document.getElementById("canvas"),
+                            arguments: [blobUrl],
+                            onRuntimeInitialized: () => console.log("EmuX | Engine Ready:", bootFile.name)
+                        };
+                        const script = document.createElement('script');
+                        script.src = '../src/core/pico8.js';
+                        document.body.appendChild(script);
+                    });
+                };
+                reader.readAsArrayBuffer(file);
+            });
+        </script>
+    </body>
+</html>
