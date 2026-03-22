@@ -101,53 +101,34 @@ async function pauseGame() {
 }
 // ===== rebootGame =====
 async function rebootGame() {location.reload();}
-// ===== BBS Mock =====
-const localBBS = new Map();
-(function initBBSMock() {
-    const prototype = XMLHttpRequest.prototype, originalOpen = prototype.open, originalSend = prototype.send, defineProperty = (object, property, value) => Object.defineProperty(object, property, {value, configurable: true});
-    prototype.open = function (method, url) {this._url = url; return originalOpen.apply(this, arguments);};
-    prototype.send = function () {
-        if (this._url?.includes('lid=')) {
-            const key = this._url.split('lid=')[1].split('&')[0].toLowerCase(), foundFile = [...localBBS.keys()].find(name => name.includes(key));
-            if (foundFile) {
-                const isInfoRequest = this._url.includes('nfo=1'), responseData = isInfoRequest ? new TextEncoder().encode(`lid:${foundFile.split('.')[0]}`).buffer : localBBS.get(foundFile).buffer;
-                defineProperty(this, 'status', 200); defineProperty(this, 'readyState', 4); defineProperty(this, 'response', responseData);
-                defineProperty(this, 'responseText', isInfoRequest ? new TextDecoder().decode(responseData) : "");
-                ['onload', 'onreadystatechange'].forEach(event => this[event]?.()); return;
-            }
-        }
-        return originalSend.apply(this, arguments);
-    };
-})();
-
 // ===== Pico8 =====
-async function pico8(config, finalRomName, rawData) {
-    window.pico8_buttons = [0, 0, 0, 0, 0, 0, 0, 0], window.pico8_gpio = new Uint8Array(128);
-    updateButtons(config.btns);
-    localBBS.clear();
-    let bootData = rawData, bootName = finalRomName;
-    if (rawData && (finalRomName.toLowerCase().endsWith('.zip') || finalRomName.toLowerCase().endsWith('.zp8') || (rawData[0] === 0x50 && rawData[1] === 0x4B))) {
-        try {
-            const unzipped = fflate.unzipSync(rawData);
-            const zipName = finalRomName.split('.')[0].toLowerCase();
-            let bestScore = -1;
-            Object.keys(unzipped).forEach(name => {
-                const data = unzipped[name], lowerName = name.toLowerCase();
-                localBBS.set(lowerName, data);
-                if (lowerName.endsWith('.p8') || lowerName.endsWith('.png')) {
-                    let score = (lowerName === zipName + ".p8" || lowerName === zipName + ".p8.png" || lowerName === zipName + ".png") ? 10 : (lowerName.includes(zipName) ? 5 : 0);
-                    if (score > bestScore || (score === bestScore && bootName && name.length < bootName.length)) {
-                        bestScore = score; bootData = data; bootName = name;
-                    }
-                }
-            });
-            if (!bootData) {let fk = Object.keys(unzipped).find(k => k.endsWith('.p8') || k.endsWith('.png')); if (fk) {bootData = unzipped[fk]; bootName = fk;} }
-        } catch (e) { }
-    } else localBBS.set(finalRomName.toLowerCase(), rawData);
+const localBBS = new Map();
+async function pico8(config, romName, raw) {
+    const proto = XMLHttpRequest.prototype, _open = proto.open, _send = proto.send;
+    proto.open = function (_, u) { this._u = u; return _open.apply(this, arguments); };
+    proto.send = function () {
+        const key = this._u?.split('lid=')[1]?.split('&')[0]?.toLowerCase(), found = key && [...localBBS.keys()].find(n => n.includes(key));
+        if (!found) return _send.apply(this, arguments);
+        const info = this._u.includes('nfo=1'), data = info ? new TextEncoder().encode(`lid:${found.split('.')[0]}`).buffer : localBBS.get(found).buffer;
+        Object.defineProperties(this, {status: {value: 200}, readyState: {value: 4}, response: {value: data}, responseText: {value: info ? new TextDecoder().decode(data) : ""}});
+        this.onload?.(); this.onreadystatechange?.();
+    };
 
-    const romBlobUrl = URL.createObjectURL(new Blob([bootData], {type: 'image/png'}));
-    window.Module = {canvas: document.getElementById("canvas"), arguments: [romBlobUrl]};
-    const script = document.createElement('script'); script.src = config.script; document.body.appendChild(script);
+    Object.assign(window, {pico8_buttons: [0,0,0,0,0,0,0,0], pico8_gpio: new Uint8Array(128)});
+    updateButtons(config.btns); localBBS.clear();
+    let bootData = raw, bootName = romName, lowName = romName.toLowerCase();
+
+    if (raw && (lowName.endsWith('.zip') || raw[0] === 0x50)) {
+        const unzipped = fflate.unzipSync(raw), target = lowName.replace('.zip', '');
+        for (const name in unzipped) {
+            const lower = name.toLowerCase(); localBBS.set(lower, unzipped[name]);
+            if (lower.startsWith(target)) { bootData = unzipped[name]; bootName = name; }
+        }
+    } else localBBS.set(lowName, raw);
+
+    const isJs = lowName.endsWith('.js');
+    Object.assign(window, {Module: {canvas: document.getElementById("canvas"), arguments: isJs ? [] : [URL.createObjectURL(new Blob([bootData]))]}});
+    document.body.appendChild(Object.assign(document.createElement('script'), {src: isJs ? URL.createObjectURL(new Blob([raw])) : config.script}));
     await delay(200); await gameView(bootName); await timer(true);
     return (gameName = bootName);
 }

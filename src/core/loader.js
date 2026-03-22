@@ -43,7 +43,7 @@ const CORE_CONFIG = [
     {ext: '.bin,.iso,.img,.pbp,.chd,.cue', script: 'ps1.zip', btns: {'btn-1': ['A', 8], 'btn-2': ['X', 9], 'btn-3': ['B', 0], 'btn-4': ['Y', 1], 'btn-l': [' bl.', 10], 'btn-r': [' br.', 11], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/scph5501.bin']},
     {ext: '.min', script: 'pokemini.zip', btns: {'btn-1': ['A', 8], 'btn-3': ['B', 0], 'btn-l': [' bc.', 1], 'btn-r': [' br.', 2], 'btn-select': [' sc.', ''], 'btn-start': [' st.', 3]}},
     {ext: '.lnx', script: 'lynx.zip', btns: {'btn-1': ['A', 0], 'btn-3': ['B', 8], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/lynxboot.img']},
-    {id: 'pico8', ext: '.p8.png,.p8,.png', script: './src/core/pico8.js', btns: {'btn-1': ['O', 8], 'btn-3': ['X', 9], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', ''], 'btn-start': [' st.', 3]}},
+    {id: 'pico8', ext: '.p8.png,.p8,.png,.js', script: './src/core/pico8.js', btns: {'btn-1': ['O', 8], 'btn-3': ['X', 9], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', ''], 'btn-start': [' st.', 3]}},
 ];
 var isRunning = false, isConfig;
 // ===== initCore ====
