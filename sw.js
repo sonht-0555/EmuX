@@ -1,4 +1,4 @@
-let revision = 'EmuX_6.22';
+let revision = 'EmuX_6.25';
 // git add . && git commit --amend --no-edit && git push -f && clear
 // git reset --hard xxxxxxx && git push -f && clear
 // git add .github/workflows/build-pico.yml && git commit --amend --no-edit && git push -f && clear
@@ -77,6 +77,18 @@ self.addEventListener('install', function (event) {
 });
 self.addEventListener('fetch', function (event) {
     if (event.request.url.includes('api.github.com')) return;
+    if (event.request.url.includes('workers.dev')) {
+        event.respondWith(
+            caches.match(event.request).then(response => {
+                return response || fetch(event.request).then(res => {
+                    const cacheRes = res.clone();
+                    caches.open(revision).then(cache => cache.put(event.request, cacheRes));
+                    return res;
+                });
+            })
+        );
+        return;
+    }
     event.respondWith(
         caches.match(event.request, {ignoreSearch: true}).then(function (response) {
             if (response) return addHeaders(response, event.request.url);

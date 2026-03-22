@@ -27,18 +27,26 @@
 
             // --- BBS MOCK: Giả lập server ---
             const X = XMLHttpRequest.prototype, _op = X.open, _sd = X.send;
-            X.open = function (m, u) {this._u = u; return _op.apply(this, arguments);};
-            X.send = function () {
-                if (this._u?.includes('lid=')) {
-                    const k = this._u.split('lid=')[1].split('&')[0].toLowerCase(), f = [...localBBS.keys()].find(s => s.includes(k));
-                    if (f) {
-                        const isNfo = this._u.includes('nfo=1'), d = isNfo ? new TextEncoder().encode(`lid:${f.split('.')[0]}`).buffer : localBBS.get(f).buffer;
-                        def(this, 'status', 200); def(this, 'readyState', 4); def(this, 'response', d);
-                        def(this, 'responseText', isNfo ? new TextDecoder().decode(d) : "");
-                        ['onload', 'onreadystatechange'].forEach(e => this[e]?.()); return;
+            X.open = function (m, u) {
+                this._u = u;
+                // Nếu file (lid) không nằm trong bộ nhớ local, chuyển hướng yêu cầu qua Proxy sang Lexaloffle
+                if (u.includes('lid=')) {
+                    const k = u.split('lid=')[1].split('&')[0].toLowerCase();
+                    if (![...localBBS.keys()].find(s => s.includes(k))) {
+                        const lex = "https://www.lexaloffle.com" + u.substring(u.indexOf('/bbs/'));
+                        this._u = "https://emux-cors.hoangtuanson91.workers.dev/" + lex;
+                        return _op.call(this, m, this._u, true);
                     }
                 }
-                return _sd.apply(this, arguments);
+                return _op.apply(this, arguments);
+            };
+            X.send = function () {
+                const k = this._u?.split('lid=')[1]?.split('&')[0]?.toLowerCase(), f = k && [...localBBS.keys()].find(s => s.includes(k));
+                if (!f || this._u.includes('workers.dev')) return _sd.apply(this, arguments);
+                const isNfo = this._u.includes('nfo=1'), d = isNfo ? new TextEncoder().encode(`lid:${f.split('.')[0]}`).buffer : localBBS.get(f).buffer;
+                def(this, 'status', 200); def(this, 'readyState', 4); def(this, 'response', d);
+                def(this, 'responseText', isNfo ? new TextDecoder().decode(d) : "");
+                ['onload', 'onreadystatechange'].forEach(e => this[e]?.());
             };
 
             // --- ZIP Loader ---
