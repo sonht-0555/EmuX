@@ -196,6 +196,13 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+  tag {
+    padding: 2px 0px 2px 2px;
+    height: 6px;
+    background: var(--profile-3);
+    margin: 15px 0px;
+    color: var(--profile-black);
+  }
   cta {
     grid-template-columns: auto 50px 50px 90px;
     gap: 8px;
