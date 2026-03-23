@@ -11,7 +11,7 @@ window.addEventListener('gamepaddisconnected', function () {hasGamepad = false; 
 window.onkeydown = function (e) {
     var id = KEYS[e.key];
     if (id !== undefined) {keyMask |= (1 << id); e.preventDefault();}
-    if (audioContext?.state !== 'running') {audioContext?.resume(); window.resetAudioSync?.();}
+    if (audioContext?.state !== 'running') {audioContext?.resume().then(() => {window.resetAudioSync?.();});}
 };
 window.onkeyup = function (e) {
     var id = KEYS[e.key];
@@ -31,13 +31,18 @@ function buttonPress(button) {
     var id = buttonMap[button];
     if (id !== undefined) touchMask |= (1 << id);
     b = PICO_M[id]; if (window.pico8_buttons && b) pico8_buttons[0] |= b; //pico8
-    if (audioContext?.state !== 'running') {audioContext?.resume(); window.resetAudioSync?.();}
+    if (audioContext?.state !== 'running') {audioContext?.resume().then(() => {window.resetAudioSync?.();});}
 }
 // ===== buttonUnpress =====
 function buttonUnpress(button) {
     var id = buttonMap[button];
     if (id !== undefined) touchMask &= ~(1 << id);
     b = PICO_M[id]; if (window.pico8_buttons && b) pico8_buttons[0] &= ~b; //pico8
+}
+// ===== buttonClick =====
+function buttonClick(button) {
+    buttonPress(button);
+    setTimeout(() => buttonUnpress(button), 100);
 }
 // ===== input_state_cb =====
 function input_state_cb(port, device, index, id) {

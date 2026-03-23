@@ -6,7 +6,7 @@ const logToScreen = (msg) => {
     logMessages.unshift(msg);
     if (logMessages.length > 5) logMessages.pop();
     render();
-    setTimeout(() => {const i = logMessages.lastIndexOf(msg); if (i > -1) {logMessages.splice(i, 1); render();} }, 5000);
+    setTimeout(() => {const i = logMessages.lastIndexOf(msg); if (i > -1) {logMessages.splice(i, 1); render();} }, 60000);
 };
 console.log = (...args) => {originalLog(...args); logToScreen(args.join(' '));};
 console.error = (...args) => {originalError(...args); logToScreen('🍖 | ' + args.join(' '));};
@@ -87,14 +87,14 @@ async function timer(isStart) {
 }
 // ===== resumeGame =====
 async function resumeGame() {
-    if (isConfig.id === 'pico8') return buttonUnpress('start');
+    if (isConfig.id === 'pico8') return buttonClick('start');
     if (audioContext && audioContext.state !== 'running') await audioContext.resume(), window.resetAudioSync?.();
     window.gameLoop?.(true);
     timer(true); message("[_] Resumed!");
 }
 // ===== pauseGame =====
 async function pauseGame() {
-    if (isConfig.id === 'pico8') return buttonPress('start');
+    if (isConfig.id === 'pico8') return buttonClick('start');
     window.gameLoop?.(false);
     if (audioContext && audioContext.state === 'running') await audioContext.suspend();
     timer(false); message("[_] Paused!");
@@ -109,7 +109,7 @@ async function pico8(config, romName, raw) {
         return _open.call(this, method, this._url, true);
     };
     Object.assign(window, {pico8_buttons: [0, 0, 0, 0, 0, 0, 0, 0], pico8_gpio: new Uint8Array(128)});
-    Object.assign(window, {Module: {canvas: document.getElementById("canvas"), arguments: [URL.createObjectURL(new Blob([raw]))]}});
+    Object.assign(window, {Module: {canvas: document.getElementById("canvas"), arguments: [URL.createObjectURL(new Blob([raw]))], print: () => { }, printErr: () => { }}});
     document.body.appendChild(Object.assign(document.createElement('script'), {src: config.script}));
     updateButtons(config.btns); await delay(200); await gameView(romName); await timer(true);
     return (gameName = romName);

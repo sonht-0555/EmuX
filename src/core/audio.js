@@ -61,19 +61,22 @@ function writeAudio(pointer, frames) {
 // ===== getAudioSync =====
 window.getAudioSync = () => {
     const now = performance.now();
-    const delta = now - lastRafTime;
-    lastRafTime = now;
-    if (!audioContext || audioContext.state !== 'running' || !gameFps || delta <= 0 || delta > 100) return 1;
+    const delta = now - lastRafTime; lastRafTime = now;
+    let drift = 1.0, backlog = 0;
 
-    let backlog = totalSamplesSent - (audioContext.currentTime - audioStartTime) * audioContext.sampleRate;
-    if (Math.abs(backlog) > 5000) {
-        audioContext.suspend();
-        console.log(`Burst Fixed | ${backlog.toFixed(0)}`);
-        audioStartTime = audioContext.currentTime - (totalSamplesSent / audioContext.sampleRate);
-        acc = 0; saveState(); backlog = 0;
+    if (audioContext && audioContext.state === 'running' && gameFps && delta > 0 && delta < 100) {
+        backlog = totalSamplesSent - (audioContext.currentTime - audioStartTime) * audioContext.sampleRate;
+        if (Math.abs(backlog) > 5000) {
+            audioContext.suspend();
+            console.log(`Burst Fixed | ${backlog.toFixed(0)}`);
+            audioStartTime = audioContext.currentTime - (totalSamplesSent / audioContext.sampleRate);
+            acc = 0; saveState(); backlog = 0;
+        }
+        drift = 1.0 + (2000 - backlog) / 100000;
     }
-    let drift = 1.0 + (2000 - backlog) / 100000;
-    acc += (gameFps * delta / 1000) * (sDrift = sDrift * 0.9 + drift * 0.1);
+
+    let fairDelta = (delta <= 0 || delta > 100) ? 16.6 : delta;
+    acc += (gameFps * fairDelta / 1000) * (sDrift = sDrift * 0.9 + drift * 0.1);
     let runs = Math.floor(acc);
     acc -= runs;
     // if (now - time > 1000) {console.log(`C.${gameFps.toFixed(1)} | D.${delta.toFixed(1)} | L.0${runs} | B.${backlog.toFixed(0)}`), time = now;}

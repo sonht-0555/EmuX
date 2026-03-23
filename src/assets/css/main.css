@@ -371,8 +371,8 @@
     font-family: "04bf";
     color: var(--profile-4);
     white-space: pre;
-    transition: opacity 0.2s;
     pointer-events: auto;
+    opacity: 0;
   }
   invis {
     width: 90%;

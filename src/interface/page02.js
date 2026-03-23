@@ -33,7 +33,7 @@ document.addEventListener("DOMContentLoaded", () => {
             else touchY < rect.height / 2 ? saveState(3) : saveState(2);
         }
         swipeStartY = event.clientY;
-        isSwiping = event.clientX > (rect.right - 40);
+        isSwiping = event.clientX > (rect.right - 20);
     };
     canvas.onpointermove = event => {
         if (!isSwiping || !rect) return;
@@ -58,7 +58,7 @@ document.addEventListener("DOMContentLoaded", () => {
     switch0.onpointerdown = switchRenderer;
     ['pointerup', 'pointercancel'].forEach(type => addEventListener(type, event => {setPointerState(event.pointerId, null); isSwiping = false; joy.style.opacity = "0";}));
     joy.onpointerdown = () => joy.style.opacity = "1";
-    log.onpointerdown = () => log.style.opacity = log.style.opacity == "0" ? "1" : "0";
+    log.onpointerdown = () => log.style.opacity = log.style.opacity == "1" ? "0" : "1";
     invis.onpointermove = () => {page00.hidden = false; showNotification(" pa", "use.", "", " double tap to resume."); pauseGame();};
-    page00.onpointerdown = event => {if (doubleTap(event, page00)) {page00.hidden = true; resumeGame();} };
+    page00.onpointerdown = async event => {if (doubleTap(event, page00)) {await resumeGame(); await delay(100); page00.hidden = true;} };
 });
