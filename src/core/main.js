@@ -76,7 +76,7 @@ async function timer(isStart) {
             if (seconds === 60) {seconds = 0; minutes++;}
             if (minutes === 60) {minutes = 0; hours++;}
             const rendered = frameCount - skippedFrames;
-            logMessages[0] = `W${rendered.toString().padStart(2, '0')}_${hours ? hours + '.' : ''}${minutes.toString().padStart(2, '0')}.${(seconds % 60).toString().padStart(2, '0')}`;
+            logMessages[0] = `Skip ${rendered.toString().padStart(2, '0')} | Time ${hours ? hours + '.' : ''}${minutes.toString().padStart(2, '0')}.${(seconds % 60).toString().padStart(2, '0')} | ${local('core_repo')} | ${gameName}`;
             window.log && (log.textContent = logMessages.filter(m => m !== "").join('\n--\n'));
             window._runCount = 0; frameCount = skippedFrames = 0;
             if (++count1 === 60) {saveState(); count1 = 0;}

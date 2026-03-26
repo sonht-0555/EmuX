@@ -298,12 +298,11 @@ export default {
     const w = await (await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min&current=relative_humidity_2m,weather_code&timezone=auto`)).json();
 
     const l1 = `=UN ${Math.round(w.daily.temperature_2m_max[0])}'NIG ${Math.round(w.daily.temperature_2m_min[0])}'`;
-    const l2 = `MUM ${Math.round(w.current.relative_humidity_2m)}'${w.current.weather_code >= 51 ? "RAINY_" : (w.current.weather_code >= 1 && w.current.weather_code <= 3 ? "CLOUDY_" : "SUNNY_")}`;
+    const l2 = `HUM ${Math.round(w.current.relative_humidity_2m)}'${w.current.weather_code >= 51 ? "RAINY_" : (w.current.weather_code >= 1 && w.current.weather_code <= 3 ? "CLOUDY_" : "SUNNY_")}`;
 
-    const w1 = getTextWidth(l1);
-    const w2 = getTextWidth(l2);
-    const maxW = Math.max(w1, w2);
-    const startX = Math.floor((WIDTH - maxW) / 2);
+    const maxW_1x = Math.max(getTextWidth(l1), getTextWidth(l2)) / SCALE;
+    const startX_1x = Math.ceil((390 - maxW_1x) / 2);
+    const startX = startX_1x * SCALE;
 
     const buffer = new Uint8Array(WIDTH * HEIGHT);
 

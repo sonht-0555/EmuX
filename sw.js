@@ -1,4 +1,4 @@
-let revision = 'EmuX_6.94';
+let revision = 'EmuX_6.93';
 // git add . && git commit --amend --no-edit && git push -f && clear
 // git reset --hard xxxxxxx && git push -f && clear
 // git add .github/workflows/build-pico.yml && git commit --amend --no-edit && git push -f && clear
@@ -10,43 +10,6 @@ var urlsToCache = [
     './src/assets/img/icon.png',
     './src/assets/font/04bf.woff',
     './src/assets/font/3x3.ttf',
-    // Stable Cores
-    'https://raw.githubusercontent.com/sonht-0555/EmuX/stable/gba.zip',
-    'https://raw.githubusercontent.com/sonht-0555/EmuX/stable/pce.zip',
-    'https://raw.githubusercontent.com/sonht-0555/EmuX/stable/snes2010.zip',
-    'https://raw.githubusercontent.com/sonht-0555/EmuX/stable/nes.zip',
-    'https://raw.githubusercontent.com/sonht-0555/EmuX/stable/genesis.zip',
-    'https://raw.githubusercontent.com/sonht-0555/EmuX/stable/ngp.zip',
-    'https://raw.githubusercontent.com/sonht-0555/EmuX/stable/fbneo.zip',
-    'https://raw.githubusercontent.com/sonht-0555/EmuX/stable/mame.zip',
-    'https://raw.githubusercontent.com/sonht-0555/EmuX/stable/nds2021.zip',
-    'https://raw.githubusercontent.com/sonht-0555/EmuX/stable/ps1.zip',
-    'https://raw.githubusercontent.com/sonht-0555/EmuX/stable/wswan.zip',
-    'https://raw.githubusercontent.com/sonht-0555/EmuX/stable/a26.zip',
-    'https://raw.githubusercontent.com/sonht-0555/EmuX/stable/pokemini.zip',
-    'https://raw.githubusercontent.com/sonht-0555/EmuX/stable/lynx.zip',
-    // Lated Cores (Latest EMSDK)
-    'https://raw.githubusercontent.com/sonht-0555/EmuX/lated/gba.zip',
-    'https://raw.githubusercontent.com/sonht-0555/EmuX/lated/pce.zip',
-    'https://raw.githubusercontent.com/sonht-0555/EmuX/lated/snes2010.zip',
-    'https://raw.githubusercontent.com/sonht-0555/EmuX/lated/nes.zip',
-    'https://raw.githubusercontent.com/sonht-0555/EmuX/lated/genesis.zip',
-    'https://raw.githubusercontent.com/sonht-0555/EmuX/lated/ngp.zip',
-    'https://raw.githubusercontent.com/sonht-0555/EmuX/lated/fbneo.zip',
-    'https://raw.githubusercontent.com/sonht-0555/EmuX/lated/mame.zip',
-    'https://raw.githubusercontent.com/sonht-0555/EmuX/lated/nds2021.zip',
-    'https://raw.githubusercontent.com/sonht-0555/EmuX/lated/ps1.zip',
-    'https://raw.githubusercontent.com/sonht-0555/EmuX/lated/wswan.zip',
-    'https://raw.githubusercontent.com/sonht-0555/EmuX/lated/a26.zip',
-    'https://raw.githubusercontent.com/sonht-0555/EmuX/lated/pokemini.zip',
-    'https://raw.githubusercontent.com/sonht-0555/EmuX/lated/lynx.zip',
-    './src/utils/bios/neogeo.zip',
-    './src/utils/bios/scph5501.bin',
-    './src/utils/bios/bios7.bin',
-    './src/utils/bios/bios9.bin',
-    './src/utils/bios/firmware.bin',
-    './src/utils/bios/syscard3.pce',
-    './src/utils/bios/lynxboot.img',
     './src/utils/zip.js',
     './src/core/loader.js',
     './src/core/audio.js',
@@ -74,14 +37,14 @@ self.addEventListener('install', function (event) {
                 }))
             ).then(() => {
                 self.skipWaiting();
-                postMsg({msg: 'done'});
             });
         })
     );
 });
 self.addEventListener('fetch', function (event) {
-    if (event.request.url.includes('api.github.com')) return;
-    if (event.request.url.includes('workers.dev')) {
+    const url = event.request.url;
+    if (url.includes('api.github.com')) return;
+    if (url.match(/\.(zip|bin|pce|img|wasm|png)$/i) || url.match(/(workers\.dev|pico-8\.com|lexaloffle\.com)/)) {
         event.respondWith(
             caches.match(event.request).then(response => {
                 return response || fetch(event.request).then(res => {
@@ -132,9 +95,8 @@ self.addEventListener('activate', function (event) {
                     })
                 );
             })
-        ])
+        ]).then(() => postMsg({msg: 'done'}))
     );
-    postMsg({msg: 'Updated'});
 });
 function postMsg(obj) {
     clients.matchAll({includeUncontrolled: true, type: 'window'}).then((arr) => {

@@ -1,8 +1,8 @@
 name: Build All Cores (Latest EMSDK)
 
 on:
-  #push:
-    #branches: [main]
+  push:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -17,7 +17,7 @@ jobs:
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       EMSDK_VER: latest
-      OPT_FLAGS: "-Oz -ffast-math -flto -DNDEBUG -ffunction-sections -fdata-sections"
+      OPT_FLAGS: "-O2 -ffast-math -flto -DNDEBUG -ffunction-sections -fdata-sections"
       EXPORTED_METHODS: '["addFunction","FS","stringToUTF8","UTF8ToString","ccall","cwrap","getValue","setValue","HEAP8","HEAPU8","HEAP16","HEAPU16","HEAP32","HEAPU32","HEAPF32","HEAPF64"]'
       EXPORTED_FUNCS: '["_retro_init","_retro_run","_retro_load_game","_retro_get_system_av_info","_retro_set_environment","_retro_set_video_refresh","_retro_set_audio_sample","_retro_set_audio_sample_batch","_retro_set_input_poll","_retro_set_input_state","_malloc","_free","_retro_serialize_size","_retro_serialize","_retro_unserialize","_emux_is_dirty","_emux_render16","_emux_render32","_emux_audio_reset","_emux_audio_process","_emux_audio_get_buffer_l","_emux_audio_get_buffer_r","_emux_audio_set_core_rate"]'
     strategy:

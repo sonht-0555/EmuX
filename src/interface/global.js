@@ -54,8 +54,8 @@ async function message(text, duration = 2000) {
 }
 // ===== gameView =====
 async function gameView(name) {
-    page02.ontouchstart = event => event.preventDefault();
-    cta.ontouchstart = event => event.preventDefault();
+    page02.ontouchstart = page02.ontouchmove = event => event.preventDefault();
+    cta.ontouchstart = cta.ontouchmove = event => event.preventDefault();
     gameWidth = canvas.width;
     gameHeight = canvas.height;
     switch0.textContent = local('render');

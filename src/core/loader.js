@@ -143,6 +143,5 @@ async function initCore(romFile) {
         script.onload = () => {if (scriptSource.startsWith('blob:')) URL.revokeObjectURL(scriptSource);};
         document.body.appendChild(script);
         gameName = romFile.name;
-        console.log(`Core | ${local('core_repo')} | ${gameName}`);
     });
 }
