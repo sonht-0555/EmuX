@@ -42,9 +42,15 @@ async function message(text, duration = 2000) {
     if (count) count.cancelled = true;
     const token = {cancelled: false};
     count = token;
-    title1.textContent = text.charAt(0).toUpperCase() + text.slice(1);
+    const fullText = text.charAt(0).toUpperCase() + text.slice(1);
+    title1.textContent = "";
+    for (const char of fullText) {
+        if (token.cancelled) return;
+        title1.textContent += char;
+        await delay(75);
+    }
     await delay(duration);
-    if (!token.cancelled && count === token) {title1.textContent = gameName; count = null;}
+    if (!token.cancelled && count === token) {title1.textContent = ""; count = null;}
 }
 // ===== gameView =====
 async function gameView(name) {
@@ -52,31 +58,28 @@ async function gameView(name) {
     cta.ontouchstart = event => event.preventDefault();
     gameWidth = canvas.width;
     gameHeight = canvas.height;
-    title1.textContent = name.charAt(0).toUpperCase() + name.slice(1);
     switch0.textContent = local('render');
     const maxInteger = Math.floor((window.innerWidth * window.devicePixelRatio) / gameWidth);
     integer = (maxInteger > 6) ? maxInteger - (maxInteger % 2) : maxInteger;
     const ratio = integer / window.devicePixelRatio, style = screen.style;
-    display.style.cssText = `height:${Math.ceil(gameHeight * ratio) + 10}px;width:${Math.ceil(gameWidth * ratio)}px`;
-    style.width = `${Math.ceil(gameWidth * ratio)}px`;
+    display.style.cssText = `height:${Math.ceil(gameHeight * ratio)}px;width:${Math.ceil(gameWidth * ratio)}px`;
+    style.width = `${(gameWidth * ratio)}px`;
     style.setProperty("--size", `${integer}px`);
     style.setProperty("--width", `${gameWidth * integer}px`);
     style.setProperty("--height", `${gameHeight * integer}px`);
     style.setProperty("--scale", ratio / integer);
     const buttonWidth = (window.innerWidth - 36) / 8, size = Math.round(buttonWidth) % 2 === 0 ? Math.round(buttonWidth) - 1 : Math.round(buttonWidth);
     gamepad.style.gridTemplateColumns = `${size}px 1px ${size}px 1px ${size}px 1px ${size}px 1px auto 1px ${size}px 1px ${size}px 1px ${size}px 1px ${size}px`;
-    page02.style.gridTemplateRows = `auto ${window.innerWidth - (size * 8 + 30)}px ${size * 4 + 36}px ${window.innerWidth - (size * 8 + 20)}px 1fr 20px`;
+    page02.style.gridTemplateRows = `auto ${window.innerWidth - (size * 8 + 20)}px ${size * 4 + 36}px 1fr 20px`;
     joy.style.width = `${size * 4 + 3}px`;
     await delay(200);
     [page00, page01, list01, list02, switch0].forEach(page => page.hidden = true);
     [page02, list].forEach(page => page.hidden = false);
     const patternSize = (integer <= 4 || integer % 2 !== 0) ? integer : (integer / 2);
     style.setProperty("--shader", generateSvgPattern(integer / patternSize, patternSize, local(`shader0${local("shader")}`) || patternSize));
+    message(name);
 }
 // ===== Event Listeners =====
-document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === 'visible' && window.resetAudioSync) window.resetAudioSync();
-});
 document.addEventListener("DOMContentLoaded", () => {
     body.removeAttribute('hide');
     canvasBottom = document.getElementById("canvas-bottom");

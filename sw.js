@@ -1,4 +1,4 @@
-let revision = 'EmuX_6.41';
+let revision = 'EmuX_6.94';
 // git add . && git commit --amend --no-edit && git push -f && clear
 // git reset --hard xxxxxxx && git push -f && clear
 // git add .github/workflows/build-pico.yml && git commit --amend --no-edit && git push -f && clear
@@ -9,8 +9,6 @@ var urlsToCache = [
     './src/assets/css/main.css',
     './src/assets/img/icon.png',
     './src/assets/font/04bf.woff',
-    './src/assets/font/04b.ttf',
-    './src/assets/font/mother.ttf',
     './src/assets/font/3x3.ttf',
     // Stable Cores
     'https://raw.githubusercontent.com/sonht-0555/EmuX/stable/gba.zip',
@@ -66,12 +64,18 @@ var urlsToCache = [
     './src/interface/page02.js'
 ];
 self.addEventListener('install', function (event) {
-    postMsg({msg: 'Updating...'});
+    let current = 0, total = urlsToCache.length;
     event.waitUntil(
         caches.open(revision).then((newCache) => {
             return Promise.all(
-                urlsToCache.map(url => newCache.add(url + '?ver=' + revision))
-            ).then(() => self.skipWaiting());
+                urlsToCache.map(url => newCache.add(url + '?ver=' + revision).then(() => {
+                    current++;
+                    postMsg({msg: 'progress', current, total});
+                }))
+            ).then(() => {
+                self.skipWaiting();
+                postMsg({msg: 'done'});
+            });
         })
     );
 });

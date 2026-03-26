@@ -1,17 +1,22 @@
 // ===== Audio System =====
 const audio_batch_cb = (pointer, frames) => writeAudio(pointer, frames), audio_cb = () => { };
-var audioContext, audioWorkletNode, audioGainNode, totalSamplesSent = 0, audioStartTime = 0, gameFps = 60, lastRafTime = 0, acc = 0, sDrift = 1, lastLogTime = 0, sabL, sabR, sabIndices, sabViewLeft, sabViewRight, sabViewIndices, wasmOutL = 0, wasmOutR = 0, sabBufSize = 0, sabMask = 0, activeSession = null;
+var audioContext, audioWorkletNode, audioGainNode, totalSamplesSent = 0, audioStartTime = 0, gameFps = 60, lastRafTime = 0, acc = 0, sDrift = 1, lastLogTime = 0, sabL, sabR, sabIndices, sabViewLeft, sabViewRight, sabViewIndices, wasmOutL = 0, wasmOutR = 0, sabBufSize = 0, sabMask = 0, activeSession = null, audioBurstLimit = 10000, audioMaxWrite = 4000, audioTargetLimit = 3000;
 // ===== initAudio =====
 async function initAudio(avInfoPointer) {
     const p = Number(avInfoPointer);
     gameFps = Module.HEAPF64[(p + 24) >> 3] || 60;
     const coreRate = Module.HEAPF64[(p + 32) >> 3] || 48000;
+    const spf = 48000 / gameFps;
+    audioBurstLimit = Math.max(8000, spf * 8);
+    audioMaxWrite = Math.max(3000, spf * 3);
+    audioTargetLimit = Math.max(2000, spf * 4);
+    console.log(`${gameFps.toFixed(1)} | ${coreRate} | ${spf.toFixed(1)} | ${audioBurstLimit} | ${audioMaxWrite} | ${audioTargetLimit.toFixed(1)}`);
     if (audioContext) return audioContext.resume();
     audioContext = new (window.AudioContext || window.webkitAudioContext)({sampleRate: 48000});
     const code = `class P extends AudioWorkletProcessor{constructor(o){super();const{sabL,sabR,sabIndices,bufSize}=o.processorOptions;this.L=new Float32Array(sabL);this.R=new Float32Array(sabR);this.I=new Uint32Array(sabIndices);this.S=bufSize;this.M=bufSize-1}process(_,o){const u=o[0],l=u[0],r=u[1],n=l.length,w=Atomics.load(this.I,0),i=Atomics.load(this.I,1);if(((w-i+this.S)&this.M)<n){l.fill(0);if(r)r.fill(0);return true}const s=this.S-i;if(n<=s){l.set(this.L.subarray(i,i+n));if(r)r.set(this.R.subarray(i,i+n))}else{l.set(this.L.subarray(i,i+s));l.set(this.L.subarray(0,n-s),s);if(r){r.set(this.R.subarray(i,i+s));r.set(this.R.subarray(0,n-s),s)}}Atomics.store(this.I,1,(i+n)&this.M);return true}}registerProcessor('p',P)`;
     const blob = new Blob([code], {type: 'application/javascript'});
     await audioContext.audioWorklet.addModule(URL.createObjectURL(blob));
-    sabBufSize = 8192;
+    sabBufSize = 16384;
     sabMask = sabBufSize - 1;
     sabL = new SharedArrayBuffer(sabBufSize * 4);
     sabR = new SharedArrayBuffer(sabBufSize * 4);
@@ -34,7 +39,7 @@ async function initAudio(avInfoPointer) {
 function writeAudio(pointer, frames) {
     if (!audioWorkletNode || !isRunning || !Module._emux_audio_process) return frames;
     const count = Module._emux_audio_process(pointer, frames);
-    if (count > 2000) return frames;
+    if (count > audioMaxWrite) return frames;
     if (count > 0) {
         const writeIndex = Atomics.load(sabViewIndices, 0);
         const readIndex = Atomics.load(sabViewIndices, 1);
@@ -66,13 +71,14 @@ window.getAudioSync = () => {
 
     if (audioContext && audioContext.state === 'running' && gameFps && delta > 0 && delta < 100) {
         backlog = totalSamplesSent - (audioContext.currentTime - audioStartTime) * audioContext.sampleRate;
-        if (Math.abs(backlog) > 5000) {
-            audioContext.suspend();
+        if (Math.abs(backlog) > audioBurstLimit) {
+            // audioContext.suspend();
+            message(`@bursted_${backlog.toFixed(0)}`);
             console.log(`Burst Fixed | ${backlog.toFixed(0)}`);
             audioStartTime = audioContext.currentTime - (totalSamplesSent / audioContext.sampleRate);
             acc = 0; saveState(); backlog = 0;
         }
-        drift = 1.0 + (2000 - backlog) / 100000;
+        drift = 1.0 + (audioTargetLimit - backlog) / 200000;
     }
 
     let fairDelta = (delta <= 0 || delta > 100) ? 16.6 : delta;
@@ -107,3 +113,10 @@ window.gameLoop = (isLooping) => {
     }
     window.skipRender = false;
 };
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && audioContext && isRunning) {
+        if (audioContext.state !== 'running') audioContext.resume();
+        console.log(`Sync Reset | ${audioContext.state}`);
+        window.resetAudioSync();
+    }
+});

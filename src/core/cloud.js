@@ -40,10 +40,7 @@ async function cloudBackup() {
             if (fileName.includes('__') && !newHashes[fileName]) await api.del(backupCode, fileName);
         }
         cloudCache('chash_' + backupCode, newHashes);
-        await message(`Cloud_Sync_OK!`, 1500);
-    } catch (e) {
-        await message(`Error_Sync!`, 2000);
-    }
+    } catch (e) { }
     page00.hidden = true;
 }
 // ===== cloudRestore =====
@@ -53,7 +50,7 @@ async function cloudRestore() {
     showNotification(" pa", "use.", "", "Scanning...");
     try {
         const cloudObjects = await api.list(restoreCode);
-        if (!cloudObjects.length) return (page00.hidden = true, message("Code_Not_Found"));
+        if (!cloudObjects.length) return (page00.hidden = true, message("#code_not_found"));
         const validFiles = cloudObjects.filter(object => object.Key.includes('__')), PARALLEL = 5;
         let restoredCount = 0;
         for (let i = 0; i < validFiles.length; i += PARALLEL) {
@@ -65,9 +62,6 @@ async function cloudRestore() {
                 if (data) await emuxDB(new Uint8Array(data), key);
             }));
         }
-        await message(`Cloud_Restore_OK!`, 1500);
-    } catch (e) {
-        await message(`Error_Restore!`, 2000);
-    }
+    } catch (e) { }
     page00.hidden = true;
 }

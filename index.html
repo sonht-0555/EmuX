@@ -63,11 +63,10 @@
     </page01>
     <page02 hidden>
       <display>
-        <screen><canvas fil id="canvas"></canvas></screen>
-        <notification>
+        <screen>
+          <canvas fil id="canvas"></canvas>
           <title1>...</title1>
-          <time1>W00_00.00</time1>
-        </notification>
+        </screen>
       </display>
       <divide></divide>
       <gamepad>
@@ -97,11 +96,10 @@
         <btn-select data="func-select"> sc.</btn-select>
         <btn-start data="func-start"> st.</btn-start>
       </gamepad>
-      <divide></divide>
       <joypad>
         <log></log>
         <canvas fil style="display:none" id="canvas-bottom"></canvas>
-        <svg id="joy" style="height:auto; width:auto" viewBox="0 0 100 100" fill-opacity="0">
+        <svg id="joy" style="height:auto; width:auto; padding-top:20px;" viewBox="0 0 100 100" fill-opacity="0">
           <polygon points="50 50, 100 100, 100 0" fill="transparent" data="btn-right" />
           <polygon points="0 0, 0 100, 50 50" fill="transparent" data="btn-left" />
           <polygon points="0 0, 100 0, 50 50" fill="transparent" data="btn-up" />

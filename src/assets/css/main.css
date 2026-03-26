@@ -5,16 +5,8 @@
     padding: 0;
   }
   @font-face {
-    font-family: "04b";
-    src: url("../font/04b.ttf");
-  }
-  @font-face {
     font-family: "04bf";
     src: url("../font/04bf.woff");
-  }
-  @font-face {
-    font-family: "mother";
-    src: url("../font/mother.ttf");
   }
   @font-face {
     font-family: "3x3";
@@ -48,7 +40,7 @@
     --profile-4: oklch(from var(--profile-base) l c h / 0.20);
     --profile-5: oklch(from var(--profile-base) l c h / 0.04);
   }
-  body::after, page00::after, screen::after {
+  body::after, page00::after, screen::after, title1::after {
     content: "";
     position: absolute;
     top: 0;
@@ -73,7 +65,7 @@
     height: 100vh;
     overflow: hidden;
   }
-  body::after, page00::after {
+  body::after, page00::after, title1::after {
     background-image: var(--background);
   }
 }
@@ -200,7 +192,7 @@
     padding: 2px 0px 2px 2px;
     height: 6px;
     background: var(--profile-3);
-    margin: 15px 0px;
+    margin: 15px;
     color: var(--profile-black);
   }
   cta {
@@ -208,17 +200,12 @@
     gap: 8px;
     grid-row: 2;
   }
-  more {
-    width: 40px;
-    background: linear-gradient(var(--profile-3), var(--profile-3));
-    mask: url("data:image/svg+xml,%3Csvg width='10' height='10' viewBox='0 0 10 10' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 1H2M0 5H2M0 9H2M4 1H6M8 1H10M4 5H6M8 5H10M4 9H6M8 9H10' stroke='%23C5AF90' stroke-width='2'/%3E%3C/svg%3E%0A") no-repeat center;
-  }
   dele {
     width: 40px;
     background: linear-gradient(var(--profile-3), var(--profile-3));
     mask: url("data:image/svg+xml,%3Csvg width='10' height='8' viewBox='0 0 10 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M8 4H10M6 4H4M2 4H0' stroke='%23C5AF90' stroke-width='2'/%3E%3C/svg%3E%0A") no-repeat center;
   }
-  setting, label, more, down, dele {
+  setting, label, down, dele {
     background-position: center;
     background-repeat: no-repeat;
     place-items: center;
@@ -231,8 +218,8 @@
   /* layer display */
   display {
     position: relative;
-    grid-template-rows: 1fr 10px;
-    justify-items: left;
+    justify-items: start;
+    align-items: end;
   }
   screen {
     z-index: 2;
@@ -250,29 +237,18 @@
     image-rendering: pixelated;
     transition: opacity 0.5s ease-in-out;
   }
-  notification {
-    position: relative;
-    font-family: "04b";
-    grid-template-columns: 1fr auto;
-    color: var(--profile-2);
-    text-align: left;
-    align-items: end;
-  }
-  notification title1, time1 {
-    line-height: 6px;
-    height: 7px;
+  title1 {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    max-width: 90%;
+    background-color: var(--profile-black);
+    padding: 2px 0px 0px 0px;
+    font-size: 8px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    background-color: var(--profile-black);
-  }
-  notification title1 {
-    max-width: 70%
-  }
-  notification time1 {
-    font-family: "04bf";
-    position: absolute;
-    right: -1px;
+    z-index: 4;
   }
   /* layer gamepad */
   page02 gamepad {
@@ -369,14 +345,15 @@
   }
   joypad {
     justify-content: end;
+    padding: 6px;
   }
   log {
     position: absolute;
     text-align: left;
-    padding: 6px;
     font-size: 8px;
     font-family: "04bf";
-    color: var(--profile-4);
+    text-transform: uppercase;
+    color: var(--profile-3);
     white-space: pre;
     pointer-events: auto;
     opacity: 0;
@@ -386,7 +363,7 @@
     height: 20px;
     position: absolute;
     bottom: 0;
-    z-index: 10;
+    z-index: 5;
   }
 }
 @layer page-3 {}

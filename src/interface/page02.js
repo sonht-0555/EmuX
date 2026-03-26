@@ -41,7 +41,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (distance >= 20) {
             brightnessValue = Math.max(0, Math.min(10, brightnessValue + (swipeStartY - event.clientY > 0 ? 1 : -1)));
             gamepad.style.opacity = brightnessValue / 10;
-            message(`Brightness_${brightnessValue}0.nit`);
+            //message(`#${brightnessValue}0_Brightness`);
             swipeStartY = event.clientY;
         }
     };

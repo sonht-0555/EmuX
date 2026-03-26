@@ -1,12 +1,12 @@
 // ===== logHook =====
-var logMessages = [];
+var logMessages = [""];
 const originalLog = console.log, originalError = console.error;
 const logToScreen = (msg) => {
-    const render = () => window.log && (log.textContent = logMessages.join('\n--\n'));
-    logMessages.unshift(msg);
-    if (logMessages.length > 5) logMessages.pop();
+    const render = () => window.log && (log.textContent = logMessages.filter(m => m !== "").join('\n--\n'));
+    const now = new Date(), time = `${now.getHours().toString().padStart(2, '0')}.${now.getMinutes().toString().padStart(2, '0')}.${now.getSeconds().toString().padStart(2, '0')}`;
+    logMessages.splice(1, 0, `${time} | ${msg}`);
+    if (logMessages.length > 12) logMessages.pop();
     render();
-    setTimeout(() => {const i = logMessages.lastIndexOf(msg); if (i > -1) {logMessages.splice(i, 1); render();} }, 60000);
 };
 console.log = (...args) => {originalLog(...args); logToScreen(args.join(' '));};
 console.error = (...args) => {originalError(...args); logToScreen('🍖 | ' + args.join(' '));};
@@ -52,7 +52,7 @@ async function saveState(slot = 1) {
     if (Module._retro_serialize(statePointer, stateSize)) {
         const stateData = new Uint8Array(Module.HEAPU8.buffer, statePointer, stateSize).slice();
         await emuxDB(stateData, `${gameName}.ss${slot}`);
-        await message(`[ss${slot}]_Recorded!`, 1000);
+        if (slot !== 1) await message(`#${slot}_saved`);
     }
     Module._free(statePointer);
 }
@@ -65,19 +65,19 @@ async function loadState(slot = 1) {
         Module.HEAPU8.set(stateData, statePointer);
         Module._retro_unserialize(statePointer, stateData.length);
         Module._free(statePointer);
-        await message(`[ss${slot}]_Loaded!`, 1000);
+        if (slot !== 1) await message(`#${slot}_loaded`);
     }
 }
 // ===== timer =====
 async function timer(isStart) {
     if (isStart && !timerId) {
-        if (!time1Element) time1Element = document.querySelector("time1");
         timerId = setInterval(() => {
             seconds++;
             if (seconds === 60) {seconds = 0; minutes++;}
             if (minutes === 60) {minutes = 0; hours++;}
             const rendered = frameCount - skippedFrames;
-            time1Element.textContent = `W${rendered.toString().padStart(2, '0')}_${hours ? hours + '.' : ''}${minutes.toString().padStart(2, '0')}.${(seconds % 60).toString().padStart(2, '0')}`;
+            logMessages[0] = `W${rendered.toString().padStart(2, '0')}_${hours ? hours + '.' : ''}${minutes.toString().padStart(2, '0')}.${(seconds % 60).toString().padStart(2, '0')}`;
+            window.log && (log.textContent = logMessages.filter(m => m !== "").join('\n--\n'));
             window._runCount = 0; frameCount = skippedFrames = 0;
             if (++count1 === 60) {saveState(); count1 = 0;}
         }, 1000);
@@ -90,14 +90,14 @@ async function resumeGame() {
     if (isConfig.id === 'pico8') return buttonClick('start');
     if (audioContext && audioContext.state !== 'running') await audioContext.resume(), window.resetAudioSync?.();
     window.gameLoop?.(true);
-    timer(true); message("[_] Resumed!");
+    timer(true); message("_resumed");
 }
 // ===== pauseGame =====
 async function pauseGame() {
     if (isConfig.id === 'pico8') return buttonClick('start');
     window.gameLoop?.(false);
     if (audioContext && audioContext.state === 'running') await audioContext.suspend();
-    timer(false); message("[_] Paused!");
+    timer(false); message("_paused");
 }
 // ===== rebootGame =====
 async function rebootGame() {location.reload();}

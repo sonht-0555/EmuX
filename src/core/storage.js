@@ -89,5 +89,4 @@ async function downloadFromStore(name) {
     const url = URL.createObjectURL(new Blob([data])), link = document.createElement('a');
     link.href = url; link.download = name; link.click();
     URL.revokeObjectURL(url);
-    message(`[#]_Exported!`);
 }

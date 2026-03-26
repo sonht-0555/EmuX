@@ -30,12 +30,12 @@ async function listGame() {
         const coreConfiguration = window.CORE_CONFIG?.find(config => config.ext?.split(',').map(e => e.trim()).includes(fileExtension));
         const displayName = gameFilename.toLowerCase().endsWith(fileExtension.toLowerCase()) ? gameFilename.slice(0, -fileExtension.length) : (gameFilename.lastIndexOf('.') > 0 ? gameFilename.substring(0, gameFilename.lastIndexOf('.')) : gameFilename);
         const gameTag = (local('tags_' + gameFilename) || coreConfiguration?.tag || fileExtension.slice(1)).slice(0, 4);
-        return `<rom data-full="${gameFilename}"><name>${displayName}</name><tag>${gameTag}</tag><more></more></rom>`;
+        return `<rom data-full="${gameFilename}"><name>${displayName}</name><tag>${gameTag}</tag></rom>`;
     }).join('');
     list.querySelectorAll('rom').forEach(romElement => {
         const fullName = romElement.getAttribute('data-full'), displayName = romElement.querySelector('name').textContent;
         romElement.querySelector('name').onclick = () => loadGame(fullName);
-        romElement.querySelector('more').onclick = () => {showFileGroups(displayName); view('details');};
+        romElement.querySelector('tag').onclick = () => {showFileGroups(displayName); view('details');};
     });
 }
 // ===== verticalSetting =====
@@ -63,11 +63,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').then(registration => registration.active && !navigator.serviceWorker.controller && location.reload()));
         navigator.serviceWorker.addEventListener('message', event => {
-            if (event.data.msg === "Updating...") {
-                let counter = 0, interval = setInterval(() => {
-                    showNotification(" Up", "date.", "", ` Please wait in...|${++counter}|`);
-                    if (counter === 10) {clearInterval(interval); location.reload();}
-                }, 1000);
+            if (event.data.msg === "progress") {
+                showNotification(" Up", "date.", "", ` Please wait in...|${event.data.current}.${event.data.total}|`);
+            } else if (event.data.msg === "done") {
+                location.reload();
             }
         });
     }
