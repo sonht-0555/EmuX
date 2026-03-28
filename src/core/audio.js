@@ -1,6 +1,6 @@
 // ===== Audio System =====
 const audio_batch_cb = (pointer, frames) => writeAudio(pointer, frames), audio_cb = () => { };
-var audioContext, audioWorkletNode, audioGainNode, totalSamplesSent = 0, audioStartTime = 0, gameFps = 60, lastRafTime = 0, acc = 0, sDrift = 1, lastLogTime = 0, sabL, sabR, sabIndices, sabViewLeft, sabViewRight, sabViewIndices, wasmOutL = 0, wasmOutR = 0, sabBufSize = 0, sabMask = 0, activeSession = null, audioBurstLimit = 10000, audioMaxWrite = 4000, audioTargetLimit = 3000;
+var audioContext, audioWorkletNode, audioGainNode, totalSamplesSent = 0, audioStartTime = 0, gameFps = 60, lastRafTime = 0, acc = 0, sDrift = 1, lastLogTime = 0, lastAudioTime = 0, sabL, sabR, sabIndices, sabViewLeft, sabViewRight, sabViewIndices, wasmOutL = 0, wasmOutR = 0, sabBufSize = 0, sabMask = 0, activeSession = null, audioBurstLimit = 10000, audioMaxWrite = 4000, audioTargetLimit = 3000;
 // ===== initAudio =====
 async function initAudio(avInfoPointer) {
     const p = Number(avInfoPointer);
@@ -69,16 +69,27 @@ window.getAudioSync = () => {
     const delta = now - lastRafTime; lastRafTime = now;
     let drift = 1.0, backlog = 0;
 
-    if (audioContext && audioContext.state === 'running' && gameFps && delta > 0 && delta < 100) {
-        backlog = totalSamplesSent - (audioContext.currentTime - audioStartTime) * audioContext.sampleRate;
-        if (Math.abs(backlog) > audioBurstLimit) {
-            // audioContext.suspend();
-            message(`@bursted_${backlog.toFixed(0)}`);
-            console.log(`Burst Fixed | ${backlog.toFixed(0)}`);
-            audioStartTime = audioContext.currentTime - (totalSamplesSent / audioContext.sampleRate);
-            acc = 0; saveState(); backlog = 0;
+    if (audioContext && audioContext.state === 'running' && gameFps && delta > 0) {
+        const curTime = audioContext.currentTime;
+        if (lastAudioTime > 0 && delta < 100) {
+            const audioDelta = curTime - lastAudioTime;
+            const wallDelta = delta / 1000;
+            // Nếu đồng hồ Audio lệch quá 50ms so với thực tế (do treo hoặc nhảy vọt), ta hấp thụ nó
+            if (Math.abs(audioDelta - wallDelta) > 0.05) audioStartTime += (audioDelta - wallDelta);
         }
-        drift = 1.0 + (audioTargetLimit - backlog) / 200000;
+        lastAudioTime = curTime;
+
+        if (delta < 100) {
+            backlog = totalSamplesSent - (curTime - audioStartTime) * audioContext.sampleRate;
+            if (Math.abs(backlog) > audioBurstLimit) {
+                // audioContext.suspend();
+                message(`@bursted_${backlog.toFixed(0)}`);
+                console.log(`Burst Fixed | ${backlog.toFixed(0)}`);
+                audioStartTime = audioContext.currentTime - (totalSamplesSent / audioContext.sampleRate);
+                acc = 0; saveState(); backlog = 0;
+            }
+            drift = 1.0 + (audioTargetLimit - backlog) / 200000;
+        }
     }
 
     let fairDelta = (delta <= 0 || delta > 100) ? 16.6 : delta;
@@ -91,7 +102,7 @@ window.getAudioSync = () => {
 // ===== resetAudioSync =====
 window.resetAudioSync = () => {
     totalSamplesSent = 0;
-    if (audioContext) audioStartTime = audioContext.currentTime;
+    if (audioContext) audioStartTime = lastAudioTime = audioContext.currentTime;
     if (window.Module && window.Module._emux_audio_reset) window.Module._emux_audio_reset();
     if (sabViewIndices) {
         Atomics.store(sabViewIndices, 0, 0);
