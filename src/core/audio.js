@@ -71,11 +71,8 @@ window.getAudioSync = () => {
 
     if (audioContext && audioContext.state === 'running' && gameFps && delta > 0) {
         const curTime = audioContext.currentTime;
-        if (lastAudioTime > 0 && delta < 100) {
-            const audioDelta = curTime - lastAudioTime;
-            const wallDelta = delta / 1000;
-            // Nếu đồng hồ Audio lệch quá 50ms so với thực tế (do treo hoặc nhảy vọt), ta hấp thụ nó
-            if (Math.abs(audioDelta - wallDelta) > 0.05) audioStartTime += (audioDelta - wallDelta);
+        if (delta > 100 || (lastAudioTime > 0 && Math.abs(curTime - lastAudioTime - delta / 1000) > 0.03)) {
+            audioStartTime = curTime - (totalSamplesSent / audioContext.sampleRate);
         }
         lastAudioTime = curTime;
 
@@ -127,7 +124,5 @@ window.gameLoop = (isLooping) => {
 document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible" && audioContext && isRunning) {
         if (audioContext.state !== 'running') audioContext.resume();
-        console.log(`Sync Reset | ${audioContext.state}`);
-        window.resetAudioSync();
     }
 });
