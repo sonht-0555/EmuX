@@ -1,6 +1,6 @@
 // ===== Audio System =====
 const audio_batch_cb = (pointer, frames) => writeAudio(pointer, frames), audio_cb = () => { };
-var audioContext, audioWorkletNode, audioGainNode, totalSamplesSent = 0, audioStartTime = 0, gameFps = 60, lastRafTime = 0, acc = 0, sDrift = 1, lastLogTime = 0, sabL, sabR, sabIndices, sabViewLeft, sabViewRight, sabViewIndices, wasmOutL = 0, wasmOutR = 0, sabBufSize = 0, sabMask = 0, activeSession = null, audioBurstLimit = 10000, audioMaxWrite = 4000, audioTargetLimit = 3000;
+var audioContext, audioWorkletNode, audioGainNode, totalSamplesSent = 0, audioStartTime = 0, gameFps = 60, lastRafTime = 0, acc = 0, sDrift = 1, lastLogTime = 0, lastAudioTime = 0, sabL, sabR, sabIndices, sabViewLeft, sabViewRight, sabViewIndices, wasmOutL = 0, wasmOutR = 0, sabBufSize = 0, sabMask = 0, activeSession = null, audioBurstLimit = 10000, audioMaxWrite = 4000, audioTargetLimit = 3000;
 // ===== initAudio =====
 async function initAudio(avInfoPointer) {
     const p = Number(avInfoPointer);
@@ -84,17 +84,24 @@ window.getAudioSync = () => {
     const now = performance.now();
     const delta = now - lastRafTime; lastRafTime = now;
     let drift = 1.0, backlog = 0;
-    // Burst Fixed
-    if (audioContext && audioContext.state === 'running' && gameFps && delta > 0 && delta < 100) {
-        backlog = totalSamplesSent - (audioContext.currentTime - audioStartTime) * audioContext.sampleRate;
-        if (Math.abs(backlog) > audioBurstLimit) {
-            // audioContext.suspend();
-            message(`@bursted_${backlog.toFixed(0)}`);
+    if (audioContext && audioContext.state === 'running' && gameFps && delta > 0) {
+        const curTime = audioContext.currentTime;
+        // Silent Fix (Clock Discontinuity/Stall)
+        if (delta > 100 || (lastAudioTime > 0 && Math.abs(curTime - lastAudioTime - delta / 1000) > 0.03)) {
+            const preFixBacklog = totalSamplesSent - (curTime - audioStartTime) * audioContext.sampleRate;
+            console.log(`Silent Fix | ${preFixBacklog.toFixed(0)} | ${(curTime - lastAudioTime).toFixed(3)}s`);
+            audioStartTime = curTime - (totalSamplesSent / audioContext.sampleRate);
+        }
+        lastAudioTime = curTime;
+        // Burst Fixed (Buffer Overflow Protection)
+        const isStable = delta < 100;
+        backlog = isStable ? (totalSamplesSent - (curTime - audioStartTime) * audioContext.sampleRate) : 0;
+        if (isStable && Math.abs(backlog) > audioBurstLimit) {
             console.log(`Burst Fixed | ${backlog.toFixed(0)}`);
-            audioStartTime = audioContext.currentTime - (totalSamplesSent / audioContext.sampleRate);
+            audioStartTime = curTime - (totalSamplesSent / audioContext.sampleRate);
             acc = 0; saveState(); backlog = 0;
         }
-        drift = 1.0 + (backlog - audioTargetLimit) / 200000;
+        drift = isStable ? (1.0 + (backlog - audioTargetLimit) / 200000) : 1.0;
     }
     // Sync Audio
     if (window.Module && Module._emux_audio_set_drift) {
@@ -137,6 +144,7 @@ document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible" && audioContext && isRunning) {
         if (audioContext.state !== 'running') audioContext.resume();
         console.log(`Sync Reset | ${audioContext.state}`);
+        message(`_sync`);
         window.resetAudioSync();
     }
 });
