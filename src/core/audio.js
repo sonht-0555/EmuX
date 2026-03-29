@@ -1,6 +1,9 @@
 // ===== Audio System =====
 const audio_batch_cb = (pointer, frames) => writeAudio(pointer, frames), audio_cb = () => { };
-var audioContext, audioWorkletNode, audioGainNode, totalSamplesSent = 0, audioStartTime = 0, gameFps = 60, lastRafTime = 0, acc = 0, sDrift = 1, lastLogTime = 0, lastAudioTime = 0, sabL, sabR, sabIndices, sabViewLeft, sabViewRight, sabViewIndices, wasmOutL = 0, wasmOutR = 0, sabBufSize = 0, sabMask = 0, activeSession = null, audioBurstLimit = 10000, audioMaxWrite = 4000, audioTargetLimit = 3000;
+var audioContext, audioWorkletNode, audioGainNode, totalSamplesSent = 0, audioStartTime = 0, gameFps = 60, lastRafTime = 0, acc = 0, sDrift = 1, lastLogTime = 0, lastAudioTime = 0, lastFrameTime = 0, audio_fix_skip = 0, sabL, sabR, sabIndices, sabViewLeft, sabViewRight, sabViewIndices, wasmOutL = 0, wasmOutR = 0, sabBufSize = 0, sabMask = 0, activeSession = null, audioBurstLimit = 10000, audioMaxWrite = 4000, audioTargetLimit = 3000;
+// Kalman V-Sync
+var k_period = 16.666, k_error = 1.0;
+const k_process_noise = 0.0001, k_measure_noise = 0.05;
 // ===== initAudio =====
 async function initAudio(avInfoPointer) {
     const p = Number(avInfoPointer);
@@ -108,11 +111,19 @@ window.getAudioSync = () => {
         sDrift = sDrift * 0.9 + drift * 0.1;
         Module._emux_audio_set_drift(sDrift);
     }
-    // Sync Timing
-    let fairDelta = (delta <= 0 || delta > 100) ? (1000 / gameFps) : delta;
-    acc += (gameFps * fairDelta / 1000);
+    // Sync Timing (Kalman V-Sync)
+    let rawDelta = (lastFrameTime > 0) ? (now - lastFrameTime) : (1000 / gameFps);
+    lastFrameTime = now;
+    if (rawDelta > 100 || rawDelta < 1) rawDelta = 1000 / gameFps;
+    // Kalman Predict & Update
+    let k_prediction_error = k_error + k_process_noise;
+    let k_gain = k_prediction_error / (k_prediction_error + k_measure_noise);
+    k_period = k_period + k_gain * (rawDelta - k_period);
+    k_error = (1 - k_gain) * k_prediction_error;
+
+    acc += (gameFps * k_period / 1000);
     let runs = Math.floor(acc); acc -= runs;
-    // if (now - time > 10000) {console.log(`C.${gameFps.toFixed(1)} | D.${delta.toFixed(1)} | L.0${runs} | B.${backlog.toFixed(0)}`), time = now;}
+    // if (now - time > 1000) {console.log(`C.${gameFps.toFixed(0)} | K.${k_period.toFixed(3)} | D.${delta.toFixed(2)} | B.${backlog.toFixed(0)}`); time = now;}
     return Math.max(0, Math.min(4, runs));
 };
 // ===== resetAudioSync =====
@@ -125,6 +136,7 @@ window.resetAudioSync = () => {
         Atomics.store(sabViewIndices, 1, 0);
     }
     lastRafTime = acc = time = 0; sDrift = 1;
+    lastFrameTime = 0; k_period = 1000 / gameFps; k_error = 1.0;
 };
 // ===== gameLoop =====
 window.gameLoop = (isLooping) => {
@@ -144,7 +156,7 @@ document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible" && audioContext && isRunning) {
         if (audioContext.state !== 'running') audioContext.resume();
         console.log(`Sync Reset | ${audioContext.state}`);
-        message(`_sync`);
+        message(`#ync_reset`);
         window.resetAudioSync();
     }
 });
