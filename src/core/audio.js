@@ -1,22 +1,21 @@
 // ===== Audio System =====
 const audio_batch_cb = (pointer, frames) => writeAudio(pointer, frames), audio_cb = () => { };
-var audioContext, audioWorkletNode, audioGainNode, totalSamplesSent = 0, audioStartTime = 0, gameFps = 60, lastRafTime = 0, acc = 0, time = 0, sDrift = 1, lastLogTime = 0, lastAudioTime = 0, sabL, sabR, sabIndices, sabViewLeft, sabViewRight, sabViewIndices, wasmOutL = 0, wasmOutR = 0, sabBufSize = 0, sabMask = 0, activeSession = null, audioMaxWrite = 4000, audioTargetLimit = 3000;
+var audioContext, audioWorkletNode, audioGainNode, totalSamplesSent = 0, audioStartTime = 0, gameFps = 60, lastRafTime = 0, acc = 0, sDrift = 1, lastLogTime = 0, sabL, sabR, sabIndices, sabViewLeft, sabViewRight, sabViewIndices, wasmOutL = 0, wasmOutR = 0, sabBufSize = 0, sabMask = 0, activeSession = null, audioBurstLimit = 10000, audioMaxWrite = 4000, audioTargetLimit = 3000;
 // ===== initAudio =====
 async function initAudio(avInfoPointer) {
     const p = Number(avInfoPointer);
     gameFps = Module.HEAPF64[(p + 24) >> 3] || 60;
     const coreRate = Module.HEAPF64[(p + 32) >> 3] || 48000;
-    let spf = 48000 / gameFps;
+    const spf = 48000 / gameFps;
+    audioBurstLimit = Math.max(8000, spf * 8);
     audioMaxWrite = Math.max(3000, spf * 3);
+    audioTargetLimit = Math.max(2000, spf * 4);
+    console.log(`${gameFps.toFixed(1)} | ${coreRate} | ${spf.toFixed(1)} | ${audioBurstLimit} | ${audioMaxWrite} | ${audioTargetLimit.toFixed(1)}`);
     if (audioContext) return audioContext.resume();
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
     const outRate = audioContext.sampleRate;
     if (window.Module && Module._emux_audio_set_out_rate) Module._emux_audio_set_out_rate(outRate);
     if (window.Module && Module._emux_audio_set_core_rate) Module._emux_audio_set_core_rate(coreRate);
-    spf = outRate / gameFps;
-    audioMaxWrite = Math.max(3000, spf * 3);
-    audioTargetLimit = Math.max(spf * 4, 3000);
-    console.log(`${gameFps.toFixed(1)} | ${coreRate} | ${outRate} | ${spf.toFixed(1)} | ${audioTargetLimit.toFixed(1)}`);
     const code = `class P extends AudioWorkletProcessor{constructor(o){super();const{sabL,sabR,sabIndices,bufSize}=o.processorOptions;this.L=new Float32Array(sabL);this.R=new Float32Array(sabR);this.I=new Uint32Array(sabIndices);this.S=bufSize;this.M=bufSize-1}process(_,o){const u=o[0],l=u[0],r=u[1],n=l.length,w=Atomics.load(this.I,0),i=Atomics.load(this.I,1);if(((w-i+this.S)&this.M)<n){l.fill(0);if(r)r.fill(0);return true}const s=this.S-i;if(n<=s){l.set(this.L.subarray(i,i+n));if(r)r.set(this.R.subarray(i,i+n))}else{l.set(this.L.subarray(i,i+s));l.set(this.L.subarray(0,n-s),s);if(r){r.set(this.R.subarray(i,i+s));r.set(this.R.subarray(0,n-s),s)}}Atomics.store(this.I,1,(i+n)&this.M);return true}}registerProcessor('p',P)`;
     const blob = new Blob([code], {type: 'application/javascript'});
     await audioContext.audioWorklet.addModule(URL.createObjectURL(blob));
@@ -33,10 +32,24 @@ async function initAudio(avInfoPointer) {
     audioGainNode.gain.value = 1;
     wasmOutL = Module._emux_audio_get_buffer_l();
     wasmOutR = Module._emux_audio_get_buffer_r();
+    Module._emux_audio_set_core_rate(coreRate);
     if (Module._emux_audio_reset) Module._emux_audio_reset();
     audioWorkletNode.connect(audioGainNode).connect(audioContext.destination);
     audioStartTime = audioContext.currentTime;
     totalSamplesSent = 0;
+    // iOS Background Audio Hack (Silent Pipe)
+    try {
+        const silentAudio = new Audio();
+        silentAudio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==';
+        silentAudio.loop = true;
+        silentAudio.play().catch(() => { });
+        if ('mediaSession' in navigator) {
+            navigator.mediaSession.metadata = new MediaMetadata({title: 'EmuX Console', artist: 'EmuX Engine'});
+            navigator.mediaSession.setActionHandler('play', () => audioContext.resume());
+            navigator.mediaSession.setActionHandler('pause', () => audioContext.suspend());
+        }
+    } catch (e) { }
+    // iOS Background Audio Hack (Silent Pipe)
 }
 // ===== writeAudio =====
 function writeAudio(pointer, frames) {
@@ -71,36 +84,35 @@ window.getAudioSync = () => {
     const now = performance.now();
     const delta = now - lastRafTime; lastRafTime = now;
     let drift = 1.0, backlog = 0;
-    // Silent Fix
-    if (audioContext && audioContext.state === 'running' && gameFps && delta > 0) {
-        const curTime = audioContext.currentTime;
-        if (delta > 100 || (lastAudioTime > 0 && Math.abs(curTime - lastAudioTime - delta / 1000) > 0.03)) {
-            const preFixBacklog = totalSamplesSent - (curTime - audioStartTime) * audioContext.sampleRate;
-            console.log(`Silent Fix | ${preFixBacklog.toFixed(0)} | ${(curTime - lastAudioTime).toFixed(3)}s`);
-            audioStartTime = curTime - (totalSamplesSent / audioContext.sampleRate);
+    // Burst Fixed
+    if (audioContext && audioContext.state === 'running' && gameFps && delta > 0 && delta < 100) {
+        backlog = totalSamplesSent - (audioContext.currentTime - audioStartTime) * audioContext.sampleRate;
+        if (Math.abs(backlog) > audioBurstLimit) {
+            // audioContext.suspend();
+            message(`@bursted_${backlog.toFixed(0)}`);
+            console.log(`Burst Fixed | ${backlog.toFixed(0)}`);
+            audioStartTime = audioContext.currentTime - (totalSamplesSent / audioContext.sampleRate);
+            acc = 0; saveState(); backlog = 0;
         }
-        lastAudioTime = curTime; const isStable = delta < 100;
-        backlog = isStable ? (totalSamplesSent - (curTime - audioStartTime) * audioContext.sampleRate) : 0;
-        drift = isStable ? (1.0 + (backlog - audioTargetLimit) / 200000) : 1.0;
+        drift = 1.0 + (backlog - audioTargetLimit) / 200000;
     }
-    // Sync
+    // Sync Audio
     if (window.Module && Module._emux_audio_set_drift) {
         sDrift = sDrift * 0.9 + drift * 0.1;
         Module._emux_audio_set_drift(sDrift);
     }
-    let fairDelta = (delta <= 0 || delta > 100) ? 16.6 : delta;
-    acc += (gameFps * fairDelta / 1000); // Core chạy nhịp chuẩn 1.0x
-    let runs = Math.floor(acc);
-    acc -= runs;
-    // if (now - time > 3000) {console.log(`C.${gameFps.toFixed(1)} | D.${delta.toFixed(1)} | L.0${runs} | B.${backlog.toFixed(0)}`), time = now;}
+    // Sync Timing
+    let fairDelta = (delta <= 0 || delta > 100) ? (1000 / gameFps) : delta;
+    acc += (gameFps * fairDelta / 1000);
+    let runs = Math.floor(acc); acc -= runs;
+    // if (now - time > 10000) {console.log(`C.${gameFps.toFixed(1)} | D.${delta.toFixed(1)} | L.0${runs} | B.${backlog.toFixed(0)}`), time = now;}
     return Math.max(0, Math.min(4, runs));
 };
 // ===== resetAudioSync =====
 window.resetAudioSync = () => {
-    totalSamplesSent = 0; sDrift = 1.0;
-    if (audioContext) audioStartTime = lastAudioTime = audioContext.currentTime;
+    totalSamplesSent = 0;
+    if (audioContext) audioStartTime = audioContext.currentTime;
     if (window.Module && window.Module._emux_audio_reset) window.Module._emux_audio_reset();
-    if (window.Module && window.Module._emux_audio_set_drift) window.Module._emux_audio_set_drift(1.0);
     if (sabViewIndices) {
         Atomics.store(sabViewIndices, 0, 0);
         Atomics.store(sabViewIndices, 1, 0);
@@ -124,5 +136,7 @@ window.gameLoop = (isLooping) => {
 document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible" && audioContext && isRunning) {
         if (audioContext.state !== 'running') audioContext.resume();
+        console.log(`Sync Reset | ${audioContext.state}`);
+        window.resetAudioSync();
     }
 });
