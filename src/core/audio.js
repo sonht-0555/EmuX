@@ -81,7 +81,6 @@ window.getAudioSync = () => {
     let backlog = 0, isStable = (delta > 0 && delta < 100);
     if (audioContext && audioContext.state === 'running' && gameFps && delta > 0) {
         const curTime = audioContext.currentTime;
-        if (audioStartTime < 0 && curTime > 0) audioStartTime = curTime;
         // Silent Fix (Clock Discontinuity/Stall)
         if (audio_fix_skip > 0) {
             audio_fix_skip--;
@@ -116,16 +115,20 @@ window.getAudioSync = () => {
     return Math.max(0, Math.min(4, runs));
 };
 // ===== resetAudioSync =====
-window.resetAudioSync = () => {
-    totalSamplesSent = 0; audioStartTime = -1; audio_fix_skip = 10;
+window.resetAudioSync = async () => {
+    if (audioGainNode) audioGainNode.gain.value = 0;
+    totalSamplesSent = 0; audio_fix_skip = 10;
+    if (audioContext) audioStartTime = audioContext.currentTime;
     if (window.Module && window.Module._emux_audio_reset) window.Module._emux_audio_reset();
     if (sabViewIndices) {
         Atomics.store(sabViewIndices, 0, 0);
         Atomics.store(sabViewIndices, 1, 0);
     }
-    lastRafTime = performance.now(); acc = time = 0; sDrift = 1;
+    lastRafTime = acc = time = 0; sDrift = 1;
     lastFrameTime = 0; vk.est = 1000 / gameFps; vk.err = 1.0;
     ak.est = 1.0; ak.err = 1.0;
+    await delay(1000);
+    if (audioGainNode) audioGainNode.gain.value = 1;
 };
 // ===== gameLoop =====
 window.gameLoop = (isLooping) => {
@@ -141,7 +144,7 @@ window.gameLoop = (isLooping) => {
     }
     window.skipRender = false;
 };
-document.addEventListener("visibilitychange", () => {
+document.addEventListener("visibilitychange", async () => {
     if (document.visibilityState === "visible" && audioContext && isRunning) {
         if (audioContext.state !== 'running') audioContext.resume();
         console.log(`Sync Reset | ${audioContext.state}`);

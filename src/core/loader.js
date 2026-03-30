@@ -130,7 +130,7 @@ async function initCore(romFile) {
                 window.resetAudioSync?.();
                 window.currentSessionId = Math.random();
                 window.gameLoop?.(true);
-                await delay(100);
+                await delay(200);
                 await loadState();
                 await timer(true);
                 if (window.wasmUrl && window.wasmUrl.startsWith('blob:')) URL.revokeObjectURL(window.wasmUrl);
