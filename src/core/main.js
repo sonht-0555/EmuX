@@ -65,7 +65,7 @@ async function loadState(slot = 1) {
         Module.HEAPU8.set(stateData, statePointer);
         Module._retro_unserialize(statePointer, stateData.length);
         Module._free(statePointer);
-        window.resetAudioSync?.();
+        if (slot === 1) await window.resetAudioSync?.();
         if (slot !== 1) await message(`#${slot}_loaded`);
     }
 }
@@ -97,7 +97,7 @@ async function resumeGame() {
 async function pauseGame() {
     if (isConfig.id === 'pico8') return buttonClick('start');
     window.gameLoop?.(false);
-    if (audioContext && audioContext.state === 'running') await audioContext.suspend();
+    // if (audioContext && audioContext.state === 'running') await audioContext.suspend();
     timer(false); message("_paused");
 }
 // ===== rebootGame =====
