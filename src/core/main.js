@@ -89,7 +89,8 @@ async function timer(isStart) {
 // ===== resumeGame =====
 async function resumeGame() {
     if (isConfig.id === 'pico8') return buttonClick('start');
-    if (audioContext && audioContext.state !== 'running') await audioContext.resume(), window.resetAudioSync?.();
+    window.resetAudioSync?.();
+    if (audioContext.state !== 'running') audioContext.resume();
     window.gameLoop?.(true);
     timer(true); message("_resumed");
 }
@@ -97,7 +98,6 @@ async function resumeGame() {
 async function pauseGame() {
     if (isConfig.id === 'pico8') return buttonClick('start');
     window.gameLoop?.(false);
-    // if (audioContext && audioContext.state === 'running') await audioContext.suspend();
     timer(false); message("_paused");
 }
 // ===== rebootGame =====

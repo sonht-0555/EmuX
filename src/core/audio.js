@@ -1,6 +1,6 @@
 // ===== Audio System =====
 const audio_batch_cb = (pointer, frames) => writeAudio(pointer, frames), audio_cb = () => { };
-var audioContext, audioWorkletNode, audioGainNode, totalSamplesSent = 0, audioStartTime = 0, gameFps = 60, lastRafTime = 0, acc = 0, sDrift = 1, lastLogTime = 0, lastAudioTime = 0, lastFrameTime = 0, audio_stable_count = 0, audio_fix_skip = 0, sabL, sabR, sabIndices, sabViewLeft, sabViewRight, sabViewIndices, wasmOutL = 0, wasmOutR = 0, sabBufSize = 0, sabMask = 0, activeSession = null, audioBurstLimit = 10000, audioMaxWrite = 4000, audioTargetLimit = 3000;
+var audioContext, audioWorkletNode, audioGainNode, totalSamplesSent = 0, audioStartTime = 0, gameFps = 60, lastRafTime = 0, acc = 0, lastAudioTime = 0, lastFrameTime = 0, audio_fix_skip = 0, sabL, sabR, sabIndices, sabViewLeft, sabViewRight, sabViewIndices, wasmOutL = 0, wasmOutR = 0, sabBufSize = 0, sabMask = 0, activeSession = null, audioBurstLimit = 10000, audioMaxWrite = 4000, audioTargetLimit = 3000;
 // Kalman Filters
 var vk = {est: 16.666, err: 1.0, pn: 0.0001, mn: 0.05};
 var ak = {est: 1.0, err: 1.0, pn: 0.00001, mn: 0.1};
@@ -126,7 +126,7 @@ window.resetAudioSync = () => {
         Atomics.store(sabViewIndices, 0, 0);
         Atomics.store(sabViewIndices, 1, 0);
     }
-    lastRafTime = acc = time = 0; sDrift = 1;
+    lastRafTime = acc = time = 0;
     lastFrameTime = 0; vk.est = 1000 / gameFps; vk.err = 1.0;
     ak.est = 1.0; ak.err = 1.0;
 };
