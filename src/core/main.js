@@ -52,7 +52,7 @@ async function saveState(slot = 1) {
     if (Module._retro_serialize(statePointer, stateSize)) {
         const stateData = new Uint8Array(Module.HEAPU8.buffer, statePointer, stateSize).slice();
         await emuxDB(stateData, `${gameName}.ss${slot}`);
-        if (slot !== 1) await message(`#${slot}_saved`);
+        if (slot !== 1) await message(`#${slot}_recored`);
     }
     Module._free(statePointer);
 }
@@ -77,7 +77,7 @@ async function timer(isStart) {
             if (seconds === 60) {seconds = 0; minutes++;}
             if (minutes === 60) {minutes = 0; hours++;}
             const rendered = frameCount - skippedFrames;
-            logMessages[0] = `Skip ${rendered.toString().padStart(2, '0')} | Time ${hours ? hours + '.' : ''}${minutes.toString().padStart(2, '0')}.${(seconds % 60).toString().padStart(2, '0')} | ${local('core_repo')} | ${gameName}`;
+            logMessages[0] = `W.${rendered.toString().padStart(2, '0')} | ${(hours % 60).toString().padStart(2, '0')}.${(minutes % 60).toString().padStart(2, '0')}.${(seconds % 60).toString().padStart(2, '0')} | ${runs}.${backlog.toFixed(0)} | ${local('core_repo')}`;
             window.log && (log.textContent = logMessages.filter(m => m !== "").join('\n--\n'));
             window._runCount = 0; frameCount = skippedFrames = 0;
             if (++count1 === 60) {saveState(); count1 = 0;}
@@ -92,13 +92,13 @@ async function resumeGame() {
     window.resetAudioSync?.();
     if (audioContext.state !== 'running') audioContext.resume();
     window.gameLoop?.(true);
-    timer(true); message("_resumed");
+    timer(true); message("#esume_");
 }
 // ===== pauseGame =====
 async function pauseGame() {
     if (isConfig.id === 'pico8') return buttonClick('start');
     window.gameLoop?.(false);
-    timer(false); message("_paused");
+    timer(false); message("#ause_");
 }
 // ===== rebootGame =====
 async function rebootGame() {location.reload();}

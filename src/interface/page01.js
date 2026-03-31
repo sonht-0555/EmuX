@@ -12,10 +12,17 @@ function view(name) {
 async function showFileGroups(gameName) {
     const titles = ["saves", "states", "games"], results = await Promise.all(titles.map(type => listStore(type)));
     const fileGroups = titles.map((title, index) => ({title, files: results[index].filter(file => file === gameName || file.startsWith(gameName + "."))}));
-    list01.innerHTML = fileGroups.map(group => group.files.length ? group.files.map(file => `<file data="${group.title}"><name>${file}</name><dele></dele></file>`).join('') + `<titl>${group.title}.</titl>` : '').join('');
+    list01.innerHTML = fileGroups.map(group => group.files.length ? group.files.map(file => `<file data="${group.title}"><name>${file}</name><rena></rena><dele></dele></file>`).join('') + `<titl>${group.title}.</titl>` : '').join('');
     list01.querySelectorAll('name').forEach(button => button.onclick = async () => {
         const name = button.textContent;
         if (confirm(`Download this file? ${name}`)) {await downloadFromStore(name); showFileGroups(gameName);}
+    });
+    list01.querySelectorAll('rena').forEach(button => button.onclick = async () => {
+        const oldName = button.parentElement.querySelector('name').textContent;
+        const newName = prompt("Rename this file", oldName);
+        if (newName && newName !== oldName && await renameFromStore(oldName, newName)) {
+            showFileGroups(newName.substring(0, newName.lastIndexOf('.')) || newName);
+        }
     });
     list01.querySelectorAll('dele').forEach(button => button.onclick = async () => {
         const name = button.parentElement.querySelector('name').textContent;

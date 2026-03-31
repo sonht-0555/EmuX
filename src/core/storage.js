@@ -82,6 +82,27 @@ async function deleteFromStore(key) {
         transaction.onerror = event => reject(event);
     });
 }
+// ===== renameFromStore =====
+async function renameFromStore(oldName, newName) {
+    if (!oldName || !newName || oldName === newName) return false;
+    const oldBase = oldName.includes('.') ? oldName.substring(0, oldName.lastIndexOf('.')) : oldName;
+    const newBase = newName.includes('.') ? newName.substring(0, newName.lastIndexOf('.')) : newName;
+    const stores = getAllStoreNames();
+    for (const store of stores) {
+        const keys = await listStore(store);
+        const targets = keys.filter(k => k === oldBase || k.startsWith(oldBase + "."));
+        for (const key of targets) {
+            const suffix = key.slice(oldBase.length);
+            const targetKey = newBase + suffix;
+            const data = await emuxDB(key);
+            if (data) {
+                await emuxDB(data, targetKey);
+                await deleteFromStore(key);
+            }
+        }
+    }
+    return true;
+}
 // ===== downloadFromStore =====
 async function downloadFromStore(name) {
     const data = await emuxDB(name);
