@@ -1,14 +1,6 @@
 // ===== Audio System =====
 const audio_batch_cb = (pointer, frames) => writeAudio(pointer, frames), audio_cb = () => { };
-var audioContext, audioWorkletNode, audioGainNode, totalSamplesSent = 0, audioStartTime = 0, gameFps = 60, lastRafTime = 0, acc = 0, lastAudioTime = 0, lastFrameTime = 0, audio_fix_skip = 0, sabL, sabR, sabIndices, sabViewLeft, sabViewRight, sabViewIndices, wasmOutL = 0, wasmOutR = 0, sabBufSize = 0, sabMask = 0, activeSession = null, audioBurstLimit = 10000, audioMaxWrite = 4000, audioTargetLimit = 3000;
-// Kalman Filters
-var vk = {est: 16.666, err: 1.0, pn: 0.0001, mn: 0.05};
-var ak = {est: 1.0, err: 1.0, pn: 0.00001, mn: 0.1};
-const kalman = (k, m) => {
-    let p_err = k.err + k.pn, gain = p_err / (p_err + k.mn);
-    k.est += gain * (m - k.est); k.err = (1 - gain) * p_err;
-    return k.est;
-};
+var audioContext, audioWorkletNode, audioGainNode, totalSamplesSent = 0, audioStartTime = 0, gameFps = 60, lastRafTime = 0, acc = 0, sDrift = 1, lastLogTime = 0, sabL, sabR, sabIndices, sabViewLeft, sabViewRight, sabViewIndices, wasmOutL = 0, wasmOutR = 0, sabBufSize = 0, sabMask = 0, activeSession = null, audioBurstLimit = 10000, audioMaxWrite = 4000, audioTargetLimit = 3000, skip_frame = 0;
 // ===== initAudio =====
 async function initAudio(avInfoPointer) {
     const p = Number(avInfoPointer);
@@ -20,10 +12,7 @@ async function initAudio(avInfoPointer) {
     audioTargetLimit = Math.max(2000, spf * 4);
     console.log(`${gameFps.toFixed(1)} | ${coreRate} | ${spf.toFixed(1)} | ${audioBurstLimit} | ${audioMaxWrite} | ${audioTargetLimit.toFixed(1)}`);
     if (audioContext) return audioContext.resume();
-    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const outRate = audioContext.sampleRate;
-    if (window.Module && Module._emux_audio_set_out_rate) Module._emux_audio_set_out_rate(outRate);
-    if (window.Module && Module._emux_audio_set_core_rate) Module._emux_audio_set_core_rate(coreRate);
+    audioContext = new (window.AudioContext || window.webkitAudioContext)({sampleRate: 48000});
     const code = `class P extends AudioWorkletProcessor{constructor(o){super();const{sabL,sabR,sabIndices,bufSize}=o.processorOptions;this.L=new Float32Array(sabL);this.R=new Float32Array(sabR);this.I=new Uint32Array(sabIndices);this.S=bufSize;this.M=bufSize-1}process(_,o){const u=o[0],l=u[0],r=u[1],n=l.length,w=Atomics.load(this.I,0),i=Atomics.load(this.I,1);if(((w-i+this.S)&this.M)<n){l.fill(0);if(r)r.fill(0);return true}const s=this.S-i;if(n<=s){l.set(this.L.subarray(i,i+n));if(r)r.set(this.R.subarray(i,i+n))}else{l.set(this.L.subarray(i,i+s));l.set(this.L.subarray(0,n-s),s);if(r){r.set(this.R.subarray(i,i+s));r.set(this.R.subarray(0,n-s),s)}}Atomics.store(this.I,1,(i+n)&this.M);return true}}registerProcessor('p',P)`;
     const blob = new Blob([code], {type: 'application/javascript'});
     await audioContext.audioWorklet.addModule(URL.createObjectURL(blob));
@@ -78,57 +67,38 @@ function writeAudio(pointer, frames) {
 window.getAudioSync = () => {
     const now = performance.now();
     const delta = now - lastRafTime; lastRafTime = now;
-    let backlog = 0, isStable = (delta > 0 && delta < 100);
-    if (audioContext && audioContext.state === 'running' && gameFps && delta > 0) {
-        const curTime = audioContext.currentTime;
-        // Silent Fixed 
-        if (audio_fix_skip > 0) {
-            audio_fix_skip--;
-            audioStartTime = curTime - (totalSamplesSent / audioContext.sampleRate);
-        } else if (delta > 100 || (lastAudioTime > 0 && Math.abs(curTime - lastAudioTime - delta / 1000) > 0.03)) {
-            const preFixBacklog = totalSamplesSent - (curTime - audioStartTime) * audioContext.sampleRate;
-            console.log(`Silent Fixed | ${preFixBacklog.toFixed(0)} | ${(curTime - lastAudioTime).toFixed(3)}s`);
-            audioStartTime = curTime - (totalSamplesSent / audioContext.sampleRate);
-            saveState(); audio_fix_skip = 40;
-        }
-        lastAudioTime = curTime;
-        // Burst Fixed
-        backlog = isStable ? (totalSamplesSent - (curTime - audioStartTime) * audioContext.sampleRate) : 0;
-        if (isStable && Math.abs(backlog) > audioBurstLimit) {
+    let drift = 1.0, backlog = 0;
+
+    if (skip_frame > 0) skip_frame--;
+    if (audioContext && audioContext.state === 'running' && gameFps && delta > 0 && delta < 100 && skip_frame === 0) {
+        backlog = totalSamplesSent - (audioContext.currentTime - audioStartTime) * audioContext.sampleRate;
+        if (Math.abs(backlog) > audioBurstLimit) {
+            // audioContext.suspend();
+            message(`@bursted_${backlog.toFixed(0)}`);
             console.log(`Burst Fixed | ${backlog.toFixed(0)}`);
-            audioStartTime = curTime - (totalSamplesSent / audioContext.sampleRate);
-            acc = 0; backlog = 0; audio_fix_skip = 40;
+            audioStartTime = audioContext.currentTime - (totalSamplesSent / audioContext.sampleRate);
+            acc = 0; saveState(); backlog = 0;
         }
+        drift = 1.0 + (audioTargetLimit - backlog) / 200000;
     }
-    if (audio_fix_skip === 1 && audioGainNode) {audioGainNode.gain.setTargetAtTime(1, audioContext.currentTime, 0.1);}
-    // Sync Audio (Kalman)
-    if (window.Module && Module._emux_audio_set_drift) {
-        let raw_drift = isStable ? (1.0 + (backlog - audioTargetLimit) / 200000) : 1.0;
-        Module._emux_audio_set_drift(kalman(ak, raw_drift));
-    }
-    // Sync Video (Kalman)
-    let rawDelta = (lastFrameTime > 0) ? (now - lastFrameTime) : (1000 / gameFps);
-    lastFrameTime = now;
-    if (rawDelta > 100 || rawDelta < 1) rawDelta = 1000 / gameFps;
-    // Predict & Update (Kalman)
-    acc += (gameFps * kalman(vk, rawDelta) / 1000);
-    let runs = Math.floor(acc); acc -= runs;
-    // if (now - time > 1000) {console.log(`C.${gameFps.toFixed(0)} | K.${vk.est.toFixed(3)} | A.${ak.est.toFixed(5)} | D.${delta.toFixed(2)} | B.${backlog.toFixed(0)}`); time = now;}
+
+    let fairDelta = (delta <= 0 || delta > 100) ? 16.6 : delta;
+    acc += (gameFps * fairDelta / 1000) * (sDrift = sDrift * 0.9 + drift * 0.1);
+    let runs = Math.floor(acc);
+    acc -= runs;
+    // if (now - time > 1000) {console.log(`C.${gameFps.toFixed(1)} | D.${delta.toFixed(1)} | L.0${runs} | B.${backlog.toFixed(0)}`), time = now;}
     return Math.max(0, Math.min(4, runs));
 };
 // ===== resetAudioSync =====
 window.resetAudioSync = () => {
-    if (audioGainNode) audioGainNode.gain.value = 0;
-    totalSamplesSent = 0; audio_fix_skip = 40;
+    totalSamplesSent = 0;
     if (audioContext) audioStartTime = audioContext.currentTime;
     if (window.Module && window.Module._emux_audio_reset) window.Module._emux_audio_reset();
     if (sabViewIndices) {
         Atomics.store(sabViewIndices, 0, 0);
         Atomics.store(sabViewIndices, 1, 0);
     }
-    lastRafTime = acc = time = 0;
-    lastFrameTime = 0; vk.est = 1000 / gameFps; vk.err = 1.0;
-    ak.est = 1.0; ak.err = 1.0;
+    lastRafTime = acc = time = 0; sDrift = 1; skip_frame = 40;
 };
 // ===== gameLoop =====
 window.gameLoop = (isLooping) => {
@@ -144,11 +114,9 @@ window.gameLoop = (isLooping) => {
     }
     window.skipRender = false;
 };
-document.addEventListener("visibilitychange", async () => {
+document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible" && audioContext && isRunning) {
         window.resetAudioSync?.();
-        if (audioContext.state !== 'running') audioContext.resume();
-        console.log(`Sync Reset | ${audioContext.state}`);
-        message(`#ync_reset`);
+        audioContext.resume();
     }
 });

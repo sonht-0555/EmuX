@@ -1,15 +1,9 @@
-#ifdef __EMSCRIPTEN__
 #include <emscripten.h>
-#endif
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#ifndef EMSCRIPTEN_KEEPALIVE
-#define EMSCRIPTEN_KEEPALIVE
-#endif
 
 // ===== Video Utilities =====
 EMSCRIPTEN_KEEPALIVE __attribute__((used)) int
@@ -99,31 +93,9 @@ EMSCRIPTEN_KEEPALIVE __attribute__((used)) float *emux_audio_get_buffer_r() {
   return audio_out_r;
 }
 
-static float audio_out_rate = 48000.0f;
-static float audio_base_rate = 44100.0f;
-static float audio_drift = 1.0f;
-
-EMSCRIPTEN_KEEPALIVE __attribute__((used)) void
-emux_audio_set_out_rate(float out_rate) {
-  if (out_rate < 8000.0f)
-    out_rate = 48000.0f;
-  audio_out_rate = out_rate;
-}
-
 EMSCRIPTEN_KEEPALIVE __attribute__((used)) void
 emux_audio_set_core_rate(float core_rate) {
-  if (core_rate < 1000.0f)
-    core_rate = 44100.0f;
-  audio_base_rate = core_rate;
-  audio_ratio = (audio_base_rate * audio_drift) / audio_out_rate;
-}
-
-EMSCRIPTEN_KEEPALIVE __attribute__((used)) void
-emux_audio_set_drift(float drift) {
-  if (drift < 0.5f || drift > 2.0f)
-    drift = 1.0f;
-  audio_drift = drift;
-  audio_ratio = (audio_base_rate * audio_drift) / audio_out_rate;
+  audio_ratio = core_rate / 48000.0f;
 }
 
 EMSCRIPTEN_KEEPALIVE __attribute__((used)) void emux_audio_reset() {
