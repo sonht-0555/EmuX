@@ -59,7 +59,7 @@ function writeAudio(pointer, frames) {
         }
         Atomics.store(sabViewIndices, 0, (writeIndex + count) & sabMask);
         totalSamplesSent += count;
-        const isGating = totalSamplesSent < audioBurstLimit;
+        const isGating = (totalSamplesSent < audioBurstLimit) || (window._turbo > 1.0);
         audioGainNode.gain.setTargetAtTime(isGating ? 0 : 1, audioContext.currentTime, isGating ? 0.001 : 0.01);
     }
     return frames;
@@ -71,17 +71,16 @@ window.getAudioSync = () => {
     if (skip_frame > 0) skip_frame--;
     if (audioContext && audioContext.state === 'running' && gameFps && delta > 0 && delta < 100 && skip_frame === 0) {
         backlog = totalSamplesSent - (audioContext.currentTime - audioStartTime) * audioContext.sampleRate;
-        if (Math.abs(backlog) > audioBurstLimit) {
-            // audioContext.suspend();
-            message(`#urst_`);
-            console.log(`Burst Fixed | ${backlog.toFixed(0)}`);
-            audioStartTime = audioContext.currentTime - ((totalSamplesSent - audioTargetLimit) / audioContext.sampleRate);
-            acc = 0; saveState(); backlog = audioTargetLimit;
+        if (window._turbo > 1.0 || Math.abs(backlog) > audioBurstLimit) {
+            const isBurst = window._turbo <= 1.0;
+            if (isBurst) {message(`#burst_`); console.log(`Burst Fixed | ${backlog.toFixed(0)}`); acc = 0; saveState();}
+            audioStartTime = audioContext.currentTime - (totalSamplesSent - audioTargetLimit) / audioContext.sampleRate;
+            backlog = audioTargetLimit;
         }
         drift = 1.0 + (audioTargetLimit - backlog) / 200000;
     }
     let fairDelta = (delta <= 0 || delta > 100) ? (1000 / gameFps) : delta;
-    acc += (gameFps * fairDelta / 1000) * (sDrift = sDrift * 0.9 + drift * 0.1);
+    acc += (gameFps * fairDelta / 1000) * (sDrift = sDrift * 0.9 + drift * 0.1) * (window._turbo || 1.0);
     runs = Math.floor(acc);
     acc -= runs;
     return Math.max(0, Math.min(4, runs));

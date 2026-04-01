@@ -92,13 +92,18 @@ async function resumeGame() {
     window.resetAudioSync?.();
     if (audioContext.state !== 'running') audioContext.resume();
     window.gameLoop?.(true);
-    timer(true); message("#esume_");
+    timer(true); message("#resume_");
 }
 // ===== pauseGame =====
 async function pauseGame() {
     if (isConfig.id === 'pico8') return buttonClick('start');
     window.gameLoop?.(false);
-    timer(false); message("#ause_");
+    timer(false); message("#pause_");
+}
+// ===== toggleTurbo =====
+function toggleTurbo() {
+    window._turbo = (window._turbo === 1.0 || !window._turbo) ? 2.0 : 1.0;
+    message(window._turbo === 2.0 ? "#fast_" : "#normal_");
 }
 // ===== rebootGame =====
 async function rebootGame() {location.reload();}
