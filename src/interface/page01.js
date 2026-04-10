@@ -47,7 +47,7 @@ async function listGame() {
 }
 // ===== verticalSetting =====
 async function verticalSetting(values) {
-    const list = Array.isArray(values) ? values : [80, 160, 5];
+    const list = Array.isArray(values) ? values : [80, 160, 0];
     if (current >= list.length) current = 0;
     page02.style.paddingTop = `${list[current]}px`;
     list.forEach((value, index) => {
@@ -57,13 +57,20 @@ async function verticalSetting(values) {
     local('vertical', current);
     current = (current + 1) % list.length;
 }
+const optionStyle = (selector, value) => {
+    document.querySelectorAll(selector).forEach(el => {
+        let text = el.textContent.trim().replace(/_$/, '');
+        el.textContent = text.toLowerCase() === (value || '').toLowerCase() ? text + '_' : text;
+    });
+};
 // ===== optionClick =====
 const optionClick = text => ({
-    'Cloud': () => { },
+    'Cloud': () => {const api = prompt("Enter API key"); local('gemini_key', api);},
     'Restore': () => cloudRestore(),
     'Backup': () => cloudBackup(),
-    'Lated': () => local('core_repo', 'lated'),
-    'Stable': () => local('core_repo', 'stable')
+    'Lated': () => {local('core_repo', 'lated'); optionStyle('opti', 'lated');},
+    'Stable': () => {local('core_repo', 'stable'); optionStyle('opti', 'stable');},
+    'Test': () => {local('core_repo', 'test'); optionStyle('opti', 'test');},
 }[text]?.());
 // ===== Event Listeners =====
 document.addEventListener("DOMContentLoaded", () => {
@@ -73,13 +80,16 @@ document.addEventListener("DOMContentLoaded", () => {
             if (event.data.msg === "progress") {
                 showNotification(" Up", "date.", "", ` Please wait in...|${event.data.current}.${event.data.total}|`);
             } else if (event.data.msg === "done") {
-                location.reload();
+                setTimeout(() => location.reload(), 2000);
             }
         });
     }
     fetch('./sw.js').then(r => r.text()).then(t => ver.textContent = t.match(/revision = '(.*?)'/)[1]);
     switch0.textContent = local('render') || 'WGPU';
-    setTimeout(() => {listGame(); verticalSetting();}, 2000);
+    setTimeout(() => {
+        listGame(); verticalSetting();
+        optionStyle('opti', local('core_repo') || 'lated');
+    }, 2000);
     romInput.onchange = event => inputGame(event);
     logo.onpointerdown = () => view('home');
     vertical.onpointerdown = () => verticalSetting();

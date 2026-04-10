@@ -50,7 +50,7 @@ window.activeRenderFn = function (pointer, width, height, pitch) {
         context2d = Module.canvas.getContext('2d', {alpha: false, desynchronized: true, willReadFrequently: false});
         if (Module.isNDS) {
             page02.style.paddingTop = "5px"; canvasBottom.style.display = "block";
-            joypad.style.justifyContent = "center"; joy.style.display = "none";
+            jpad.style.justifyContent = "center"; joy.style.display = "none";
             context2dBottom = canvasBottom.getContext('2d', {alpha: false, desynchronized: true, willReadFrequently: false});
         }
     }

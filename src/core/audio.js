@@ -6,10 +6,10 @@ async function initAudio(avInfoPointer) {
     const p = Number(avInfoPointer);
     gameFps = Module.HEAPF64[(p + 24) >> 3] || 60;
     const coreRate = Module.HEAPF64[(p + 32) >> 3] || 48000;
-    audioBurstLimit = (48000 / gameFps) * 8.0;
-    audioMaxWrite = (48000 / gameFps) * 6.0;
-    audioTargetLimit = (48000 / gameFps) * 4.0;
-    console.log(`${gameFps.toFixed(2)} | ${audioBurstLimit.toFixed(0)} | ${audioMaxWrite.toFixed(0)} | ${audioTargetLimit.toFixed(0)}`);
+    audioBurstLimit = (48000 / gameFps) * 10.0;
+    audioMaxWrite = (48000 / gameFps) * 8.0;
+    audioTargetLimit = (48000 / gameFps) * 6.0;
+    // console.log(`${gameFps.toFixed(2)} | ${audioBurstLimit.toFixed(0)} | ${audioMaxWrite.toFixed(0)} | ${audioTargetLimit.toFixed(0)}`);
     if (audioContext) return audioContext.resume();
     audioContext = new (window.AudioContext || window.webkitAudioContext)({sampleRate: 48000});
     const code = `class P extends AudioWorkletProcessor{constructor(o){super();const{sabL,sabR,sabIndices,bufSize}=o.processorOptions;this.L=new Float32Array(sabL);this.R=new Float32Array(sabR);this.I=new Uint32Array(sabIndices);this.S=bufSize;this.M=bufSize-1}process(_,o){const u=o[0],l=u[0],r=u[1],n=l.length,w=Atomics.load(this.I,0),i=Atomics.load(this.I,1);if(((w-i+this.S)&this.M)<n){l.fill(0);if(r)r.fill(0);return true}const s=this.S-i;if(n<=s){l.set(this.L.subarray(i,i+n));if(r)r.set(this.R.subarray(i,i+n))}else{l.set(this.L.subarray(i,i+s));l.set(this.L.subarray(0,n-s),s);if(r){r.set(this.R.subarray(i,i+s));r.set(this.R.subarray(0,n-s),s)}}Atomics.store(this.I,1,(i+n)&this.M);return true}}registerProcessor('p',P)`;
@@ -72,8 +72,6 @@ window.getAudioSync = () => {
     if (audioContext && audioContext.state === 'running' && gameFps && delta > 0 && delta < 100 && skip_frame === 0) {
         backlog = totalSamplesSent - (audioContext.currentTime - audioStartTime) * audioContext.sampleRate;
         if (window._turbo > 1.0 || Math.abs(backlog) > audioBurstLimit) {
-            const isBurst = window._turbo <= 1.0;
-            if (isBurst) {message(`#burst_`); console.log(`Burst Fixed | ${backlog.toFixed(0)}`); acc = 0; saveState();}
             audioStartTime = audioContext.currentTime - (totalSamplesSent - audioTargetLimit) / audioContext.sampleRate;
             backlog = audioTargetLimit;
         }
@@ -111,8 +109,5 @@ window.gameLoop = (isLooping) => {
     window.skipRender = false;
 };
 document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible" && audioContext && isRunning) {
-        window.resetAudioSync?.();
-        audioContext.resume();
-    }
+    if (document.visibilityState === "visible" && audioContext && isRunning) syncGame();
 });

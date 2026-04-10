@@ -40,7 +40,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const distance = Math.abs(swipeStartY - event.clientY);
         if (distance >= 20) {
             brightnessValue = Math.max(0, Math.min(10, brightnessValue + (swipeStartY - event.clientY > 0 ? 1 : -1)));
-            gamepad.style.opacity = brightnessValue / 10;
+            dpad.style.opacity = brightnessValue / 10;
+            bpad.style.opacity = brightnessValue / 10;
             //message(`#${brightnessValue}0_Brightness`);
             swipeStartY = event.clientY;
         }
@@ -61,5 +62,6 @@ document.addEventListener("DOMContentLoaded", () => {
     log.onpointerdown = () => log.style.opacity = log.style.opacity == "1" ? "0" : "1";
     invis.onpointermove = () => {page00.hidden = false; showNotification(" pa", "use.", "", " double tap to resume."); pauseGame();};
     page00.onpointerdown = async event => {if (doubleTap(event, page00)) {await resumeGame(); await delay(100); page00.hidden = true;} };
-    menu.onpointerdown = () => toggleTurbo();
+    menu.onpointerdown = event => {clearTimeout(menu._timer); if (doubleTap(event, menu)) toggleTurbo(); else menu._timer = setTimeout(transGame, 250);};
+    title1.onpointerdown = () => title1.textContent = "";
 });

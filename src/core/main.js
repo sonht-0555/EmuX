@@ -2,7 +2,7 @@
 var logMessages = [""];
 const originalLog = console.log, originalError = console.error;
 const logToScreen = (msg) => {
-    const render = () => window.log && (log.textContent = logMessages.filter(m => m !== "").join('\n--\n'));
+    const render = () => window.log && isConfig?.id !== 'pico8' && (log.textContent = logMessages.filter(m => m !== "").join('\n'));
     const now = new Date(), time = `${now.getHours().toString().padStart(2, '0')}.${now.getMinutes().toString().padStart(2, '0')}.${now.getSeconds().toString().padStart(2, '0')}`;
     logMessages.splice(1, 0, `${time} | ${msg}`);
     if (logMessages.length > 12) logMessages.pop();
@@ -65,7 +65,6 @@ async function loadState(slot = 1) {
         Module.HEAPU8.set(stateData, statePointer);
         Module._retro_unserialize(statePointer, stateData.length);
         Module._free(statePointer);
-        if (slot === 1) await window.resetAudioSync?.();
         if (slot !== 1) await message(`#${slot}_loaded`);
     }
 }
@@ -77,8 +76,10 @@ async function timer(isStart) {
             if (seconds === 60) {seconds = 0; minutes++;}
             if (minutes === 60) {minutes = 0; hours++;}
             const rendered = frameCount - skippedFrames;
-            logMessages[0] = `W.${rendered.toString().padStart(2, '0')} | ${(hours % 60).toString().padStart(2, '0')}.${(minutes % 60).toString().padStart(2, '0')}.${(seconds % 60).toString().padStart(2, '0')} | ${runs}.${backlog.toFixed(0)} | ${local('core_repo')}`;
-            window.log && (log.textContent = logMessages.filter(m => m !== "").join('\n--\n'));
+            const timeStr = hours > 0 ? `${hours}|${minutes.toString().padStart(2, '0')}|${seconds.toString().padStart(2, '0')}` : `${minutes.toString().padStart(2, '0')}|${seconds.toString().padStart(2, '0')}`;
+            const audioP = Math.round((backlog / (audioTargetLimit || 1)) * 100);
+            logMessages[0] = `${local('core_repo') === 'stable' ? 'W' : 'M'}${rendered.toString().padStart(2, '0')} ${timeStr} 0${runs}|${audioP}"`;
+            if (window.log && isConfig?.id !== 'pico8') log.textContent = logMessages.filter(m => m !== "").join('\n');
             window._runCount = 0; frameCount = skippedFrames = 0;
             if (++count1 === 60) {saveState(); count1 = 0;}
         }, 1000);
@@ -89,7 +90,7 @@ async function timer(isStart) {
 // ===== resumeGame =====
 async function resumeGame() {
     if (isConfig.id === 'pico8') return buttonClick('start');
-    window.resetAudioSync?.();
+    // window.resetAudioSync?.();
     if (audioContext.state !== 'running') audioContext.resume();
     window.gameLoop?.(true);
     timer(true); message("#resume_");
@@ -99,6 +100,42 @@ async function pauseGame() {
     if (isConfig.id === 'pico8') return buttonClick('start');
     window.gameLoop?.(false);
     timer(false); message("#pause_");
+}
+// ===== syncGame =====
+async function syncGame() {
+    if (!isRunning) return;
+    await window.gameLoop?.(false);
+    await delay(500);
+    // await window.resetAudioSync?.();
+    if (audioContext && audioContext.state !== 'running') await audioContext.resume();
+    await window.gameLoop?.(true);
+    message("#syncing_");
+}
+// ===== transGame =====
+async function transGame() {
+    const geminiKey = local('gemini_key');
+    if (!geminiKey) return message("#need_key_");
+    message("#trans_", 4000);
+    try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
+            method: "POST",
+            body: JSON.stringify({
+                contents: [{
+                    parts: [{text: "Dịch sang tiếng Việt, chỉ trả về kết quả."},
+                    {
+                        inline_data: {
+                            mime_type: "image/jpeg",
+                            data: canvas.toDataURL('image/jpeg', 0.1).split(',')[1]
+                        }
+                    }]
+                }]
+            })
+        });
+        const result = await response.json();
+        message(result?.candidates?.[0]?.content?.parts?.[0]?.text || "#error_", 60000);
+    } catch (e) {
+        message("#ai_error_");
+    }
 }
 // ===== toggleTurbo =====
 function toggleTurbo() {

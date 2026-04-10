@@ -11,7 +11,7 @@ window.addEventListener('gamepaddisconnected', function () {hasGamepad = false; 
 window.onkeydown = function (e) {
     var id = KEYS[e.key];
     if (id !== undefined) {keyMask |= (1 << id); e.preventDefault();}
-    if (audioContext?.state !== 'running') {audioContext?.resume().then(() => {window.resetAudioSync?.();});}
+    if (audioContext?.state !== 'running') {audioContext?.resume();}
 };
 window.onkeyup = function (e) {
     var id = KEYS[e.key];
@@ -31,7 +31,7 @@ function buttonPress(button) {
     var id = buttonMap[button];
     if (id !== undefined) touchMask |= (1 << id);
     b = PICO_M[id]; if (window.pico8_buttons && b) pico8_buttons[0] |= b; //pico8
-    if (audioContext?.state !== 'running') {audioContext?.resume().then(() => {window.resetAudioSync?.();});}
+    if (audioContext?.state !== 'running') {audioContext?.resume();}
 }
 // ===== buttonUnpress =====
 function buttonUnpress(button) {
@@ -60,10 +60,16 @@ function updateButtons(config) {
         if (settings) {
             element.innerText = settings[0];
             if (settings[1] !== undefined) buttonMap[tag.replace('btn-', '')] = settings[1];
-        } else element.style.display = 'none';
+            element.hidden = false;
+        } else {
+            element.hidden = true;
+        }
     });
     ['sec-12', 'sec-34'].forEach(function (tag) {
         var element = document.querySelector(tag);
-        if (element && Array.from(element.children).every(function (child) {return child.style.display === 'none';})) element.style.display = 'none';
+        if (element) {
+            var allHidden = Array.from(element.children).every(child => child.hidden);
+            element.hidden = allHidden;
+        }
     });
 }

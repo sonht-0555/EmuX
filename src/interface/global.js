@@ -1,5 +1,5 @@
 // ===== Global System =====
-const tags = ["html", "body", "page00", "page01", "page02", "notification", "display", "list", "list01", "list02", "name", "ver", "gamepad", "title1", "vertical", "screen", "invis", "message0", "skip1", "switch0", "title0", "logo", "joypad", "setting", "cta", "log"];
+const tags = ["html", "body", "page00", "page01", "page02", "notification", "display", "list", "list01", "list02", "name", "ver", "title1", "vertical", "screen", "invis", "message0", "skip1", "switch0", "title0", "logo", "jpad", "setting", "cta", "log"];
 tags.forEach(selector => window[selector] = document.querySelector(selector));
 const local = (key, value) => (value === undefined || value === null) ? localStorage.getItem(key) : localStorage.setItem(key, value);
 const delay = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
@@ -39,6 +39,7 @@ async function showNotification(green, white, gray, text, wait) {
 }
 // ===== message =====
 async function message(text, duration = 2000) {
+    if (log.style.opacity === '1') log.style.display = "none";
     if (count) count.cancelled = true;
     const token = {cancelled: false};
     count = token;
@@ -50,38 +51,41 @@ async function message(text, duration = 2000) {
         await delay(75);
     }
     await delay(duration);
-    if (!token.cancelled && count === token) {title1.textContent = ""; count = null;}
+    if (!token.cancelled && count === token) {
+        title1.textContent = ""; count = null;
+        await delay(200);
+        if (log.style.opacity === '1') log.style.display = "block";
+    }
 }
 // ===== gameView =====
 async function gameView(name) {
-    page02.ontouchstart = page02.ontouchmove = event => event.preventDefault();
-    cta.ontouchstart = cta.ontouchmove = event => event.preventDefault();
-    gameWidth = canvas.width;
-    gameHeight = canvas.height;
+    if (!name) return;
+    const styles = getComputedStyle(document.documentElement);
+    const safeLeft = parseFloat(styles.getPropertyValue('--safe-left')) || 0;
+    const safeRight = parseFloat(styles.getPropertyValue('--safe-right')) || 0;
     switch0.textContent = local('render');
-    const maxInteger = Math.floor((window.innerWidth * window.devicePixelRatio) / gameWidth);
+    const maxInteger = Math.floor(window.innerWidth < window.innerHeight ? (window.innerWidth * window.devicePixelRatio) / canvas.width : Math.min(((window.innerWidth - ((Math.floor((window.innerHeight * 0.5 - 13) / 4) * 4) * 2) - 17 - Math.max(0, safeLeft - 10) - Math.max(0, safeRight - 10)) * window.devicePixelRatio) / canvas.width, (window.innerHeight * window.devicePixelRatio) / canvas.height));
     integer = (maxInteger > 6) ? maxInteger - (maxInteger % 2) : maxInteger;
-    const ratio = integer / window.devicePixelRatio, style = screen.style;
-    display.style.cssText = `height:${Math.ceil(gameHeight * ratio)}px;width:${Math.ceil(gameWidth * ratio)}px`;
-    style.width = `${(gameWidth * ratio)}px`;
-    style.setProperty("--size", `${integer}px`);
-    style.setProperty("--width", `${gameWidth * integer}px`);
-    style.setProperty("--height", `${gameHeight * integer}px`);
-    style.setProperty("--scale", ratio / integer);
-    const buttonWidth = (window.innerWidth - 36) / 8, size = Math.round(buttonWidth) % 2 === 0 ? Math.round(buttonWidth) - 1 : Math.round(buttonWidth);
-    gamepad.style.gridTemplateColumns = `${size}px 1px ${size}px 1px ${size}px 1px ${size}px 1px auto 1px ${size}px 1px ${size}px 1px ${size}px 1px ${size}px`;
-    page02.style.gridTemplateRows = `auto ${window.innerWidth - (size * 8 + 20)}px ${size * 4 + 36}px 1fr 20px`;
-    joy.style.width = `${size * 4 + 3}px`;
+    const ratio = integer / window.devicePixelRatio;
+    display.style.cssText = `height:${Math.ceil(canvas.height * ratio)}px;width:${Math.ceil(canvas.width * ratio)}px`;
+    screen.style.width = `${(canvas.width * ratio)}px`;
+    screen.style.setProperty("--size", `${integer}px`);
+    screen.style.setProperty("--width", `${canvas.width * integer}px`);
+    screen.style.setProperty("--height", `${canvas.height * integer}px`);
+    screen.style.setProperty("--scale", ratio / integer);
     await delay(300);
-    [page00, page01, list01, list02, switch0].forEach(page => page.hidden = true);
+    [page01, list01, list02, switch0].forEach(page => page.hidden = true);
+    if (isRunning) page00.hidden = true;
     [page02, list].forEach(page => page.hidden = false);
     const patternSize = (integer <= 4 || integer % 2 !== 0) ? integer : (integer / 2);
-    style.setProperty("--shader", generateSvgPattern(integer / patternSize, patternSize, local(`shader0${local("shader")}`) || patternSize));
+    screen.style.setProperty("--shader", generateSvgPattern(integer / patternSize, patternSize, local(`shader0${local("shader")}`) || patternSize));
     message(name);
 }
+window.addEventListener("resize", () => gameView(gameName));
 // ===== Event Listeners =====
 document.addEventListener("DOMContentLoaded", () => {
     body.removeAttribute('hide');
+    [page00, page02].forEach(el => el.ontouchstart = el.ontouchmove = el.oncontextmenu = e => e.preventDefault());
     canvasBottom = document.getElementById("canvas-bottom");
     body.style.setProperty("--background", generateSvgPattern(1, window.devicePixelRatio, window.devicePixelRatio));
 });

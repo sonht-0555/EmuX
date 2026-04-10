@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <style>
+            body {
+                background: black;
+                display: grid;
+                margin: 6px;
+                height: 100lvh;
+                --base-width: round(down, calc(50vw - 12px), 4px);
+                --base-height: round(down, calc(50vh - 12px), 4px);
+                gap: 1px;
+            }
+
+            .display {
+                outline: 1px solid white;
+                grid-area: display;
+            }
+
+            .btl-group {
+                display: grid;
+                grid-area: btl-group;
+                grid-template-areas:
+                    "btl-1 btl-2"
+                    "btl-3 btl-4"
+                    "btl-5 btl-6";
+                grid-template-rows: 1fr 1fr 24px;
+                grid-template-columns: 1fr 1fr;
+                gap: 1px;
+                width: 100%;
+            }
+
+            .jpad {
+                grid-area: jpad;
+                display: grid;
+                grid-template-areas:
+                    "btn-7"
+                    "btl-8";
+                grid-template-rows: 24px 1fr;
+                gap: 8px;
+            }
+
+            .gamepad {
+                grid-area: gamepad;
+                display: grid;
+                grid-template-areas:
+                    "btn-l"
+                    "btl-group";
+                grid-template-rows: 24px 1fr;
+                gap: 8px;
+
+            }
+
+            .btn-l {
+                grid-area: btn-l;
+                outline: 1px solid white;
+            }
+
+            .btl-1 {
+                grid-area: btl-1;
+                outline: 1px solid white;
+            }
+
+            .btl-2 {
+                grid-area: btl-2;
+                outline: 1px solid white;
+            }
+
+            .btl-3 {
+                grid-area: btl-3;
+                outline: 1px solid white;
+            }
+
+            .btl-4 {
+                grid-area: btl-4;
+                outline: 1px solid white;
+            }
+
+            .btl-5 {
+                grid-area: btl-5;
+                outline: 1px solid white;
+            }
+
+            .btl-6 {
+                grid-area: btl-6;
+                outline: 1px solid white;
+            }
+
+            .btn-7 {
+                grid-area: btn-7;
+                outline: 1px solid white;
+            }
+
+            .btl-8 {
+                grid-area: btl-8;
+                outline: 1px solid white;
+            }
+
+            @media (orientation: portrait) {
+                body {
+                    padding-top: calc(env(safe-area-inset-top) - 10px);
+                    grid-template-rows: 0.5fr auto 1fr;
+                    grid-template-columns: var(--base-width) 1fr calc(var(--base-width) + 1px);
+                    grid-template-areas: "display display display" "jpad . gamepad";
+                    row-gap: calc(100vw - 2*(var(--base-width) + 6px));
+                }
+
+                .jpad {
+                    width: var(--base-width);
+                }
+
+                .gamepad {
+                    width: calc(var(--base-width) + 1px);
+                }
+
+                .btl-group,
+                .btl-8 {
+                    height: var(--base-width);
+                }
+            }
+
+            @media (orientation: landscape) {
+                body {
+                    padding: 0 calc(env(safe-area-inset-right) - 10px) 0 calc(env(safe-area-inset-left) - 10px);
+                    grid-template-rows: 1fr;
+                    grid-template-columns: auto 1fr auto;
+                    grid-template-areas: "jpad display gamepad";
+                    gap: 8px;
+                }
+
+                .jpad {
+                    width: var(--base-height);
+                }
+
+                .gamepad {
+                    width: calc(var(--base-height) + 1px);
+                }
+
+                .btl-group,
+                .btl-8 {
+                    height: var(--base-height);
+                }
+
+            }
+        </style>
+    </head>
+    <body>
+        <div class="display">1.5</div>
+        <div class="gamepad">
+            <div class="btn-l">L</div>
+            <div class="btl-group">
+                <div class="btl-1">1</div>
+                <div class="btl-2">2</div>
+                <div class="btl-3">3</div>
+                <div class="btl-4">4</div>
+                <div class="btl-5">5</div>
+                <div class="btl-6">6</div>
+            </div>
+        </div>
+        <div class="jpad">
+            <div class="btn-7">7</div>
+            <div class="btl-8">8</div>
+        </div>
+    </body>
+</html>

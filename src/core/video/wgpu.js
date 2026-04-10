@@ -145,7 +145,7 @@ window.activeRenderFn = async function (pointer, width, height, pitch) {
         if (!await gpuInitializing) return;
         if (Module.isNDS) {
             page02.style.paddingTop = "5px"; canvasBottom.style.display = "block";
-            joypad.style.justifyContent = "center"; joy.style.display = "none";
+            jpad.style.justifyContent = "center"; joy.style.display = "none";
         }
     }
     const encoder = gpuDevice.createCommandEncoder();

@@ -92,7 +92,7 @@ window.activeRenderFn = function (pointer, width, height, pitch) {
         glContext = main.context; glTexture = main.tex;
         if (Module.isNDS) {
             page02.style.paddingTop = "5px"; canvasBottom.style.display = "block";
-            joypad.style.justifyContent = "center"; joy.style.display = "none";
+            jpad.style.justifyContent = "center"; joy.style.display = "none";
             const bottom = initGL(canvasBottom); glContextBottom = bottom.context; glTextureBottom = bottom.tex;
         }
     }
