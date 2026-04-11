@@ -29,11 +29,9 @@
   :root {
     --safe-left: env(safe-area-inset-left);
     --safe-right: env(safe-area-inset-right);
-    --profile-base: oklch(75% 0.05 80);
-    --profile-black: oklch(4% 0 0);
-    --profile-orange: oklch(63% 0.19 32);
-    --profile-cyan: oklch(66% 0.11 200);
-    --profile-green: oklch(33% 0.05 160);
+    --profile-base: oklch(0.7649 0.0494 76.31);
+    --profile-black: oklch(0 0 0);
+    --profile-green: oklch(0.2727 0 0);
     --profile-d: oklch(from var(--profile-green) l c h / 0.40);
     --profile-o: color-mix(in oklch, var(--profile-base) 24%, var(--profile-black));
     --profile-1: oklch(from var(--profile-base) l c h / 0.60);
@@ -139,8 +137,8 @@
   }
   [green]::before {
     content: attr(green);
-    color: var(--profile-green);
-    text-shadow: -3px 0px 0px var(--profile-d);
+    color: var(--profile-3);
+    text-shadow: -3px 0px 0px var(--profile-4);
   }
   [gray]::after {
     content: attr(gray);
@@ -191,7 +189,7 @@
       tag {
         padding: 2px 0px 2px 2px;
         height: 6px;
-        background: var(--profile-3);
+        background: var(--profile-4);
         margin: 15px;
         color: var(--profile-black);
       }
@@ -205,7 +203,7 @@
         padding-left: 4px;
       }
       logo[green]::before {
-        text-shadow: -4px 0px 0px var(--profile-d);
+        text-shadow: -4px 0px 0px var(--profile-4);
       }
     }
   }

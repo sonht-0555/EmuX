@@ -127,7 +127,6 @@ async function initCore(romFile) {
                 initAudio(audioVideoPointer);
                 audioContext.resume();
                 Module._free(audioVideoPointer);
-                // window.resetAudioSync?.();
                 window.currentSessionId = Math.random();
                 window.gameLoop?.(true);
                 await delay(200);
