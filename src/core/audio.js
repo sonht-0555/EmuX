@@ -33,6 +33,8 @@ async function initAudio(avInfoPointer) {
     audioWorkletNode.connect(audioGainNode).connect(audioContext.destination);
     audioStartTime = audioContext.currentTime;
     totalSamplesSent = 0;
+    // iOS audio fix
+    if (window.AudioOptimizer) AudioOptimizer.init(audioContext, audioGainNode);
 }
 // ===== writeAudio =====
 function writeAudio(pointer, frames) {
@@ -108,6 +110,21 @@ window.gameLoop = (isLooping) => {
     }
     window.skipRender = false;
 };
-document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible" && audioContext && isRunning) syncGame();
-});
+// ===== Audio Optimizer iOS =====
+(function () {
+    let ctx;
+    window.AudioOptimizer = {
+        init: (audioCtx) => {
+            if (!audioCtx || ctx) return; ctx = audioCtx;
+            ctx.onstatechange = () => (ctx.state == 'suspended' || ctx.state == 'interrupted') && setTimeout(() => AudioOptimizer.safeResume(), 1000);
+        },
+        safeResume: async () => {
+            if (!ctx || ctx.state == 'running') return;
+            try {
+                await ctx.suspend().catch(() => { }); await ctx.resume();
+                if (window.totalSamplesSent != undefined) audioStartTime = ctx.currentTime - totalSamplesSent / ctx.sampleRate + 0.04;
+                message("#syncing_");
+            } catch (error) {setTimeout(() => AudioOptimizer.safeResume(), 500);}
+        }
+    };
+})();
