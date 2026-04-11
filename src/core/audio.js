@@ -1,14 +1,14 @@
 // ===== Audio System =====
 const audio_batch_cb = (pointer, frames) => writeAudio(pointer, frames), audio_cb = () => { };
-var audioContext, audioWorkletNode, audioGainNode, totalSamplesSent = 0, audioStartTime = 0, gameFps = 60, lastRafTime = 0, acc = 0, sDrift = 1, lastLogTime = 0, sabL, sabR, sabIndices, sabViewLeft, sabViewRight, sabViewIndices, wasmOutL = 0, wasmOutR = 0, sabBufSize = 0, sabMask = 0, activeSession = null, audioBurstLimit = 10000, audioMaxWrite = 4000, audioTargetLimit = 3000, skip_frame = 0, time = 0, drift = 1.0, backlog = 0, runs = 1;
+var audioContext, audioWorkletNode, audioGainNode, totalSamplesSent = 0, audioStartTime = 0, gameFps = 60, lastRafTime = 0, acc = 0, sDrift = 1, lastLogTime = 0, sabL, sabR, sabIndices, sabViewLeft, sabViewRight, sabViewIndices, wasmOutL = 0, wasmOutR = 0, sabBufSize = 0, sabMask = 0, activeSession = null, audioBurstLimit = 10000, audioMaxWrite = 4000, audioTargetLimit = 3000, skip_frame = 0, time = 0, drift = 1.0, backlog = 0, runs = 1, audioOptimizerContext, keepAliveAudio;
 // ===== initAudio =====
 async function initAudio(avInfoPointer) {
     const p = Number(avInfoPointer);
     gameFps = Module.HEAPF64[(p + 24) >> 3] || 60;
     const coreRate = Module.HEAPF64[(p + 32) >> 3] || 48000;
-    audioBurstLimit = (48000 / gameFps) * 10.0;
-    audioMaxWrite = (48000 / gameFps) * 8.0;
-    audioTargetLimit = (48000 / gameFps) * 6.0;
+    audioBurstLimit = (48000 / gameFps) * 8.0;
+    audioMaxWrite = (48000 / gameFps) * 6.0;
+    audioTargetLimit = (48000 / gameFps) * 4.0;
     // console.log(`${gameFps.toFixed(2)} | ${audioBurstLimit.toFixed(0)} | ${audioMaxWrite.toFixed(0)} | ${audioTargetLimit.toFixed(0)}`);
     if (audioContext) return audioContext.resume();
     audioContext = new (window.AudioContext || window.webkitAudioContext)({sampleRate: 48000});
@@ -33,8 +33,7 @@ async function initAudio(avInfoPointer) {
     audioWorkletNode.connect(audioGainNode).connect(audioContext.destination);
     audioStartTime = audioContext.currentTime;
     totalSamplesSent = 0;
-    // iOS audio fix
-    if (window.AudioOptimizer) AudioOptimizer.init(audioContext, audioGainNode);
+    initAudioOptimizer(audioContext);
 }
 // ===== writeAudio =====
 function writeAudio(pointer, frames) {
@@ -85,17 +84,6 @@ window.getAudioSync = () => {
     acc -= runs;
     return Math.max(0, Math.min(4, runs));
 };
-// ===== resetAudioSync =====
-window.resetAudioSync = () => {
-    totalSamplesSent = 0;
-    if (audioContext) audioStartTime = audioContext.currentTime;
-    if (window.Module && window.Module._emux_audio_reset) window.Module._emux_audio_reset();
-    if (sabViewIndices) {
-        Atomics.store(sabViewIndices, 0, 0);
-        Atomics.store(sabViewIndices, 1, 0);
-    }
-    lastRafTime = acc = time = 0; sDrift = 1; skip_frame = 40;
-};
 // ===== gameLoop =====
 window.gameLoop = (isLooping) => {
     if (isLooping === false) return isRunning = false;
@@ -110,21 +98,24 @@ window.gameLoop = (isLooping) => {
     }
     window.skipRender = false;
 };
-// ===== Audio Optimizer iOS =====
-(function () {
-    let ctx;
-    window.AudioOptimizer = {
-        init: (audioCtx) => {
-            if (!audioCtx || ctx) return; ctx = audioCtx;
-            ctx.onstatechange = () => (ctx.state == 'suspended' || ctx.state == 'interrupted') && setTimeout(() => AudioOptimizer.safeResume(), 1000);
-        },
-        safeResume: async () => {
-            if (!ctx || ctx.state == 'running') return;
-            try {
-                await ctx.suspend().catch(() => { }); await ctx.resume();
-                if (window.totalSamplesSent != undefined) audioStartTime = ctx.currentTime - totalSamplesSent / ctx.sampleRate + 0.04;
-                message("#syncing_");
-            } catch (error) {setTimeout(() => AudioOptimizer.safeResume(), 500);}
-        }
-    };
-})();
+// ===== syncGame =====
+async function syncGame() {
+    if (!audioOptimizerContext || audioOptimizerContext.state == 'running') return;
+    try {
+        if (keepAliveAudio) keepAliveAudio.play().catch(() => { });
+        await audioOptimizerContext.suspend().catch(() => { });
+        await audioOptimizerContext.resume();
+        if (window.totalSamplesSent != undefined) audioStartTime = audioOptimizerContext.currentTime - totalSamplesSent / audioOptimizerContext.sampleRate + 0.04;
+        message("#syncing_");
+    } catch (error) {setTimeout(syncGame, 500);}
+}
+// ===== initAudioOptimizer =====
+async function initAudioOptimizer(audioCtx) {
+    if (!audioCtx || audioOptimizerContext) return; audioOptimizerContext = audioCtx;
+    try {
+        const destination = audioOptimizerContext.createMediaStreamDestination(), oscillator = audioOptimizerContext.createOscillator(), silentGain = audioOptimizerContext.createGain();
+        silentGain.gain.value = 0.001; oscillator.connect(silentGain).connect(destination); oscillator.start();
+        keepAliveAudio = new Audio(); keepAliveAudio.srcObject = destination.stream; keepAliveAudio.play();
+    } catch (error) { }
+    audioOptimizerContext.onstatechange = () => (audioOptimizerContext.state == 'suspended' || audioOptimizerContext.state == 'interrupted') && setTimeout(syncGame, 1000);
+}

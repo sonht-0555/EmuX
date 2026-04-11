@@ -90,7 +90,6 @@ async function timer(isStart) {
 // ===== resumeGame =====
 async function resumeGame() {
     if (isConfig.id === 'pico8') return buttonClick('start');
-    // window.resetAudioSync?.();
     if (audioContext.state !== 'running') audioContext.resume();
     window.gameLoop?.(true);
     timer(true); message("#resume_");
@@ -100,16 +99,6 @@ async function pauseGame() {
     if (isConfig.id === 'pico8') return buttonClick('start');
     window.gameLoop?.(false);
     timer(false); message("#pause_");
-}
-// ===== syncGame =====
-async function syncGame() {
-    if (!isRunning) return;
-    await window.gameLoop?.(false);
-    await delay(500);
-    // await window.resetAudioSync?.();
-    if (audioContext && audioContext.state !== 'running') await audioContext.resume();
-    await window.gameLoop?.(true);
-    message("#syncing_");
 }
 // ===== transGame =====
 async function transGame() {
