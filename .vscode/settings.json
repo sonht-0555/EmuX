@@ -42,6 +42,6 @@
     "explorer.fileNesting.enabled": true,
     "explorer.fileNesting.expand": false,
     "explorer.fileNesting.patterns": {
-        "index.html": "src, docs, .github, .vscode, .agent, .gitignore, manifest.json, .prettierignore, _headers, CNAME"
+        "index.html": "src, docs, .github, .vscode, .agent, .gitignore, manifest.json, .prettierignore, _headers, CNAME, build.sh"
     }
 }

@@ -60,7 +60,7 @@ document.addEventListener("DOMContentLoaded", () => {
     ['pointerup', 'pointercancel'].forEach(type => addEventListener(type, event => {setPointerState(event.pointerId, null); isSwiping = false; joy.style.opacity = "0";}));
     joy.onpointerdown = () => joy.style.opacity = "1";
     log.onpointerdown = () => log.style.opacity = log.style.opacity == "1" ? "0" : "1";
-    invis.onpointermove = () => {page00.hidden = false; showNotification(" pa", "use.", "", " double tap to resume."); pauseGame();};
+    invis.onpointermove = () => {if (isConfig.id === 'pico8') return; page00.hidden = false; showNotification(" pa", "use.", "", " double tap to resume."); pauseGame();};
     page00.onpointerdown = async event => {if (doubleTap(event, page00)) {await resumeGame(); await delay(100); page00.hidden = true;} };
     menu.onpointerdown = event => {clearTimeout(menu._timer); if (doubleTap(event, menu)) toggleTurbo(); else menu._timer = setTimeout(transGame, 250);};
     title1.onpointerdown = () => title1.textContent = "";

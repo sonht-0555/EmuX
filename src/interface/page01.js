@@ -12,12 +12,12 @@ function view(name) {
 async function showFileGroups(gameName) {
     const titles = ["saves", "states", "games"], results = await Promise.all(titles.map(type => listStore(type)));
     const fileGroups = titles.map((title, index) => ({title, files: results[index].filter(file => file === gameName || file.startsWith(gameName + "."))}));
-    list01.innerHTML = fileGroups.map(group => group.files.length ? group.files.map(file => `<file data="${group.title}"><name>${file}</name><rena></rena><dele></dele></file>`).join('') + `<titl>${group.title}.</titl>` : '').join('');
-    list01.querySelectorAll('name').forEach(button => button.onclick = async () => {
+    list01.innerHTML = fileGroups.map(group => group.files.length ? group.files.map(file => `<file data="${group.title}"><name>${file}</name><down></down><dele></dele></file>`).join('') + `<titl>${group.title}.</titl>` : '').join('');
+    list01.querySelectorAll('down').forEach(button => button.onclick = async () => {
         const name = button.textContent;
         if (confirm(`Download this file? ${name}`)) {await downloadFromStore(name); showFileGroups(gameName);}
     });
-    list01.querySelectorAll('rena').forEach(button => button.onclick = async () => {
+    list01.querySelectorAll('name').forEach(button => button.onclick = async () => {
         const oldName = button.parentElement.querySelector('name').textContent;
         const newName = prompt("Rename this file", oldName);
         if (newName && newName !== oldName && await renameFromStore(oldName, newName)) {
@@ -37,12 +37,12 @@ async function listGame() {
         const coreConfiguration = window.CORE_CONFIG?.find(config => config.ext?.split(',').map(e => e.trim()).includes(fileExtension));
         const displayName = gameFilename.toLowerCase().endsWith(fileExtension.toLowerCase()) ? gameFilename.slice(0, -fileExtension.length) : (gameFilename.lastIndexOf('.') > 0 ? gameFilename.substring(0, gameFilename.lastIndexOf('.')) : gameFilename);
         const gameTag = (local('tags_' + gameFilename) || coreConfiguration?.tag || fileExtension.slice(1)).slice(0, 4);
-        return `<rom data-full="${gameFilename}"><name>${displayName}</name><tag>${gameTag}</tag></rom>`;
+        return `<rom data-full="${gameFilename}"><name>${displayName}</name><tag>_${gameTag}</tag><dot></dot></rom>`;
     }).join('');
     list.querySelectorAll('rom').forEach(romElement => {
         const fullName = romElement.getAttribute('data-full'), displayName = romElement.querySelector('name').textContent;
-        romElement.querySelector('name').onclick = () => loadGame(fullName);
-        romElement.querySelector('tag').onclick = () => {showFileGroups(displayName); view('details');};
+        romElement.querySelectorAll('name, tag').forEach(el => el.onclick = () => loadGame(fullName));
+        romElement.querySelector('dot').onclick = () => {showFileGroups(displayName); view('details');};
     });
 }
 // ===== verticalSetting =====

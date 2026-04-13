@@ -26,9 +26,9 @@ function generateSvgPattern(repetitions, size, pattern) {
     return `url("data:image/svg+xml,${encodeURIComponent(svg + "</svg>")}")`;
 }
 // ===== showNotification =====
-async function showNotification(green, white, gray, text, wait) {
+async function showNotification(base, white, gray, text, wait) {
     page00.hidden = false;
-    title0.setAttribute('green', green);
+    title0.setAttribute('base', base);
     title0.setAttribute('gray', gray);
     title0.textContent = white;
     message0.textContent = text;
@@ -64,7 +64,7 @@ async function gameView(name) {
     const safeLeft = parseFloat(styles.getPropertyValue('--safe-left')) || 0;
     const safeRight = parseFloat(styles.getPropertyValue('--safe-right')) || 0;
     switch0.textContent = local('render');
-    const maxInteger = Math.floor(window.innerWidth < window.innerHeight ? (window.innerWidth * window.devicePixelRatio) / canvas.width : Math.min(((window.innerWidth - ((Math.floor((window.innerHeight * 0.5 - 13) / 4) * 4) * 2) - 17 - Math.max(0, safeLeft - 10) - Math.max(0, safeRight - 10)) * window.devicePixelRatio) / canvas.width, (window.innerHeight * window.devicePixelRatio) / canvas.height));
+    const maxInteger = Math.floor(window.innerWidth < window.innerHeight ? (window.innerWidth * window.devicePixelRatio) / canvas.width : (window.innerWidth >= 1024 && matchMedia('(pointer: fine)').matches) ? (window.innerHeight * window.devicePixelRatio) / canvas.height : Math.min(((window.innerWidth - ((Math.floor((window.innerHeight * 0.5 - 13) / 4) * 4) * 2) - 17 - Math.max(0, safeLeft - 10) - Math.max(0, safeRight - 10)) * window.devicePixelRatio) / canvas.width, (window.innerHeight * window.devicePixelRatio) / canvas.height));
     integer = (maxInteger > 6) ? maxInteger - (maxInteger % 2) : maxInteger;
     const ratio = integer / window.devicePixelRatio;
     display.style.cssText = `height:${Math.ceil(canvas.height * ratio)}px;width:${Math.ceil(canvas.width * ratio)}px`;
