@@ -28,10 +28,10 @@ document.addEventListener("DOMContentLoaded", () => {
     canvas.onpointerdown = event => {
         rect = canvas.getBoundingClientRect();
         const touchX = event.clientX - rect.left, touchY = event.clientY - rect.top;
-        if (doubleTap(event, canvas, 1)) {
+        click(null, () => {
             if (touchX < rect.width / 2) touchY < rect.height / 2 ? loadState(3) : loadState(2);
             else touchY < rect.height / 2 ? saveState(3) : saveState(2);
-        }
+        });
         swipeStartY = event.clientY;
         isSwiping = event.clientX > (rect.right - 20);
     };
@@ -61,7 +61,7 @@ document.addEventListener("DOMContentLoaded", () => {
     joy.onpointerdown = () => joy.style.opacity = "1";
     log.onpointerdown = () => log.style.opacity = log.style.opacity == "1" ? "0" : "1";
     invis.onpointermove = () => {if (isConfig.id === 'pico8') return; page00.hidden = false; showNotification(" pa", "use.", "", " double tap to resume."); pauseGame();};
-    page00.onpointerdown = async event => {if (doubleTap(event, page00)) {await resumeGame(); await delay(100); page00.hidden = true;} };
-    menu.onpointerdown = event => {clearTimeout(menu._timer); if (doubleTap(event, menu)) toggleTurbo(); else menu._timer = setTimeout(transGame, 250);};
+    page00.onpointerdown = () => click(null, async () => {await resumeGame(); await delay(100); page00.hidden = true;});
+    menu.onpointerdown = () => click(transGame, toggleTurbo);
     title1.onpointerdown = () => title1.textContent = "";
 });

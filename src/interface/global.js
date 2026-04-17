@@ -5,14 +5,16 @@ const local = (key, value) => (value === undefined || value === null) ? localSto
 const delay = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 let gameName, gameWidth, gameHeight, integer, timerId, time1Element, count = null, recCount = 1, canvasBottom, hours = 0, minutes = 0, seconds = 0, count1 = 0, current = parseInt(local('vertical')) || 0;
 const canvas = document.getElementById('canvas');
-// ===== doubleTap =====
-function doubleTap(event, element, distance) {
-    const now = Date.now(), deltaTime = now - (element._lastTime || 0), isTiming = event.isPrimary && deltaTime < 300 && deltaTime > 40;
-    let isDistance = true;
-    if (distance) isDistance = Math.hypot(event.clientX - element._lastX, event.clientY - element._lastY) < 30;
-    const result = isTiming && isDistance;
-    element._lastTime = now; element._lastX = event.clientX; element._lastY = event.clientY;
-    return result;
+// ===== click =====
+function click(tap1, tap2, tap3) {
+    clearTimeout(click.timer);
+    click.count = (click.count || 0) + 1;
+    click.timer = setTimeout(function () {
+        if (click.count === 1 && tap1) tap1();
+        if (click.count === 2 && tap2) tap2();
+        if (click.count === 3 && tap3) tap3();
+        click.count = 0;
+    }, 250);
 }
 // ===== generateSvgPattern =====
 function generateSvgPattern(repetitions, size, pattern) {
