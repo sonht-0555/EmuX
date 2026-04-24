@@ -9,11 +9,13 @@ window.addEventListener('gamepadconnected', function () {hasGamepad = true;});
 window.addEventListener('gamepaddisconnected', function () {hasGamepad = false; padMask = 0;});
 // ===== Keyboard =====
 window.onkeydown = function (e) {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
     var id = KEYS[e.key];
     if (id !== undefined) {keyMask |= (1 << id); e.preventDefault();}
     if (audioContext?.state !== 'running') {audioContext?.resume();}
 };
 window.onkeyup = function (e) {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
     var id = KEYS[e.key];
     if (id !== undefined) keyMask &= ~(1 << id);
 };

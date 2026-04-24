@@ -75,10 +75,12 @@ async function gameView(name) {
     screen.style.setProperty("--width", `${canvas.width * integer}px`);
     screen.style.setProperty("--height", `${canvas.height * integer}px`);
     screen.style.setProperty("--scale", ratio / integer);
-    await delay(300);
+    await delay(100);
     [page01, list01, list02, switch0].forEach(page => page.hidden = true);
     if (isRunning) page00.hidden = true;
-    [page02, list].forEach(page => page.hidden = false);
+    list.hidden = false;
+    await delay(100);
+    page02.hidden = false;
     const patternSize = (integer <= 4 || integer % 2 !== 0) ? integer : (integer / 2);
     screen.style.setProperty("--shader", generateSvgPattern(integer / patternSize, patternSize, local(`shader0${local("shader")}`) || patternSize));
     message(name);

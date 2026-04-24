@@ -5,6 +5,9 @@ const DATABASE_NAME = 'EmuxDB', STORES = {
     saves: ['sav', 'srm', 'sram'],
     states: ['ss1', 'ss2', 'ss3', 'ss4', 'ss5', 'ss6', 'ss7', 'ss8', 'ss9', 'ss0']
 };
+const apiEndpoint = "https://api.github.com/repos/AlexBlackmore/roms/git/trees/master?recursive=1";
+const rawContentBase = "https://raw.githubusercontent.com/AlexBlackmore/roms/master/";
+let storeList = [];
 // ===== getAllStoreNames =====
 const getAllStoreNames = () => Object.keys(STORES);
 // ===== storeForFilename =====
@@ -110,4 +113,12 @@ async function downloadFromStore(name) {
     const url = URL.createObjectURL(new Blob([data])), link = document.createElement('a');
     link.href = url; link.download = name; link.click();
     URL.revokeObjectURL(url);
+}
+// ===== github store =====
+async function initStore() {
+    try {
+        const response = await fetch(apiEndpoint);
+        const data = await response.json();
+        storeList = data.tree.filter(item => item.type === 'blob');
+    } catch (e) { }
 }

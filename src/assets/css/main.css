@@ -167,6 +167,21 @@
       transform: rotate(180deg);
       gap: 1px;
       grid-row: 1;
+      #romsearch {
+        width: 100%;
+        height: 100%;
+        background: none;
+        border: none;
+        outline: none;
+        color: inherit;
+        font-family: "3x3";
+        font-size: 8px;
+        padding: 0px;
+        caret-color: transparent;
+      }
+      #romsearch::placeholder {
+        color: var(--profile-3);
+      }
       rom, titl, file, cont {
         display: flex;
         column-gap: 1px;
@@ -193,6 +208,11 @@
         color: var(--profile-3);
         flex: 1 0 auto
       }
+    }
+    /* Disable rotate when searching to fix iOS layout jump */
+    list.searching,
+    list.searching rom {
+      transform: none !important;
     }
     cta {
       grid-template-columns: auto 50px 50px 90px;
