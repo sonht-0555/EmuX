@@ -47,6 +47,14 @@ async function getDB() {
 // ===== emuxDB =====
 async function emuxDB(dataOrKey, name) {
     const db = await getDB(), key = name || dataOrKey, store = storeForFilename(String(key));
+    if (name && store === 'games') {
+        let order = JSON.parse(localStorage.getItem('emux_order') || '[]');
+        if (!order.includes(name)) {
+            order.push(name);
+            localStorage.setItem('emux_order', JSON.stringify(order));
+        }
+    }
+
     const transaction = db.transaction(store, name ? 'readwrite' : 'readonly'), objectStore = transaction.objectStore(store);
     return new Promise((resolve, reject) => {
         if (name) {
@@ -66,7 +74,17 @@ async function listStore(storeName) {
     const getKeys = store => new Promise((resolve, reject) => {
         if (!db.objectStoreNames.contains(store)) return resolve([]);
         const request = db.transaction(store, 'readonly').objectStore(store).getAllKeys();
-        request.onsuccess = () => resolve(request.result.map(String));
+        request.onsuccess = () => {
+            let keys = request.result.map(String);
+            if (store === 'games') {
+                const order = JSON.parse(localStorage.getItem('emux_order') || '[]');
+                keys.sort((a, b) => {
+                    let idxA = order.indexOf(a), idxB = order.indexOf(b);
+                    return (idxA === -1 ? 9999 : idxA) - (idxB === -1 ? 9999 : idxB);
+                });
+            }
+            resolve(keys);
+        };
         request.onerror = reject;
     });
     if (!storeName) {
@@ -78,6 +96,11 @@ async function listStore(storeName) {
 // ===== deleteFromStore =====
 async function deleteFromStore(key) {
     const db = await getDB(), store = storeForFilename(String(key));
+
+    if (store === 'games') {
+        let order = JSON.parse(localStorage.getItem('emux_order') || '[]');
+        localStorage.setItem('emux_order', JSON.stringify(order.filter(k => k !== key)));
+    }
     return new Promise((resolve, reject) => {
         const transaction = db.transaction(store, 'readwrite'), objectStore = transaction.objectStore(store);
         objectStore.delete(key);
@@ -95,8 +118,16 @@ async function renameFromStore(oldName, newName) {
         const keys = await listStore(store);
         const targets = keys.filter(k => k === oldBase || k.startsWith(oldBase + "."));
         for (const key of targets) {
-            const suffix = key.slice(oldBase.length);
-            const targetKey = newBase + suffix;
+            const suffix = key.slice(oldBase.length), targetKey = newBase + suffix;
+            if (store === 'games') {
+                let order = JSON.parse(localStorage.getItem('emux_order') || '[]');
+                const idx = order.indexOf(key);
+                if (idx !== -1) {
+                    order[idx] = targetKey;
+                    localStorage.setItem('emux_order', JSON.stringify(order));
+                }
+            }
+
             const data = await emuxDB(key);
             if (data) {
                 await emuxDB(data, targetKey);

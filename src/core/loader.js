@@ -131,6 +131,7 @@ async function initCore(romFile) {
                 window.gameLoop?.(true);
                 await delay(200);
                 await loadState();
+                await message(romFile.name);
                 await timer(true);
                 if (window.wasmUrl && window.wasmUrl.startsWith('blob:')) URL.revokeObjectURL(window.wasmUrl);
                 resolve();

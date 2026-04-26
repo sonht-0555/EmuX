@@ -83,7 +83,6 @@ async function gameView(name) {
     page02.hidden = false;
     const patternSize = (integer <= 4 || integer % 2 !== 0) ? integer : (integer / 2);
     screen.style.setProperty("--shader", generateSvgPattern(integer / patternSize, patternSize, local(`shader0${local("shader")}`) || patternSize));
-    message(name);
 }
 window.addEventListener("resize", () => gameView(gameName));
 // ===== Event Listeners =====

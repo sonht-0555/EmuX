@@ -14,7 +14,7 @@ async function showFileGroups(gameName) {
     const fileGroups = titles.map((title, index) => ({title, files: results[index].filter(file => file === gameName || file.startsWith(gameName + "."))}));
     list01.innerHTML = fileGroups.map(group => group.files.length ? group.files.map(file => `<file data="${group.title}"><name>${file}</name><down></down><dele></dele></file>`).join('') + `<titl>${group.title}.</titl>` : '').join('');
     list01.querySelectorAll('down').forEach(button => button.onclick = async () => {
-        const name = button.textContent;
+        const name = button.parentElement.querySelector('name').textContent;
         if (confirm(`Download this file? ${name}`)) {await downloadFromStore(name); showFileGroups(gameName);}
     });
     list01.querySelectorAll('name').forEach(button => button.onclick = async () => {
@@ -40,6 +40,7 @@ async function listGame() {
 
     const render = (searchQuery) => {
         const query = searchQuery.toLowerCase().trim();
+        const maxItems = Math.floor((list.clientHeight - 80) / 40);
         const items = query ? storeList
             .filter(item => item.path.toLowerCase().includes(query))
             .sort((a, b) => {
@@ -48,7 +49,7 @@ async function listGame() {
                 if (indexA !== indexB) return indexA - indexB;
                 return pathA.length - pathB.length;
             })
-            .slice(0, 6) : localGames;
+            .slice(0, maxItems) : localGames;
 
         const supportedExtensions = window.CORE_CONFIG?.flatMap(config => config.ext?.split(',').map(ext => ext.trim())).sort((a, b) => b.length - a.length) || [];
 
