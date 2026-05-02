@@ -48,6 +48,11 @@ async function loadGame(name) {
 // ===== saveState =====
 async function saveState(slot = 1) {
     if (!isRunning || isConfig.id === 'pico8') return;
+    const size = Module?._retro_get_memory_size?.(0) || 0, pointer = Module?._retro_get_memory_data?.(0) || 0;
+    if (size > 0 && pointer > 0) {
+        const bytes = new Uint8Array(Module.HEAPU8.buffer, pointer, size).slice();
+        await emuxDB(bytes, `${gameName}.sav`);
+    }
     const stateSize = Module._retro_serialize_size(), statePointer = Module._malloc(stateSize);
     if (Module._retro_serialize(statePointer, stateSize)) {
         const stateData = new Uint8Array(Module.HEAPU8.buffer, statePointer, stateSize).slice();
@@ -55,11 +60,16 @@ async function saveState(slot = 1) {
         if (slot !== 1) await message(`#${slot}_recored`);
     }
     Module._free(statePointer);
-    await saveSRM(window.saveSession);
 }
 // ===== loadState =====
 async function loadState(slot = 1) {
     if (!isRunning || isConfig.id === 'pico8') return;
+    const data = await emuxDB(`${gameName}.sav`);
+    if (data) {
+        const bytes = data instanceof Uint8Array ? data : new Uint8Array(data), size = Module?._retro_get_memory_size?.(0) || 0, ptr = Module?._retro_get_memory_data?.(0) || 0, len = Math.min(size, bytes.length);
+        Module.HEAPU8.set(bytes.subarray(0, len), ptr);
+        if (len < size) Module.HEAPU8.fill(0, ptr + len, ptr + size);
+    }
     const stateData = await emuxDB(`${gameName}.ss${slot}`);
     if (stateData) {
         const statePointer = Module._malloc(stateData.length);
@@ -96,7 +106,7 @@ async function resumeGame() {
 }
 // ===== pauseGame =====
 async function pauseGame() {
-    await saveSRM(window.saveSession);
+    saveState();
     window.gameLoop?.(false);
     timer(false); message("#pause_");
 }
@@ -146,32 +156,16 @@ async function pico8(config, romName, raw) {
     updateButtons(config.btns); await delay(200); await gameView(romName); await timer(true);
     return (gameName = romName);
 }
-// ===== loadSRM =====
-async function loadSRM({romFileName}) {
-    const preferredKey = `${romFileName}.srm`;
-    const data = await emuxDB(preferredKey);
-    if (!data?.length) return {preferredKey};
-    const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
-    for (const type of [0, 1]) {
-        const size = Module?._retro_get_memory_size?.(type) || 0;
-        const pointer = Module?._retro_get_memory_data?.(type) || 0;
-        if (!size || !pointer) continue;
-        const length = Math.min(size, bytes.length);
-        Module.HEAPU8.set(bytes.subarray(0, length), pointer);
-        if (length < size) Module.HEAPU8.fill(0, pointer + length, pointer + size);
+// ===== applyCheat =====
+async function applyCheat(rawText = null) {
+    if (rawText !== null) local(`cht_${gameName}`, String(rawText));
+    const raw = local(`cht_${gameName}`) || "", lines = raw ? raw.split(", ") : [];
+    if (!Module?._retro_cheat_set) return 0;
+    Module._retro_cheat_reset();
+    for (let i = 0; i < lines.length; ++i) {
+        const line = lines[i], pointer = Module._malloc(line.length + 1);
+        Module.stringToUTF8(line, pointer, line.length + 1);
+        Module._retro_cheat_set(i, 1, pointer);
+        Module._free(pointer);
     }
-    return {preferredKey};
-}
-// ===== saveSRM =====
-async function saveSRM(session) {
-    if (!session?.preferredKey) return false;
-    for (const type of [0, 1]) {
-        const size = Module?._retro_get_memory_size?.(type) || 0;
-        const pointer = Module?._retro_get_memory_data?.(type) || 0;
-        if (size <= 0 || pointer <= 0) continue;
-        const bytes = new Uint8Array(Module.HEAPU8.buffer, pointer, size).slice();
-        await emuxDB(bytes, session.preferredKey);
-        return true;
-    }
-    return false;
 }

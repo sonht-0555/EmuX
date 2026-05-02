@@ -121,8 +121,6 @@ async function initCore(romFile) {
                 }
                 Module.HEAPU32.set(loadInfo, Number(infoPointer) >> 2);
                 Module._retro_load_game(infoPointer);
-                const saveSession = await loadSRM({romFileName: romFile.name});
-                window.saveSession = saveSession;
                 const audioVideoPointer = Module._malloc(120);
                 Module._retro_get_system_av_info(audioVideoPointer);
                 initAudio(audioVideoPointer);
@@ -132,6 +130,7 @@ async function initCore(romFile) {
                 window.gameLoop?.(true);
                 await delay(200);
                 await loadState();
+                await applyCheat();
                 await message(romFile.name);
                 await timer(true);
                 if (window.wasmUrl && window.wasmUrl.startsWith('blob:')) URL.revokeObjectURL(window.wasmUrl);
