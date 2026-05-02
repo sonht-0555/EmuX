@@ -121,7 +121,8 @@ async function initCore(romFile) {
                 }
                 Module.HEAPU32.set(loadInfo, Number(infoPointer) >> 2);
                 Module._retro_load_game(infoPointer);
-                // Step 8: Audio & render loop start
+                const saveSession = await loadSRM({romFileName: romFile.name});
+                window.saveSession = saveSession;
                 const audioVideoPointer = Module._malloc(120);
                 Module._retro_get_system_av_info(audioVideoPointer);
                 initAudio(audioVideoPointer);

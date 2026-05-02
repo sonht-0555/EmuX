@@ -62,6 +62,6 @@ document.addEventListener("DOMContentLoaded", () => {
     log.onpointerdown = () => log.style.opacity = log.style.opacity == "1" ? "0" : "1";
     invis.onpointermove = () => {if (isConfig.id === 'pico8') return; page00.hidden = false; showNotification(" pa", "use.", "", " double tap to resume."); pauseGame();};
     page00.onpointerdown = () => click(null, async () => {await resumeGame(); await delay(100); page00.hidden = true;});
-    menu.onpointerdown = () => click(transGame, toggleTurbo);
+    menu.onpointerdown = () => click(transGame, toggleTurbo, rebootGame);
     title1.onpointerdown = () => title1.textContent = "";
 });

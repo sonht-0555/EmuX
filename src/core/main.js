@@ -55,6 +55,7 @@ async function saveState(slot = 1) {
         if (slot !== 1) await message(`#${slot}_recored`);
     }
     Module._free(statePointer);
+    await saveSRM(window.saveSession);
 }
 // ===== loadState =====
 async function loadState(slot = 1) {
@@ -95,6 +96,7 @@ async function resumeGame() {
 }
 // ===== pauseGame =====
 async function pauseGame() {
+    await saveSRM(window.saveSession);
     window.gameLoop?.(false);
     timer(false); message("#pause_");
 }
@@ -130,7 +132,7 @@ function toggleTurbo() {
     message(window._turbo === 2.0 ? "#fast_" : "#normal_");
 }
 // ===== rebootGame =====
-async function rebootGame() {location.reload();}
+async function rebootGame() {Module?._retro_reset?.();}
 // ===== Pico8 =====
 async function pico8(config, romName, raw) {
     const proto = XMLHttpRequest.prototype, _open = proto.open;
@@ -143,4 +145,33 @@ async function pico8(config, romName, raw) {
     document.body.appendChild(Object.assign(document.createElement('script'), {src: config.script}));
     updateButtons(config.btns); await delay(200); await gameView(romName); await timer(true);
     return (gameName = romName);
+}
+// ===== loadSRM =====
+async function loadSRM({romFileName}) {
+    const preferredKey = `${romFileName}.srm`;
+    const data = await emuxDB(preferredKey);
+    if (!data?.length) return {preferredKey};
+    const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
+    for (const type of [0, 1]) {
+        const size = Module?._retro_get_memory_size?.(type) || 0;
+        const pointer = Module?._retro_get_memory_data?.(type) || 0;
+        if (!size || !pointer) continue;
+        const length = Math.min(size, bytes.length);
+        Module.HEAPU8.set(bytes.subarray(0, length), pointer);
+        if (length < size) Module.HEAPU8.fill(0, pointer + length, pointer + size);
+    }
+    return {preferredKey};
+}
+// ===== saveSRM =====
+async function saveSRM(session) {
+    if (!session?.preferredKey) return false;
+    for (const type of [0, 1]) {
+        const size = Module?._retro_get_memory_size?.(type) || 0;
+        const pointer = Module?._retro_get_memory_data?.(type) || 0;
+        if (size <= 0 || pointer <= 0) continue;
+        const bytes = new Uint8Array(Module.HEAPU8.buffer, pointer, size).slice();
+        await emuxDB(bytes, session.preferredKey);
+        return true;
+    }
+    return false;
 }
