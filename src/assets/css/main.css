@@ -31,7 +31,7 @@
     --safe-right: env(safe-area-inset-right);
     --profile-base: oklch(0.8 0.04 76);
     --profile-black: oklch(0 0 0);
-    --profile-o: color-mix(in oklch, var(--profile-base) 27%, var(--profile-black));
+    --profile-o: color-mix(in oklch, var(--profile-base) 28%, var(--profile-black));
     --profile-1: oklch(from var(--profile-base) l c h / 0.60);
     --profile-2: oklch(from var(--profile-base) l c h / 0.40);
     --profile-3: oklch(from var(--profile-base) l c h / 0.30);
@@ -179,7 +179,7 @@
         padding: 0px;
         caret-color: transparent;
       }
-      #romsearch::placeholder {
+      #romsearch::placeholder, ver {
         color: var(--profile-3);
       }
       rom, titl, file, cont {

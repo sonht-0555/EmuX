@@ -4,7 +4,7 @@ function view(name) {
     list.hidden = !isHome;
     list01.hidden = name !== 'details';
     list02.hidden = name !== 'settings';
-    logo.setAttribute('green', isHome ? 'em' : 'ba');
+    logo.setAttribute('base', isHome ? 'em' : 'ba');
     logo.innerText = isHome ? 'ux' : 'ck';
     if (isHome) listGame();
 }

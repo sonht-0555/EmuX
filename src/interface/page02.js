@@ -63,5 +63,10 @@ document.addEventListener("DOMContentLoaded", () => {
     invis.onpointermove = () => {if (isConfig.id === 'pico8') return; page00.hidden = false; showNotification(" pa", "use.", "", " double tap to resume."); pauseGame();};
     page00.onpointerdown = () => click(null, async () => {await resumeGame(); await delay(100); page00.hidden = true;});
     menu.onpointerdown = () => click(transGame, toggleTurbo, rebootGame);
+    cheats.onpointerdown = () => click(null, null, async () => {
+        const raw = prompt('Add cheat code', String(local(`cht_${gameName}`) || ''));
+        if (raw === null) return;
+        await applyCheat(raw);
+    });
     title1.onpointerdown = () => title1.textContent = "";
 });
