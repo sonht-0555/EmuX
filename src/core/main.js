@@ -169,3 +169,14 @@ async function applyCheat(rawText = null) {
         Module._free(pointer);
     }
 }
+// ===== setMute =====
+function setMute(toggle) {
+    let current = local('core_audio');
+    if (current && current.endsWith('_mute')) {
+        local('core_audio', current.replace('_mute', ''));
+        message("#unmuted");
+    } else if (current) {
+        local('core_audio', current + '_mute');
+        message("#muted");
+    }
+}

@@ -33,7 +33,7 @@ async function initAudio(avInfoPointer) {
     audioWorkletNode.connect(audioGainNode).connect(audioContext.destination);
     audioStartTime = audioContext.currentTime;
     totalSamplesSent = 0;
-    initAudioOptimizer(audioContext);
+    if (local('core_audio') === 'sync') {initAudioOptimizer(audioContext);}
 }
 // ===== writeAudio =====
 function writeAudio(pointer, frames) {
@@ -61,7 +61,8 @@ function writeAudio(pointer, frames) {
         Atomics.store(sabViewIndices, 0, (writeIndex + count) & sabMask);
         totalSamplesSent += count;
         const isGating = (totalSamplesSent < audioBurstLimit) || (window._turbo > 1.0);
-        audioGainNode.gain.setTargetAtTime(isGating ? 0 : 1, audioContext.currentTime, isGating ? 0.001 : 0.01);
+        const isMuted = String(local('core_audio')).endsWith('_mute');
+        audioGainNode.gain.setTargetAtTime(isMuted ? 0 : (isGating ? 0 : 1), audioContext.currentTime, isGating ? 0.001 : 0.01);
     }
     return frames;
 }

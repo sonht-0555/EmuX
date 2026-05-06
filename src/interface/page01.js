@@ -106,20 +106,35 @@ async function verticalSetting(values) {
     local('vertical', current);
     current = (current + 1) % list.length;
 }
-const optionStyle = (selector, value) => {
+// ===== optionState & optionStyle =====
+const optionState = {};
+const clearOptionMarks = selector => {
     document.querySelectorAll(selector).forEach(el => {
-        let text = el.textContent.trim().replace(/_$/, '');
-        el.textContent = text.toLowerCase() === (value || '').toLowerCase() ? text + '_' : text;
+        el.textContent = el.textContent.trim().replace(/_$/, '');
     });
+};
+const optionStyle = (selector, value, group = 'default') => {
+    const next = (value || '').toLowerCase();
+    const prev = optionState[group];
+    document.querySelectorAll(selector).forEach(el => {
+        const text = el.textContent.trim().replace(/_$/, '');
+        const key = text.toLowerCase();
+        if (key !== prev && key !== next) return;
+        el.textContent = key === next ? text + '_' : text;
+    });
+    optionState[group] = next;
 };
 // ===== optionClick =====
 const optionClick = text => ({
     'Cloud': () => {const api = prompt("Enter API key"); local('gemini_key', api);},
     'Restore': () => cloudRestore(),
     'Backup': () => cloudBackup(),
-    'Lated': () => {local('core_repo', 'lated'); optionStyle('opti', 'lated');},
-    'Stable': () => {local('core_repo', 'stable'); optionStyle('opti', 'stable');},
-    'Test': () => {local('core_repo', 'test'); optionStyle('opti', 'test');},
+    'Lated': () => {local('core_repo', 'lated'); optionStyle('opti', 'lated', 'repo');},
+    'Stable': () => {local('core_repo', 'stable'); optionStyle('opti', 'stable', 'repo');},
+    'Test': () => {local('core_repo', 'test'); optionStyle('opti', 'test', 'repo');},
+    'Sync': () => {local('core_audio', 'sync'); optionStyle('opti', 'sync', 'audio');},
+    'Async': () => {local('core_audio', 'async'); optionStyle('opti', 'async', 'audio');},
+    'Mute': () => {setMute(); optionStyle('opti', 'mute', 'audio');},
 }[text]?.());
 // ===== Event Listeners =====
 document.addEventListener("DOMContentLoaded", () => {
@@ -137,7 +152,10 @@ document.addEventListener("DOMContentLoaded", () => {
     switch0.textContent = local('render') || 'WGPU';
     setTimeout(() => {
         listGame(); verticalSetting(); initStore();
-        optionStyle('opti', local('core_repo') || 'lated');
+        clearOptionMarks('opti');
+        optionStyle('opti', local('core_repo') || 'lated', 'repo');
+        const audioMode = (local('core_audio') || 'sync');
+        optionStyle('opti', audioMode.endsWith('_mute') ? 'mute' : audioMode, 'audio');
     }, 2000);
     romInput.onchange = event => inputGame(event);
     logo.onpointerdown = () => view('home');
