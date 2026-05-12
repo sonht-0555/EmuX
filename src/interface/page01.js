@@ -91,7 +91,17 @@ async function listGame() {
     const searchInput = document.getElementById('romsearch');
     searchInput.onfocus = () => list.classList.add('searching');
     searchInput.onblur = () => list.classList.remove('searching');
-    searchInput.oninput = event => render(event.target.value);
+    searchInput.oninput = event => {
+        const query = event.target.value.trim();
+        if (query) {
+            logo.setAttribute('base', 'ba');
+            logo.innerText = 'ck';
+        } else {
+            logo.setAttribute('base', 'em');
+            logo.innerText = 'ux';
+        }
+        render(event.target.value);
+    };
     render("");
 }
 // ===== verticalSetting =====

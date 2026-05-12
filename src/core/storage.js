@@ -93,48 +93,60 @@ async function listStore(storeName) {
     }
     return getKeys(storeName);
 }
+// ===== forEachRelated =====
+async function forEachRelated(name, callback) {
+    const store = storeForFilename(name);
+    if (store !== 'games') {
+        await callback(store, name, "");
+        return;
+    }
+    for (const s of getAllStoreNames()) {
+        const keys = await listStore(s);
+        for (const k of keys.filter(k => k === name || k.startsWith(name + "."))) {
+            await callback(s, k, k.slice(name.length));
+        }
+    }
+}
 // ===== deleteFromStore =====
 async function deleteFromStore(key) {
-    const db = await getDB(), store = storeForFilename(String(key));
-
-    if (store === 'games') {
-        let order = JSON.parse(localStorage.getItem('emux_order') || '[]');
-        localStorage.setItem('emux_order', JSON.stringify(order.filter(k => k !== key)));
-    }
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction(store, 'readwrite'), objectStore = transaction.objectStore(store);
-        objectStore.delete(key);
-        transaction.oncomplete = () => resolve(true);
-        transaction.onerror = event => reject(event);
+    await forEachRelated(key, async (s, k) => {
+        if (s === 'games') {
+            let order = JSON.parse(localStorage.getItem('emux_order') || '[]');
+            localStorage.setItem('emux_order', JSON.stringify(order.filter(i => i !== k)));
+        }
+        const db = await getDB();
+        await new Promise((res, rej) => {
+            const tx = db.transaction(s, 'readwrite');
+            tx.objectStore(s).delete(k);
+            tx.oncomplete = res; tx.onerror = rej;
+        });
     });
+    return true;
 }
 // ===== renameFromStore =====
 async function renameFromStore(oldName, newName) {
     if (!oldName || !newName || oldName === newName) return false;
-    const oldBase = oldName.includes('.') ? oldName.substring(0, oldName.lastIndexOf('.')) : oldName;
-    const newBase = newName.includes('.') ? newName.substring(0, newName.lastIndexOf('.')) : newName;
-    const stores = getAllStoreNames();
-    for (const store of stores) {
-        const keys = await listStore(store);
-        const targets = keys.filter(k => k === oldBase || k.startsWith(oldBase + "."));
-        for (const key of targets) {
-            const suffix = key.slice(oldBase.length), targetKey = newBase + suffix;
-            if (store === 'games') {
-                let order = JSON.parse(localStorage.getItem('emux_order') || '[]');
-                const idx = order.indexOf(key);
-                if (idx !== -1) {
-                    order[idx] = targetKey;
-                    localStorage.setItem('emux_order', JSON.stringify(order));
-                }
-            }
-
-            const data = await emuxDB(key);
-            if (data) {
-                await emuxDB(data, targetKey);
-                await deleteFromStore(key);
+    await forEachRelated(oldName, async (s, k, suffix) => {
+        const targetKey = newName + suffix;
+        if (s === 'games') {
+            let order = JSON.parse(localStorage.getItem('emux_order') || '[]');
+            const idx = order.indexOf(k);
+            if (idx !== -1) {
+                order[idx] = targetKey;
+                localStorage.setItem('emux_order', JSON.stringify(order));
             }
         }
-    }
+        const data = await emuxDB(k);
+        if (data) {
+            await emuxDB(data, targetKey);
+            const db = await getDB();
+            await new Promise((res, rej) => {
+                const tx = db.transaction(s, 'readwrite');
+                tx.objectStore(s).delete(k);
+                tx.oncomplete = res; tx.onerror = rej;
+            });
+        }
+    });
     return true;
 }
 // ===== downloadFromStore =====
@@ -150,6 +162,11 @@ async function initStore() {
     try {
         const response = await fetch(apiEndpoint);
         const data = await response.json();
-        storeList = data.tree.filter(item => item.type === 'blob');
+        const validExtensions = STORES.games;
+        storeList = data.tree.filter(item => {
+            if (item.type !== 'blob') return false;
+            const ext = item.path.split('.').pop()?.toLowerCase();
+            return validExtensions.includes(ext);
+        });
     } catch (e) { }
 }
