@@ -145,6 +145,14 @@ const optionClick = text => ({
     'Sync': () => {local('core_audio', 'sync'); optionStyle('opti', 'sync', 'audio');},
     'Async': () => {local('core_audio', 'async'); optionStyle('opti', 'async', 'audio');},
     'Mute': () => {setMute(); optionStyle('opti', 'mute', 'audio');},
+    'Add Oklch...': () => {
+        const defaultTheme = 'oklch(0.7649 0.0494 76.31)', theme = prompt("Enter Oklch", local('core_theme') || defaultTheme);
+        if (theme !== null) {
+            const finalTheme = theme.trim() || defaultTheme;
+            local('core_theme', finalTheme);
+            document.documentElement.style.setProperty('--profile-base', finalTheme);
+        }
+    },
 }[text]?.());
 // ===== Event Listeners =====
 document.addEventListener("DOMContentLoaded", () => {

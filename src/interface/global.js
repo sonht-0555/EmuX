@@ -87,6 +87,7 @@ async function gameView(name) {
 window.addEventListener("resize", () => gameView(gameName));
 // ===== Event Listeners =====
 document.addEventListener("DOMContentLoaded", () => {
+    document.documentElement.style.setProperty('--profile-base', local('core_theme') || 'oklch(0.7649 0.0494 76.31)');
     body.removeAttribute('hide');
     [page00, page02].forEach(el => el.ontouchstart = el.ontouchmove = el.oncontextmenu = e => e.preventDefault());
     canvasBottom = document.getElementById("canvas-bottom");
