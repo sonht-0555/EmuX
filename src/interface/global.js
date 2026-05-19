@@ -84,7 +84,7 @@ async function gameView(name) {
     const patternSize = (integer <= 4 || integer % 2 !== 0) ? integer : (integer / 2);
     screen.style.setProperty("--shader", generateSvgPattern(integer / patternSize, patternSize, local(`shader0${local("shader")}`) || patternSize));
 }
-window.addEventListener("resize", () => gameView(gameName));
+window.addEventListener("resize", () => gameName?.endsWith('.pdf') || gameView(gameName));
 // ===== Event Listeners =====
 document.addEventListener("DOMContentLoaded", () => {
     document.documentElement.style.setProperty('--profile-base', local('core_theme') || 'oklch(0.7649 0.0494 76.31)');

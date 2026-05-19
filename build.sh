@@ -9,7 +9,7 @@ mkdir -p "$OUT_DIR"
 EXCLUDE_ARGS=""
 for item in "${EXCLUDE_LIST[@]}"; do EXCLUDE_ARGS="$EXCLUDE_ARGS --exclude=$item"; done
 rsync -av $EXCLUDE_ARGS ./ "$OUT_DIR/"
-find "$OUT_DIR" -type f -name "*.js" | while read -r file; do
+find "$OUT_DIR" -type f -name "*.js" ! -path "*/src/utils/*" | while read -r file; do
     sed -i '' -E 's/([^:])\/\/.*$/\1/g' "$file"
     sed -i '' -E 's/^\/\/.*$//g' "$file"
     tr -d '\n\r' < "$file" | sed 's/[[:space:]]\{2,\}/ /g' > "$file.tmp"

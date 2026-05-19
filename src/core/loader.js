@@ -45,6 +45,7 @@ window.CORE_CONFIG = [
     {tag: 'mini', ext: '.min', script: 'pokemini.zip', btns: {'btn-1': ['A', 8], 'btn-3': ['B', 0], 'btn-l': [' bc.', 1], 'btn-r': [' br.', 2], 'btn-select': [' sc.', ''], 'btn-start': [' st.', 3]}},
     {tag: 'lynx', ext: '.lnx', script: 'lynx.zip', btns: {'btn-1': ['A', 0], 'btn-3': ['B', 8], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/lynxboot.img']},
     {tag: 'pico', ext: '.p8.png,.p8,.png', id: 'pico8', script: './src/core/pico8.js', btns: {'btn-1': ['O', 8], 'btn-3': ['X', 9], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', ''], 'btn-start': [' st.', 3]}},
+    {tag: 'cbz', ext: '.cbz', id: 'cbz', script: './src/core/cbz.js', btns: {'btn-1': ['O', ''], 'btn-3': ['X', ''], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', ''], 'btn-start': [' st.', '']}}
 ];
 var isRunning = false, isConfig;
 // ===== initCore ====
@@ -57,6 +58,7 @@ async function initCore(romFile) {
     local('tags_' + romFile.name, config.tag || config.script.split('.')[0]);
     // Pico8
     if (config.id === 'pico8') return pico8(config, finalRomName, rawData);
+    if (config.id === 'cbz') return cbz(config, finalRomName, rawData);
     rawData = null;
     const coreFetch = fetch(getCoreUrl(config.script)).then(response => response.ok ? response.arrayBuffer() : null);
     const biosFetches = config.bios ? config.bios.map(url => fetch(url).then(response => response.ok ? response.arrayBuffer() : null).catch(() => null)) : [];

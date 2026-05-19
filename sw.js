@@ -1,4 +1,4 @@
-let revision = 'EmuX_8.18';
+let revision = 'EmuX_9.18';
 // git add . && git commit --amend --no-edit && git push -f && clear
 // git reset --hard xxxxxxx && git push -f && clear
 // git add .github/workflows/build-pico.yml && git commit --amend --no-edit && git push -f && clear
@@ -15,6 +15,7 @@ var urlsToCache = [
     './src/core/audio.js',
     './src/core/video.js',
     './src/core/pico8.js',
+    './src/core/cbz.js',
     './src/core/video/w2d.js',
     './src/core/video/wgl.js',
     './src/core/video/wgpu.js',
@@ -75,10 +76,12 @@ function addHeaders(response, url) {
     newHeaders.set("Cross-Origin-Embedder-Policy", "require-corp");
     newHeaders.set("Cross-Origin-Opener-Policy", "same-origin");
     newHeaders.set("Cross-Origin-Resource-Policy", "cross-origin");
-    return new Response(response.body, {
-        status: response.status,
-        statusText: response.statusText,
-        headers: newHeaders,
+    return response.blob().then(blob => {
+        return new Response(blob, {
+            status: response.status,
+            statusText: response.statusText,
+            headers: newHeaders,
+        });
     });
 }
 self.addEventListener('activate', function (event) {

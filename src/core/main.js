@@ -47,7 +47,7 @@ async function loadGame(name) {
 }
 // ===== saveState =====
 async function saveState(slot = 1) {
-    if (!isRunning || isConfig.id === 'pico8') return;
+    if (!isRunning || isConfig.id === 'pico8' || isConfig.id === 'cbz') return;
     const size = Module?._retro_get_memory_size?.(0) || 0, pointer = Module?._retro_get_memory_data?.(0) || 0;
     if (size > 0 && pointer > 0) {
         const bytes = new Uint8Array(Module.HEAPU8.buffer, pointer, size).slice();
@@ -63,7 +63,7 @@ async function saveState(slot = 1) {
 }
 // ===== loadState =====
 async function loadState(slot = 1) {
-    if (!isRunning || isConfig.id === 'pico8') return;
+    if (!isRunning || isConfig.id === 'pico8' || isConfig.id === 'cbz') return;
     const data = await emuxDB(`${gameName}.sav`);
     if (data) {
         const bytes = data instanceof Uint8Array ? data : new Uint8Array(data), size = Module?._retro_get_memory_size?.(0) || 0, ptr = Module?._retro_get_memory_data?.(0) || 0, len = Math.min(size, bytes.length);
@@ -100,12 +100,14 @@ async function timer(isStart) {
 }
 // ===== resumeGame =====
 async function resumeGame() {
+    if (isConfig.id === 'pico8' || isConfig.id === 'cbz') return;
     if (audioContext.state !== 'running') audioContext.resume();
     window.gameLoop?.(true);
     timer(true); message("#resume_");
 }
 // ===== pauseGame =====
 async function pauseGame() {
+    if (isConfig.id === 'pico8' || isConfig.id === 'cbz') return;
     saveState();
     window.gameLoop?.(false);
     timer(false); message("#pause_");
@@ -179,4 +181,20 @@ function setMute(toggle) {
         local('core_audio', current + '_mute');
         message("#muted");
     }
+}
+// ===== DOCs =====
+async function doc(config, romName, raw) {
+    if (!window.docCore) await import(new URL(config.script, window.location.href).href);
+    updateButtons(config.btns);
+    await delay(200);
+    return window.docCore(config, romName, raw);
+}
+// ===== CBZ =====
+async function cbz(config, romName, raw) {
+    if (!window.extractCBZ) await import(new URL(config.script, window.location.href).href);
+    await showNotification("", "#", "--", "", true);
+    await showNotification("", "##", "-", "", true);
+    await showNotification("", "###", "", "", true);
+    const images = window.extractCBZ(raw, romName);
+    return images;
 }
