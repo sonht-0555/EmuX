@@ -275,12 +275,13 @@
         height: var(--height);
         transform: scale(var(--scale));
       }
-      screen img {
-        width: 100%;
-        position: absolute;
-        top: 0;
-        left: 0;
-        filter: url(#manga-sharpen) brightness(1) contrast(1.2) saturate(0.8) sepia(0.2) grayscale(0);
+      manga {
+        display: flex;
+        gap: 4px;
+        transition: transform 0.5s ease;
+      }
+      manga img {
+        min-width: 100%;
       }
       canvas {
         width: 100%;
