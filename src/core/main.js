@@ -182,19 +182,10 @@ function setMute(toggle) {
         message("#muted");
     }
 }
-// ===== DOCs =====
-async function doc(config, romName, raw) {
-    if (!window.docCore) await import(new URL(config.script, window.location.href).href);
-    updateButtons(config.btns);
-    await delay(200);
-    return window.docCore(config, romName, raw);
-}
 // ===== CBZ =====
 async function cbz(config, romName, raw) {
     if (!window.extractCBZ) await import(new URL(config.script, window.location.href).href);
     await showNotification("", "#", "--", "", true);
-    await showNotification("", "##", "-", "", true);
-    await showNotification("", "###", "", "", true);
     const images = window.extractCBZ(raw, romName);
     return images;
 }
