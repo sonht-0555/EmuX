@@ -108,7 +108,7 @@ async function listGame() {
 async function verticalSetting(values) {
     const list = Array.isArray(values) ? values : [80, 160, 0];
     if (current >= list.length) current = 0;
-    page02.style.paddingTop = `${list[current]}px`;
+    page02.style.paddingTop = `calc(env(safe-area-inset-top) + ${list[current]}px)`;
     list.forEach((value, index) => {
         const el = document.getElementById(`k${value}`);
         if (el) el.style.stroke = index === current ? "var(--profile-base)" : "var(--profile-3)";

@@ -6,11 +6,13 @@ async function extractCBZ(arrayBuffer, romName) {
     const files = fflate.unzipSync(new Uint8Array(arrayBuffer));
     const names = Object.keys(files).filter(n => imgExts.test(n) && files[n].length > 0).sort();
     const urls = names.map(name => URL.createObjectURL(new Blob([files[name]])));
+    const level = (romName.replace(/\.[^.]+$/, '')[2] || '').toLowerCase();
     let page = Number(localStorage.getItem(`page_${romName}`)) || 0, isInitialScroll = true;
-    screen.innerHTML = '';
+    screen.innerHTML = ''; body.classList.add(`manga-${level}`);
     const manga = document.createElement('manga');
     manga.innerHTML = urls.map(u => `<img src="${u}" loading="lazy">`).join('');
-    screen.appendChild(manga);
+    const one = document.createElement('one'), two = document.createElement('two'), num = document.createElement('num');
+    screen.append(num, one, two, manga);
     const restoreScroll = () => {if (page > 0 && manga.scrollHeight > manga.clientHeight) manga.scrollTop = page * (manga.scrollHeight - manga.clientHeight);};
     page02.hidden = false;
     await showNotification("", "###", "", "", true);
@@ -23,7 +25,7 @@ async function extractCBZ(arrayBuffer, romName) {
     manga.onscroll = () => {
         if (isInitialScroll) return;
         const total = manga.scrollHeight - manga.clientHeight;
-        if (total > 0) {const isAtEnd = manga.scrollTop >= total; page = isAtEnd ? 0 : manga.scrollTop / total; localStorage.setItem(`page_${romName}`, page);}
+        setTimeout(() => {num.innerHTML = `${Math.round((manga.scrollTop / total) * (urls.length - 1)) + 1}|${urls.length}`;}, 2000);
     };
     manga.ontouchstart = manga.ontouchmove = e => e.stopPropagation();
 }

@@ -67,6 +67,10 @@
   body::after, page00::after, title1::after, log::after {
     background-image: var(--background);
   }
+  body::after {
+    width: 100vw;
+    height: 100vh;
+  }
 }
 @layer base {
   page00,
@@ -78,7 +82,8 @@
   }
   page00, page01, page02 {
     position: absolute;
-    height: 100%;
+    padding-top: env(safe-area-inset-top);
+    height: 100vh;
   }
   rom, file, logo, setting, vertical, label, opti, btn-state, btn-l, btn-r, btn-menu, btn-1, btn-3, btn-2, btn-4, btn-select, btn-start, dpad svg {
     background-color: var(--profile-5);
@@ -277,10 +282,35 @@
       }
       manga {
         display: flex;
+        position: absolute;
         flex-direction: column;
         height: 100vh;
         overflow-y: auto;
         gap: 4px;
+        scrollbar-color: rgba(160, 160, 160, 0.24) rgba(160, 160, 160, 0);
+        top: 10px;
+      }
+      one, two, num {
+        width: 100vw;
+        position: absolute;
+        top: 10px;
+        left: 0;
+        z-index: 1;
+        background-color: var(--profile-black);
+        opacity: 0.6;
+      }
+      one {
+        height: 8px;
+      }
+      two {
+        height: 4px;
+      }
+      num {
+        opacity: 1;
+        height: 10px;
+        top: 0px;
+        padding-left: 4px;
+        text-align: left;
       }
       manga img {
         width: 100vw;
@@ -452,7 +482,7 @@
 }
 @layer other {
   .cbz-open page02 {
-    padding-top: 10px;
+    padding-top: env(safe-area-inset-top) !important;
   }
   .cbz-open canvas {
     image-rendering: auto;
@@ -463,5 +493,14 @@
   }
   .cbz-open screen {
     z-index: 0;
+  }
+  .manga-a manga img {
+    filter: url(#manga-sharpen) contrast(1.10) brightness(0.94) saturate(0.85) sepia(0.15);
+  }
+  .manga-b manga img {
+    filter: url(#manga-sharpen) contrast(1.15) brightness(0.93) saturate(0.75) sepia(0.25);
+  }
+  .manga-c manga img {
+    filter: url(#manga-sharpen) contrast(1.18) brightness(0.91) saturate(0.65) sepia(0.30);
   }
 }
