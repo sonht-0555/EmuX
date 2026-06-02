@@ -1,18 +1,34 @@
 // ===== view (Navigation Manager) =====
+let libraryMode = local('library_mode') === 'cbz' ? 'cbz' : 'home';
+
 function view(name) {
+    if (name === 'home' || name === 'cbz') {
+        libraryMode = name;
+        local('library_mode', name);
+    }
     const isHome = name === 'home';
-    list.hidden = !isHome;
+    const isCbz = name === 'cbz';
+    const isLibrary = isHome || isCbz;
+    list.hidden = !isLibrary;
     list01.hidden = name !== 'details';
     list02.hidden = name !== 'settings';
-    logo.setAttribute('base', isHome ? 'em' : 'ba');
-    logo.innerText = isHome ? 'ux' : 'ck';
-    if (isHome) listGame();
+    logo.setAttribute('base', isHome ? 'em' : isCbz ? 'in' : 'ba');
+    logo.innerText = isHome ? 'ux' : isCbz ? 'kx' : 'ck';
+    if (isLibrary) listGame();
 }
 // ===== showFileGroups =====
 async function showFileGroups(gameName) {
-    const titles = ["saves", "states", "games"], results = await Promise.all(titles.map(type => listStore(type)));
-    const fileGroups = titles.map((title, index) => ({title, files: results[index].filter(file => file === gameName || file.startsWith(gameName + "."))}));
-    list01.innerHTML = fileGroups.map(group => group.files.length ? group.files.map(file => `<file data="${group.title}"><name>${file}</name><down></down><dele></dele></file>`).join('') + `<titl>${group.title}.</titl>` : '').join('');
+    const isCbzMode = libraryMode === 'cbz';
+    const stores = isCbzMode ? ["games"] : ["saves", "states", "games"];
+    const results = await Promise.all(stores.map(type => listStore(type)));
+    const fileGroups = stores.map((store, index) => ({
+        store,
+        title: isCbzMode ? 'books' : store,
+        files: results[index].filter(file => isCbzMode
+            ? file.toLowerCase() === `${gameName}.cbz`.toLowerCase()
+            : file === gameName || file.startsWith(gameName + ".")),
+    }));
+    list01.innerHTML = fileGroups.map(group => group.files.length ? group.files.map(file => `<file data="${group.store}"><name>${file}</name><down></down><dele></dele></file>`).join('') + `<titl>${group.title}.</titl>` : '').join('');
     list01.querySelectorAll('down').forEach(button => button.onclick = async () => {
         const name = button.parentElement.querySelector('name').textContent;
         if (confirm(`Download this file? ${name}`)) {await downloadFromStore(name); showFileGroups(gameName);}
@@ -31,8 +47,10 @@ async function showFileGroups(gameName) {
 }
 // ===== listGame =====
 async function listGame() {
-    const localGames = await listStore('games');
-    list.innerHTML = `
+    const isCbzMode = libraryMode === 'cbz';
+    const matchesMode = path => path.toLowerCase().endsWith('.cbz') === isCbzMode;
+    const localGames = (await listStore('games')).filter(matchesMode);
+    list.innerHTML = isCbzMode ? '' : `
         <rom class="info" style="flex-shrink:0; padding: 17px;">
             <input id="romsearch" placeholder="find games_" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
         </rom>
@@ -42,7 +60,7 @@ async function listGame() {
         const query = searchQuery.toLowerCase().trim();
         const maxItems = Math.floor((list.clientHeight - 80) / 40);
         const items = query ? storeList
-            .filter(item => item.path.toLowerCase().includes(query))
+            .filter(item => matchesMode(item.path) && item.path.toLowerCase().includes(query))
             .sort((a, b) => {
                 const pathA = a.path.toLowerCase(), pathB = b.path.toLowerCase();
                 const indexA = pathA.indexOf(query), indexB = pathB.indexOf(query);
@@ -53,9 +71,9 @@ async function listGame() {
 
         const supportedExtensions = window.CORE_CONFIG?.flatMap(config => config.ext?.split(',').map(ext => ext.trim())).sort((a, b) => b.length - a.length) || [];
 
-        while (list.children.length > 1) list.removeChild(list.lastChild);
+        while (list.children.length > (isCbzMode ? 0 : 1)) list.removeChild(list.lastChild);
 
-        const html = items.map(item => {
+        const html = (isCbzMode ? `<rom data-link="./src/utils/wsg/klotski.html"><name>Klotski</name><tag>_game</tag></rom>` : '') + items.map(item => {
             const isLocal = typeof item === 'string', path = isLocal ? item : item.path;
             const fileExtension = supportedExtensions.find(extension => path.toLowerCase().endsWith(extension.toLowerCase())) || ('.' + path.split('.').pop().toLowerCase());
             const fileName = path.split('/').pop();
@@ -67,9 +85,11 @@ async function listGame() {
 
         list.insertAdjacentHTML('beforeend', html);
 
-        Array.from(list.children).slice(1).forEach(romElement => {
-            const fullName = romElement.getAttribute('data-full'), url = romElement.getAttribute('data-url'), displayName = romElement.querySelector('name').textContent;
-            if (fullName) {
+        Array.from(list.children).slice(isCbzMode ? 0 : 1).forEach(romElement => {
+            const link = romElement.getAttribute('data-link'), fullName = romElement.getAttribute('data-full'), url = romElement.getAttribute('data-url'), displayName = romElement.querySelector('name').textContent;
+            if (link) {
+                romElement.onclick = () => window.location.href = link;
+            } else if (fullName) {
                 romElement.querySelectorAll('name, tag').forEach(element => element.onclick = () => loadGame(fullName));
                 romElement.querySelector('dot').onclick = () => {showFileGroups(displayName); view('details');};
             } else romElement.onclick = async () => {
@@ -89,26 +109,28 @@ async function listGame() {
         });
     };
     const searchInput = document.getElementById('romsearch');
-    searchInput.onfocus = () => list.classList.add('searching');
-    searchInput.onblur = () => list.classList.remove('searching');
-    searchInput.oninput = event => {
-        const query = event.target.value.trim();
-        if (query) {
-            logo.setAttribute('base', 'ba');
-            logo.innerText = 'ck';
-        } else {
-            logo.setAttribute('base', 'em');
-            logo.innerText = 'ux';
-        }
-        render(event.target.value);
-    };
+    if (searchInput) {
+        searchInput.onfocus = () => list.classList.add('searching');
+        searchInput.onblur = () => list.classList.remove('searching');
+        searchInput.oninput = event => {
+            const query = event.target.value.trim();
+            if (query) {
+                logo.setAttribute('base', 'ba');
+                logo.innerText = 'ck';
+            } else {
+                logo.setAttribute('base', 'em');
+                logo.innerText = 'ux';
+            }
+            render(event.target.value);
+        };
+    }
     render("");
 }
 // ===== verticalSetting =====
 async function verticalSetting(values) {
     const list = Array.isArray(values) ? values : [80, 160, 0];
     if (current >= list.length) current = 0;
-    page02.style.paddingTop = `${list[current]}px`;
+    page02.style.paddingTop = `calc(env(safe-area-inset-top) + ${list[current]}px)`;
     list.forEach((value, index) => {
         const el = document.getElementById(`k${value}`);
         if (el) el.style.stroke = index === current ? "var(--profile-base)" : "var(--profile-3)";
@@ -169,14 +191,17 @@ document.addEventListener("DOMContentLoaded", () => {
     fetch('./sw.js').then(r => r.text()).then(t => ver.textContent = t.match(/revision = '(.*?)'/)[1]);
     switch0.textContent = local('render') || 'WGPU';
     setTimeout(() => {
-        listGame(); verticalSetting(); initStore();
+        view(libraryMode); verticalSetting(); initStore();
         clearOptionMarks('opti');
         optionStyle('opti', local('core_repo') || 'lated', 'repo');
         const audioMode = (local('core_audio') || 'sync');
         optionStyle('opti', audioMode.endsWith('_mute') ? 'mute' : audioMode, 'audio');
     }, 2000);
     romInput.onchange = event => inputGame(event);
-    logo.onpointerdown = () => view('home');
+    logo.onpointerdown = () => click(() => view(libraryMode),
+        () => {
+            view(libraryMode === 'cbz' ? 'home' : 'cbz');
+        });
     vertical.onpointerdown = () => verticalSetting();
     setting.onpointerdown = () => view(list02.hidden ? 'settings' : 'home');
     document.querySelectorAll('opti').forEach(element => element.onclick = () => optionClick(element.textContent.trim()));

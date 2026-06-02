@@ -5,6 +5,10 @@
     padding: 0;
   }
   @font-face {
+    font-family: "afacad";
+    src: url("../font/afacad.ttf");
+  }
+  @font-face {
     font-family: "04bf";
     src: url("../font/04bf.woff");
   }
@@ -38,7 +42,7 @@
     --profile-4: oklch(from var(--profile-base) l c h / 0.20);
     --profile-5: oklch(from var(--profile-base) l c h / 0.04);
   }
-  body::after, page00::after, screen::after, title1::after, log::after {
+  body::after, page00::after, screen::after, title1::after, log::after, dimg::after {
     content: "";
     position: absolute;
     top: 0;
@@ -64,8 +68,12 @@
     overflow: hidden;
     padding: 0;
   }
-  body::after, page00::after, title1::after, log::after {
+  body::after, page00::after, title1::after, log::after, dimg::after {
     background-image: var(--background);
+  }
+  body::after {
+    width: 100vw;
+    height: 100vh;
   }
 }
 @layer base {
@@ -78,7 +86,8 @@
   }
   page00, page01, page02 {
     position: absolute;
-    height: 100%;
+    padding-top: env(safe-area-inset-top);
+    height: 100vh;
   }
   rom, file, logo, setting, vertical, label, opti, btn-state, btn-l, btn-r, btn-menu, btn-1, btn-3, btn-2, btn-4, btn-select, btn-start, dpad svg {
     background-color: var(--profile-5);
@@ -111,6 +120,88 @@
     position: absolute;
     bottom: 0;
     z-index: 5;
+  }
+  .trans-wrap {
+    font-family: "afacad";
+    color: var(--profile-base);
+    font-size: 11px;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100vw;
+    pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  .t-header {
+    height: 16px;
+    position: relative;
+    background: linear-gradient(to top, var(--profile-black) 8px, transparent 8px);
+  }
+  .t-header::before, .t-header::after {
+    content: '';
+    position: absolute;
+    bottom: 8px;
+    left: 0;
+    width: 100%;
+    background-color: var(--profile-black);
+    opacity: 0.6;
+  }
+  .t-header::before {
+    height: 8px;
+  }
+  .t-header::after {
+    height: 4px;
+  }
+  .t-header .t-header-overlay {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 16px;
+    z-index: 1;
+    pointer-events: none;
+    /*background-image: var(--background);
+    background-size: 1px;
+    mix-blend-mode: overlay;*/
+  }
+  .t-footer {
+    height: 20px;
+    background: var(--profile-black);
+  }
+  trans {
+    background: var(--profile-black);
+    padding: 0px 8px;
+    max-height: 135px;
+    box-sizing: border-box;
+    overflow-y: auto;
+    border-top: 1px solid rgba(0, 0, 0, 0);
+    text-align: left;
+    width: 100%;
+    line-height: 15px;
+    scroll-snap-type: y mandatory;
+    scrollbar-width: none;
+  }
+  trans .t-row {
+    display: flex;
+    gap: 8px;
+    scroll-snap-align: start;
+  }
+  trans .t-name {
+    color: var(--profile-2);
+    min-width: 50px;
+  }
+  trans .t-text {
+    color: var(--profile-base);
+    flex: 1;
+  }
+  trans line {
+    display: block;
+    height: 1px;
+    background-color: var(--profile-4);
+    margin: 7px 0;
+    scroll-margin-top: 7px;
+    scroll-snap-align: start;
+    opacity: 0.6;
   }
 }
 @layer page-0 {
@@ -277,18 +368,78 @@
       }
       manga {
         display: flex;
+        position: absolute;
         flex-direction: column;
         height: 100vh;
         overflow-y: auto;
-        gap: 4px;
+        row-gap: 4px;
+        scrollbar-color: rgba(160, 160, 160, 0.24) rgba(160, 160, 160, 0);
+        top: 10px;
+        column-gap: 1px;
+      }
+      num {
+        width: 100vw;
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 1;
+        background-color: var(--profile-black);
+        height: 10px;
+        padding-left: 4px;
+        text-align: left;
+      }
+      num::before, num::after {
+        content: '';
+        position: absolute;
+        top: 100%;
+        left: 0;
+        width: 100%;
+        background-color: var(--profile-black);
+        opacity: 0.6;
+        z-index: 0;
+      }
+      num::before {
+        height: 8px;
+      }
+      num::after {
+        height: 4px;
+      }
+      num .num-text {
+        position: relative;
+        z-index: 1;
+      }
+      num .num-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 10px;
+        z-index: 2;
+        pointer-events: none;
+        background-image: var(--background);
+        background-size: 1px;
+        mix-blend-mode: overlay;
       }
       manga img {
         width: 100vw;
         height: auto;
-        filter: url(#manga-sharpen) contrast(110%) saturate(80%) sepia(20%);
+        filter: url(#manga-sharp-lv1) contrast(110%) saturate(80%) sepia(20%);
         transition: filter 0.5s ease;
         will-change: filter;
         transform: translateZ(0);
+        background-color: white;
+      }
+      manga.double {
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: stretch;
+        align-content: flex-start;
+      }
+      manga.double img {
+        width: calc(50vw - 0.5px);
+        background-color: white;
+        object-fit: contain;
+        object-position: top;
       }
       canvas {
         width: 100%;
@@ -452,7 +603,7 @@
 }
 @layer other {
   .cbz-open page02 {
-    padding-top: 10px;
+    padding-top: env(safe-area-inset-top) !important;
   }
   .cbz-open canvas {
     image-rendering: auto;
@@ -461,7 +612,76 @@
   .cbz-open screen {
     width: 100vw;
   }
-  .cbz-open screen {
-    z-index: 0;
+  dimg {
+    position: relative;
+  }
+  .manga-1 manga img,
+  .manga-2 manga img,
+  .manga-3 manga img,
+  .manga-4 manga img,
+  .manga-5 manga img {
+    filter: url(#manga-sharp-lv1) contrast(calc(1.20 + (var(--manga-step) * 0.05))) brightness(calc(1 - (var(--manga-step) * 0.01))) saturate(calc(0.80 - (var(--manga-step) * 0.10))) sepia(0.10);
+  }
+  .manga-1 manga img {
+    --manga-step: 1;
+  }
+  .manga-2 manga img {
+    --manga-step: 2;
+  }
+  .manga-3 manga img {
+    --manga-step: 3;
+  }
+  .manga-4 manga img {
+    --manga-step: 4;
+  }
+  .manga-5 manga img {
+    --manga-step: 5;
+  }
+  .manga-6 manga img {
+    filter: url(#manga-sharp-lv2) contrast(1.20) saturate(0.80) sepia(0.1);
+  }
+  .manga-7 manga img {
+    filter: url(#manga-sharp-lv3) contrast(1.20) saturate(0.80) sepia(0.1);
+  }
+  .manga-8 manga img {
+    filter: url(#manga-bold-ink) contrast(1.20) saturate(0.80) sepia(0.1);
+  }
+  .manga-9 manga img {
+    filter: url(#manga-denoise-sharp) contrast(1.20) saturate(0.80) sepia(0.1);
+  }
+  .manga-S0 dimg::after {
+    background: none;
+  }
+  .manga-S1 dimg::after {
+    background: url("data:image/svg+xml,%3Csvg width='2' height='2' viewBox='0 0 2 2' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0.666992 2H0.333008V1.66699H0.666992V2ZM1.33301 2H1V1.66699H1.33301V2ZM2 2H1.66699V1.66699H2V2ZM0.333008 1.66699H0V1.33301H0.333008V1.66699ZM1 1.66699H0.666992V1.33301H1V1.66699ZM1.66699 1.66699H1.33301V1.33301H1.66699V1.66699ZM0.666992 1.33301H0.333008V1H0.666992V1.33301ZM1.33301 1.33301H1V1H1.33301V1.33301ZM2 1.33301H1.66699V1H2V1.33301ZM0.333008 1H0V0.666992H0.333008V1ZM1 1H0.666992V0.666992H1V1ZM1.66699 1H1.33301V0.666992H1.66699V1ZM0.666992 0.666992H0.333008V0.333008H0.666992V0.666992ZM1.33301 0.666992H1V0.333008H1.33301V0.666992ZM2 0.666992H1.66699V0.333008H2V0.666992ZM0.333008 0.333008H0V0H0.333008V0.333008ZM1 0.333008H0.666992V0H1V0.333008ZM1.66699 0.333008H1.33301V0H1.66699V0.333008Z' fill='black'/%3E%3C/svg%3E%0A");
+    background-size: 2px;
+  }
+  .manga-S2 dimg::after {
+    background: url("data:image/svg+xml,%3Csvg width='4' height='4' viewBox='0 0 4 4' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1.33301 4H0.666992V3.33301H1.33301V4ZM2.66699 4H2V3.33301H2.66699V4ZM4 4H3.33301V3.33301H4V4ZM0.666992 3.33301H0V2.66699H0.666992V3.33301ZM2 3.33301H1.33301V2.66699H2V3.33301ZM3.33301 3.33301H2.66699V2.66699H3.33301V3.33301ZM1.33301 2.66699H0.666992V2H1.33301V2.66699ZM2.66699 2.66699H2V2H2.66699V2.66699ZM4 2.66699H3.33301V2H4V2.66699ZM0.666992 2H0V1.33301H0.666992V2ZM2 2H1.33301V1.33301H2V2ZM3.33301 2H2.66699V1.33301H3.33301V2ZM1.33301 1.33301H0.666992V0.666992H1.33301V1.33301ZM2.66699 1.33301H2V0.666992H2.66699V1.33301ZM4 1.33301H3.33301V0.666992H4V1.33301ZM0.666992 0.666992H0V0H0.666992V0.666992ZM2 0.666992H1.33301V0H2V0.666992ZM3.33301 0.666992H2.66699V0H3.33301V0.666992Z' fill='black'/%3E%3C/svg%3E%0A");
+    background-size: 4px;
+  }
+  .manga-S3 dimg::after {
+    background: url("data:image/svg+xml,%3Csvg width='1' height='1' viewBox='0 0 1 1' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0.666992 1H0.333008V0.666992H0.666992V1ZM0.333008 0.666992H0V0.333008H0.333008V0.666992ZM1 0.666992H0.666992V0.333008H1V0.666992ZM0.666992 0.333008H0.333008V0H0.666992V0.333008Z' fill='black'/%3E%3C/svg%3E%0A");
+    background-size: 1px;
+  }
+  .manga-S4 dimg::after {
+    background: url("data:image/svg+xml,%3Csvg width='1' height='1' viewBox='0 0 1 1' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0.333008 1H0V0.666992H0.333008V1ZM1 1H0.666992V0.666992H1V1ZM0.333008 0.333008H0V0H0.333008V0.333008ZM1 0.333008H0.666992V0H1V0.333008Z' fill='black'/%3E%3C/svg%3E%0A");
+    background-size: 1px;
+  }
+  .manga-S5 dimg::after {
+    background: url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 12H0V11H1V12Z' fill='black'/%3E%3Cpath d='M7 12H6V11H7V12Z' fill='black'/%3E%3Cpath d='M2 11H1V10H2V11Z' fill='black'/%3E%3Cpath d='M4 11H3V10H4V11Z' fill='black'/%3E%3Cpath d='M8 11H7V10H8V11Z' fill='black'/%3E%3Cpath d='M10 11H9V10H10V11Z' fill='black'/%3E%3Cpath d='M3 10H2V9H3V10Z' fill='black'/%3E%3Cpath d='M9 10H8V9H9V10Z' fill='black'/%3E%3Cpath d='M6 9H5V8H6V9Z' fill='black'/%3E%3Cpath d='M12 9H11V8H12V9Z' fill='black'/%3E%3Cpath d='M1 8H0V7H1V8Z' fill='black'/%3E%3Cpath d='M5 8H4V7H5V8Z' fill='black'/%3E%3Cpath d='M7 8H6V7H7V8Z' fill='black'/%3E%3Cpath d='M11 8H10V7H11V8Z' fill='black'/%3E%3Cpath d='M4 7H3V6H4V7Z' fill='black'/%3E%3Cpath d='M10 7H9V6H10V7Z' fill='black'/%3E%3Cpath d='M3 6H2V5H3V6Z' fill='black'/%3E%3Cpath d='M9 6H8V5H9V6Z' fill='black'/%3E%3Cpath d='M2 5H1V4H2V5Z' fill='black'/%3E%3Cpath d='M6 5H5V4H6V5Z' fill='black'/%3E%3Cpath d='M8 5H7V4H8V5Z' fill='black'/%3E%3Cpath d='M12 5H11V4H12V5Z' fill='black'/%3E%3Cpath d='M1 4H0V3H1V4Z' fill='black'/%3E%3Cpath d='M7 4H6V3H7V4Z' fill='black'/%3E%3Cpath d='M4 3H3V2H4V3Z' fill='black'/%3E%3Cpath d='M10 3H9V2H10V3Z' fill='black'/%3E%3Cpath d='M3 2H2V1H3V2Z' fill='black'/%3E%3Cpath d='M5 2H4V1H5V2Z' fill='black'/%3E%3Cpath d='M9 2H8V1H9V2Z' fill='black'/%3E%3Cpath d='M11 2H10V1H11V2Z' fill='black'/%3E%3Cpath d='M6 1H5V0H6V1Z' fill='black'/%3E%3Cpath d='M12 1H11V0H12V1Z' fill='black'/%3E%3C/svg%3E%0A");
+    background-size: 4px;
+  }
+  .manga-O8 dimg::after {
+    opacity: 80%;
+  }
+  .manga-O6 dimg::after {
+    opacity: 60%;
+  }
+  .manga-O4 dimg::after {
+    opacity: 40%;
+  }
+  .manga-O2 dimg::after {
+    opacity: 20%;
   }
 }
