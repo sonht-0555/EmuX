@@ -11,17 +11,19 @@ async function extractCBZ(arrayBuffer, romName) {
     screen.innerHTML = ''; body.classList.add(`manga-${level}`);
     const manga = document.createElement('manga'), one = document.createElement('one'), two = document.createElement('two'), num = document.createElement('num');
     screen.append(num, one, two, manga);
-    const loadNext = amount => { let html = ''; for (let end = Math.min(loadedCount + amount, urls.length); loadedCount < end; loadedCount++) html += `<img src="${urls[loadedCount]}" loading="lazy" data-index="${loadedCount}">`; manga.insertAdjacentHTML('beforeend', html); };
+    const loadNext = amount => {let html = ''; for (let end = Math.min(loadedCount + amount, urls.length); loadedCount < end; loadedCount++) html += `<img src="${urls[loadedCount]}" loading="lazy" data-index="${loadedCount}">`; manga.insertAdjacentHTML('beforeend', html);};
     loadNext(Math.max(10, page + 2));
-    const restoreScroll = () => { let target = manga.children[page]; if (target) manga.scrollTop += target.getBoundingClientRect().top - manga.getBoundingClientRect().top; };
+    const restoreScroll = () => {let target = manga.children[page]; if (target) manga.scrollTop += target.getBoundingClientRect().top - manga.getBoundingClientRect().top;};
     manga.querySelectorAll('img').forEach(img => img.onload = restoreScroll); restoreScroll();
-    setTimeout(() => {body.classList.add('cbz-open'); isInit = false; [bpad, dpad, jpad, page00, page01, switch0].forEach(element => element.hidden = true);}, 200);
+    setTimeout(() => {body.classList.add('cbz-open'); isInit = false;[bpad, dpad, jpad, page00, page01, switch0].forEach(element => element.hidden = true);}, 200);
     num.innerHTML = `${page + 1}|${urls.length}`; page02.hidden = false;
+    num.onclick = e => {e.stopPropagation(); let p = prompt("Page:", page + 1) - 1; if (p >= 0 && p < urls.length) {if (p >= loadedCount) loadNext(p - loadedCount + 2); let t = manga.children[p]; if (t) manga.scrollTop += t.getBoundingClientRect().top - manga.getBoundingClientRect().top; local(`page_${romName}`, page = p); num.innerHTML = `${page + 1}|${urls.length}`;} };
     await showNotification("", "###", "", "", true);
     manga.onscroll = () => !isInit && manga.scrollTop + manga.clientHeight >= manga.scrollHeight - 2000 && loadNext(10);
     manga.ontouchstart = manga.ontouchmove = event => event.stopPropagation();
+    num.ontouchstart = num.ontouchmove = event => event.stopPropagation();
     manga.onpointerdown = event => click(
-        () => { let index = event.target.getAttribute('data-index'); if (index != null) local(`page_${romName}`, page = Number(index)), num.innerHTML = `${page + 1}|${urls.length}`; },
-        () => { let newLevel = prompt("Level:", level); if (newLevel != null) body.classList.replace(`manga-${level}`, `manga-${level = newLevel}`), local('manga_level', newLevel); }
+        () => {let index = event.target.getAttribute('data-index'); if (index != null) local(`page_${romName}`, page = Number(index)), num.innerHTML = `${page + 1}|${urls.length}`;},
+        () => {let newLevel = prompt("Level:", level); if (newLevel != null) body.classList.replace(`manga-${level}`, `manga-${level = newLevel}`), local('manga_level', newLevel);}
     );
 }

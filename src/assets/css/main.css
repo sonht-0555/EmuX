@@ -497,7 +497,13 @@
   .manga-1 manga img,
   .manga-2 manga img,
   .manga-3 manga img,
-  .manga-4 manga img {
+  .manga-4 manga img,
+  .manga-5 manga img,
+  .manga-6 manga img,
+  .manga-7 manga img,
+  .manga-8 manga img,
+  .manga-9 manga img,
+  .manga-10 manga img {
     filter: url(#manga-sharpen) contrast(calc(1.20 + (var(--manga-step) * 0.05))) brightness(calc(1 - (var(--manga-step) * 0.01))) saturate(calc(0.80 - (var(--manga-step) * 0.10))) sepia(0.10);
   }
   .manga-1 manga img {
@@ -511,5 +517,23 @@
   }
   .manga-4 manga img {
     --manga-step: 4;
+  }
+  .manga-5 manga img {
+    --manga-step: 5;
+  }
+  .manga-6 manga img {
+    --manga-step: 6;
+  }
+  .manga-7 manga img {
+    --manga-step: 7;
+  }
+  .manga-8 manga img {
+    --manga-step: 8;
+  }
+  .manga-9 manga img {
+    --manga-step: 9;
+  }
+  .manga-10 manga img {
+    --manga-step: 10;
   }
 }
