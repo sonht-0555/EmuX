@@ -24,6 +24,17 @@ async function extractCBZ(arrayBuffer, romName) {
     num.ontouchstart = num.ontouchmove = event => event.stopPropagation();
     manga.onpointerdown = event => click(
         () => {let index = event.target.getAttribute('data-index'); if (index != null) local(`page_${romName}`, page = Number(index)), num.innerHTML = `${page + 1}|${urls.length}`;},
-        () => {let newLevel = prompt("Level:", level); if (newLevel != null) body.classList.replace(`manga-${level}`, `manga-${level = newLevel}`), local('manga_level', newLevel);}
+        toggle2P, () => {let newLevel = prompt("Level:", level); if (newLevel != null) body.classList.replace(`manga-${level}`, `manga-${level = newLevel}`), local('manga_level', newLevel);}
     );
 }
+window.toggle2P = () => {
+    let manga = document.querySelector('manga');
+    if (!manga) return;
+    manga.classList.toggle('double');
+    let num = document.querySelector('num');
+    if (num) {
+        let p = parseInt(num.innerHTML) - 1;
+        let target = manga.children[p];
+        if (target) manga.scrollTop += target.getBoundingClientRect().top - manga.getBoundingClientRect().top;
+    }
+};

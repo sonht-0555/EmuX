@@ -118,20 +118,26 @@
       </jpad>
       <invis></invis>
       <svg style="display:none">
-        <filter id="manga-sharpen" x="-10%" y="-10%" width="120%" height="120%">
-          <!-- Noise reduction -->
+        <filter id="manga-sharp-lv1" x="-10%" y="-10%" width="120%" height="120%">
           <feGaussianBlur in="SourceGraphic" stdDeviation="0.9" result="blur" />
-          <!-- Sharpen -->
-          <feComposite in="SourceGraphic" in2="blur" operator="arithmetic" k2="1.4" k3="-0.4" result="sharp" />
-          <!-- Contrast tuning -->
-          <feComponentTransfer in="sharp" result="final">
-            <feFuncR type="gamma" amplitude="1" exponent="0.93" offset="0" />
-            <feFuncG type="gamma" amplitude="1" exponent="0.93" offset="0" />
-            <feFuncB type="gamma" amplitude="1" exponent="0.93" offset="0" />
-            <feFuncA type="identity" />
+          <feComposite in="SourceGraphic" in2="blur" operator="arithmetic" k2="1.4" k3="-0.4" />
+        </filter>
+        <filter id="manga-sharp-lv2" x="-10%" y="-10%" width="120%" height="120%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="1.2" result="blur" />
+          <feComposite in="SourceGraphic" in2="blur" operator="arithmetic" k2="2.0" k3="-1.0" />
+        </filter>
+        <filter id="manga-sharp-lv3" x="-10%" y="-10%" width="120%" height="120%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="0.6" result="blur" />
+          <feComposite in="SourceGraphic" in2="blur" operator="arithmetic" k2="1.5" k3="-0.5" result="sharp" />
+          <feComponentTransfer in="sharp">
+            <feFuncR type="linear" slope="2" intercept="-0.25" />
+            <feFuncG type="linear" slope="2" intercept="-0.25" />
+            <feFuncB type="linear" slope="2" intercept="-0.25" />
           </feComponentTransfer>
-          <!-- Final output -->
-          <feComposite in="final" in2="final" operator="over" />
+        </filter>
+        <filter id="manga-bold-ink" x="-10%" y="-10%" width="120%" height="120%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="0.4" result="blur" />
+          <feBlend in="SourceGraphic" in2="blur" mode="hard-light" />
         </filter>
       </svg>
     </page02>

@@ -286,9 +286,10 @@
         flex-direction: column;
         height: 100vh;
         overflow-y: auto;
-        gap: 4px;
+        row-gap: 4px;
         scrollbar-color: rgba(160, 160, 160, 0.24) rgba(160, 160, 160, 0);
         top: 10px;
+        column-gap: 1px;
       }
       one, two, num {
         width: 100vw;
@@ -315,10 +316,22 @@
       manga img {
         width: 100vw;
         height: auto;
-        filter: url(#manga-sharpen) contrast(110%) saturate(80%) sepia(20%);
+        filter: url(#manga-sharp-lv1) contrast(110%) saturate(80%) sepia(20%);
         transition: filter 0.5s ease;
         will-change: filter;
         transform: translateZ(0);
+      }
+      manga.double {
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: stretch;
+        align-content: flex-start;
+      }
+      manga.double img {
+        width: calc(50vw - 0.5px);
+        background-color: white;
+        object-fit: contain;
+        object-position: top;
       }
       canvas {
         width: 100%;
@@ -498,13 +511,8 @@
   .manga-2 manga img,
   .manga-3 manga img,
   .manga-4 manga img,
-  .manga-5 manga img,
-  .manga-6 manga img,
-  .manga-7 manga img,
-  .manga-8 manga img,
-  .manga-9 manga img,
-  .manga-10 manga img {
-    filter: url(#manga-sharpen) contrast(calc(1.20 + (var(--manga-step) * 0.05))) brightness(calc(1 - (var(--manga-step) * 0.01))) saturate(calc(0.80 - (var(--manga-step) * 0.10))) sepia(0.10);
+  .manga-5 manga img {
+    filter: url(#manga-sharp-lv1) contrast(calc(1.20 + (var(--manga-step) * 0.05))) brightness(calc(1 - (var(--manga-step) * 0.01))) saturate(calc(0.80 - (var(--manga-step) * 0.10))) sepia(0.10);
   }
   .manga-1 manga img {
     --manga-step: 1;
@@ -522,18 +530,12 @@
     --manga-step: 5;
   }
   .manga-6 manga img {
-    --manga-step: 6;
+    filter: url(#manga-sharp-lv2) contrast(1.20) saturate(0.80) sepia(0.1);
   }
   .manga-7 manga img {
-    --manga-step: 7;
+    filter: url(#manga-sharp-lv3) contrast(1.20) saturate(0.80) sepia(0.1);
   }
   .manga-8 manga img {
-    --manga-step: 8;
-  }
-  .manga-9 manga img {
-    --manga-step: 9;
-  }
-  .manga-10 manga img {
-    --manga-step: 10;
+    filter: url(#manga-bold-ink) contrast(1.20) saturate(0.80) sepia(0.1);
   }
 }
