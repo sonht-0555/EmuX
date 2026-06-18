@@ -320,6 +320,7 @@
         transition: filter 0.5s ease;
         will-change: filter;
         transform: translateZ(0);
+        background-color: white;
       }
       manga.double {
         flex-direction: row;
@@ -537,5 +538,11 @@
   }
   .manga-8 manga img {
     filter: url(#manga-bold-ink) contrast(1.20) saturate(0.80) sepia(0.1);
+  }
+  .manga-9 manga img {
+    filter: url(#manga-denoise-sharp) contrast(1.20) saturate(0.80) sepia(0.1);
+  }
+  .manga-0 screen {
+    z-index: 1;
   }
 }

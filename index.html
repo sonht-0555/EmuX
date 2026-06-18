@@ -139,6 +139,13 @@
           <feGaussianBlur in="SourceGraphic" stdDeviation="0.4" result="blur" />
           <feBlend in="SourceGraphic" in2="blur" mode="hard-light" />
         </filter>
+        <filter id="manga-denoise-sharp">
+          <feMorphology in="SourceGraphic" operator="erode" radius="0.3" result="erode" />
+          <feMorphology in="erode" operator="dilate" radius="0.3" result="median" />
+          <feGaussianBlur in="median" stdDeviation="0.4" result="blur" />
+          <feComposite in="median" in2="blur" operator="arithmetic" k2="1.15" k3="-0.15" result="sharp" />
+          <feBlend in="SourceGraphic" in2="sharp" mode="soft-light" />
+        </filter>
       </svg>
     </page02>
   </body>
