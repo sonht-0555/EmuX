@@ -5,6 +5,10 @@
     padding: 0;
   }
   @font-face {
+    font-family: "afacad";
+    src: url("../font/afacad.ttf");
+  }
+  @font-face {
     font-family: "04bf";
     src: url("../font/04bf.woff");
   }
@@ -116,6 +120,77 @@
     position: absolute;
     bottom: 0;
     z-index: 5;
+  }
+  .trans-wrap {
+    font-family: "afacad";
+    color: var(--profile-base);
+    font-size: 11px;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100vw;
+    pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  .t-header {
+    height: 16px;
+    position: relative;
+    background: linear-gradient(to top, var(--profile-black) 8px, transparent 8px);
+  }
+  .t-header::before, .t-header::after {
+    content: '';
+    position: absolute;
+    bottom: 8px;
+    left: 0;
+    width: 100%;
+    background-color: var(--profile-black);
+    opacity: 0.6;
+  }
+  .t-header::before {
+    height: 8px;
+  }
+  .t-header::after {
+    height: 4px;
+  }
+  .t-footer {
+    height: 20px;
+    background: var(--profile-black);
+  }
+  trans {
+    background: var(--profile-black);
+    padding: 0px 8px;
+    max-height: 135px;
+    box-sizing: border-box;
+    overflow-y: auto;
+    border-top: 1px solid rgba(0, 0, 0, 0);
+    text-align: left;
+    width: 100%;
+    line-height: 15px;
+    scroll-snap-type: y mandatory;
+    scrollbar-width: none;
+  }
+  trans .t-row {
+    display: flex;
+    gap: 8px;
+    scroll-snap-align: start;
+  }
+  trans .t-name {
+    color: var(--profile-2);
+    min-width: 50px;
+  }
+  trans .t-text {
+    color: var(--profile-base);
+    flex: 1;
+  }
+  trans line {
+    display: block;
+    height: 1px;
+    background-color: var(--profile-4);
+    margin: 7px 0;
+    scroll-margin-top: 7px;
+    scroll-snap-align: start;
+    opacity: 0.6;
   }
 }
 @layer page-0 {
