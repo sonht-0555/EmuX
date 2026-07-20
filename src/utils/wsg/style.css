@@ -1,0 +1,113 @@
+@font-face {
+    font-family: '3x3';
+    src: url('3x3.ttf') format('truetype');
+    font-display: swap;
+}
+
+:root {
+    --bottle-width: 32px;
+}
+
+body {
+    margin: 0;
+    background: #000;
+    color: var(--ui-color);
+    font-family: '3x3';
+    font-size: 12px;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+}
+
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    pointer-events: none;
+    background: url("data:image/svg+xml,%3Csvg width='1' height='1' viewBox='0 0 1 1' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1H0.666992V0.666992H1V1ZM0.666992 0.666992H0.333008V0.333008H0.666992V0.666992ZM0.333008 0.333008H0V0H0.333008V0.333008Z' fill='black'/%3E%3C/svg%3E%0A");
+    mix-blend-mode: overlay;
+}
+
+#toolbar {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-areas: "status actions";
+    align-items: end;
+}
+
+#level-no {
+    grid-area: status;
+    font-size: 12px;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 16px
+}
+
+#toolbar-actions {
+    grid-area: actions;
+    display: flex;
+    justify-content: flex-end;
+}
+
+#toolbar-actions div {
+    font-size: 8px;
+    padding: 19px 14px 16px 12px;
+}
+
+#toolbar-actions>.inactive {
+    display: none;
+}
+
+/* Board */
+#game-container {
+    box-sizing: border-box;
+    overflow-x: hidden;
+    padding: 0 16px;
+}
+
+#game {
+    position: relative;
+}
+
+.level {
+    display: grid;
+    grid-template-columns: repeat(var(--level-columns, 1), calc(var(--bottle-width) + 4px));
+    justify-content: space-between;
+    width: 100%;
+}
+
+/* Bottles and water */
+.bottle,
+.water {
+    width: var(--bottle-width);
+}
+
+.bottle {
+    position: relative;
+    display: inline-flex;
+    flex-direction: column-reverse;
+    height: 160px;
+    margin: 24px 0 8px;
+    padding-top: 8px;
+    border: 2px solid var(--ui-color);
+    border-top: 0;
+    transition: transform 300ms cubic-bezier(0.22, 1, 0.36, 1), padding 500ms, border 500ms;
+    will-change: transform;
+}
+
+.bottle.capped {
+    padding-top: 0;
+    border-top: 8px solid var(--ui-color);
+}
+
+.bottle.selected-bottle {
+    transform: translateY(-16px);
+}
+
+.water {
+    height: 0;
+}
