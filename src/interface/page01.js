@@ -176,9 +176,13 @@ document.addEventListener("DOMContentLoaded", () => {
         optionStyle('opti', audioMode.endsWith('_mute') ? 'mute' : audioMode, 'audio');
     }, 2000);
     romInput.onchange = event => inputGame(event);
-    logo.onpointerdown = () => click(null, () => {
-        window.location.href = './src/utils/wsg/wsg.html';
-    });
+    logo.onpointerdown = () => click(null,
+        () => {
+            window.location.href = './src/utils/wsg/klotski.html';
+        },
+        () => {
+            window.location.href = './src/utils/wsg/wsg.html';
+        });
     vertical.onpointerdown = () => verticalSetting();
     setting.onpointerdown = () => view(list02.hidden ? 'settings' : 'home');
     document.querySelectorAll('opti').forEach(element => element.onclick = () => optionClick(element.textContent.trim()));
