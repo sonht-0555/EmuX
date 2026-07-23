@@ -15,8 +15,9 @@ const LEVELS = [
 
 const app = document.querySelector(".app");
 const board = app.querySelector(".board");
+const HIT_SLOP = 16;
 const status = app.querySelector(".status");
-const [levelText,movesText] = status.children;
+const [movesText,levelText] = status.children;
 const STORAGE_KEY = "klotski-game";
 let level = 0, moves = 0, pieces = [], drag = null;
 
@@ -62,15 +63,14 @@ function loadLevel(index) {
 }
 
 function render() {
-  levelText.textContent = `${String(level + 1).padStart(3,"0")}.`;
-  movesText.textContent = String(moves).padStart(3,"0");
+  movesText.textContent = `${String(moves).padStart(3,"0")}.`;
+  levelText.textContent = String(level + 1).padStart(3,"0");
   const pieceElements=pieces.map(piece => {
     const el = document.createElement("div");
     el.className = `piece${piece.id === "9" ? " hero" : piece.id < 4 ? " soldier" : ""}`;
     el.dataset.id = piece.id;
     el.style.gridColumn=`${piece.x+1} / span ${piece.w}`;
     el.style.gridRow=`${piece.y+1} / span ${piece.h}`;
-    el.onpointerdown = startDrag;
     return el;
   });
   board.replaceChildren(...pieceElements);
@@ -102,13 +102,13 @@ function cellStride(){
   return parseFloat(style.getPropertyValue("--cell"))+parseFloat(style.columnGap);
 }
 
-function startDrag(event) {
+function startDrag(event, el) {
   event.preventDefault();
   event.stopPropagation();
-  const piece = pieces.find(p => p.id === event.currentTarget.dataset.id);
+  const piece = pieces.find(p => p.id === el.dataset.id);
   drag = {
     piece,
-    el:event.currentTarget,
+    el,
     startX:event.clientX,
     startY:event.clientY,
     offsetX:0,
@@ -128,10 +128,31 @@ function startDrag(event) {
   drag.el.onpointercancel = endDrag;
 }
 
+board.onpointerdown = event => {
+  const direct = event.target.closest(".piece");
+  let el = direct;
+  if(!el){
+    let nearest = Infinity;
+    for(const candidate of board.children){
+      const rect = candidate.getBoundingClientRect();
+      const dx = Math.max(rect.left-event.clientX,0,event.clientX-rect.right);
+      const dy = Math.max(rect.top-event.clientY,0,event.clientY-rect.bottom);
+      const distance = Math.hypot(dx,dy);
+      if(dx <= HIT_SLOP && dy <= HIT_SLOP && distance < nearest){
+        nearest = distance;
+        el = candidate;
+      }
+    }
+  }
+  if(el) startDrag(event,el);
+};
+
 function moveDrag(event) {
   event.stopPropagation();
   if(!drag) return;
-  const rawX=event.clientX-drag.startX, rawY=event.clientY-drag.startY;
+  const events=event.getCoalescedEvents?.();
+  const pointer=events?.length ? events[events.length-1] : event;
+  const rawX=pointer.clientX-drag.startX, rawY=pointer.clientY-drag.startY;
   const cell=cellStride();
   const canHorizontal=drag.limits.left || drag.limits.right;
   const canVertical=drag.limits.up || drag.limits.down;
@@ -175,7 +196,7 @@ function endDrag(event) {
   el.animate([
     {transform:`translate3d(${offsetX}px,${offsetY}px,0)`},
     {transform:`translate3d(${dx*cell}px,${dy*cell}px,0)`}
-  ],{duration:90,easing:"ease-out",fill:"forwards"}).finished
+  ],{duration:110,easing:"cubic-bezier(.2,.8,.2,1)",fill:"forwards"}).finished
     .catch(()=>{})
     .then(()=>{
       if(level!==currentLevel || !el.isConnected) return;
