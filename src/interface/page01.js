@@ -176,7 +176,7 @@ document.addEventListener("DOMContentLoaded", () => {
         optionStyle('opti', audioMode.endsWith('_mute') ? 'mute' : audioMode, 'audio');
     }, 2000);
     romInput.onchange = event => inputGame(event);
-    logo.onpointerdown = () => click(null,
+    logo.onpointerdown = () => click(view('home'),
         () => {
             window.location.href = './src/utils/wsg/klotski.html';
         },
