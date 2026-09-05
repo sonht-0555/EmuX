@@ -35,6 +35,7 @@
     --safe-right: env(safe-area-inset-right);
     --profile-base: oklch(0.7649 0.0494 76.31);
     --profile-black: oklch(4% 0 0);
+    --profile-paper: oklch(0.996 0.0196 106.75);
     --profile-o: color-mix(in oklch, var(--profile-base) 28%, var(--profile-black));
     --profile-1: oklch(from var(--profile-base) l c h / 0.60);
     --profile-2: oklch(from var(--profile-base) l c h / 0.40);
@@ -423,11 +424,11 @@
       manga img {
         width: 100vw;
         height: auto;
-        filter: url(#manga-sharp-lv1) contrast(110%) saturate(80%) sepia(20%);
+        filter: url(#manga-sharp-lv1) contrast(1.20) saturate(0.80);
         transition: filter 0.5s ease;
         will-change: filter;
         transform: translateZ(0);
-        background-color: white;
+        mix-blend-mode: multiply;
       }
       manga.double {
         flex-direction: row;
@@ -614,13 +615,15 @@
   }
   dimg {
     position: relative;
+    background-color: var(--profile-paper);
+    overflow: hidden;
   }
   .manga-1 manga img,
   .manga-2 manga img,
   .manga-3 manga img,
   .manga-4 manga img,
   .manga-5 manga img {
-    filter: url(#manga-sharp-lv1) contrast(calc(1.20 + (var(--manga-step) * 0.05))) brightness(calc(1 - (var(--manga-step) * 0.01))) saturate(calc(0.80 - (var(--manga-step) * 0.10))) sepia(0.10);
+    filter: url(#manga-sharp-lv1) contrast(calc(1.20 + (var(--manga-step) * 0.05))) brightness(calc(1 - (var(--manga-step) * 0.01))) saturate(calc(0.80 - (var(--manga-step) * 0.10)));
   }
   .manga-1 manga img {
     --manga-step: 1;
@@ -638,16 +641,16 @@
     --manga-step: 5;
   }
   .manga-6 manga img {
-    filter: url(#manga-sharp-lv2) contrast(1.20) saturate(0.80) sepia(0.1);
+    filter: url(#manga-sharp-lv2) contrast(1.20) saturate(0.80);
   }
   .manga-7 manga img {
-    filter: url(#manga-sharp-lv3) contrast(1.20) saturate(0.80) sepia(0.1);
+    filter: url(#manga-sharp-lv3) contrast(1.20) saturate(0.80);
   }
   .manga-8 manga img {
-    filter: url(#manga-bold-ink) contrast(1.20) saturate(0.80) sepia(0.1);
+    filter: url(#manga-bold-ink) contrast(1.20) saturate(0.80);
   }
   .manga-9 manga img {
-    filter: url(#manga-denoise-sharp) contrast(1.20) saturate(0.80) sepia(0.1);
+    filter: url(#manga-denoise-sharp) contrast(1.20) saturate(0.80);
   }
   .manga-S0 dimg::after {
     background: none;

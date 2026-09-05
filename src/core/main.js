@@ -24,7 +24,7 @@ function findCore(name, data) {
         const extension = getExtension(fileName), consoleCore = CORE_CONFIG.find(core => core.ext !== '.zip' && tryMatch(core, extension, fileName, filenames));
         if (consoleCore) {
             if (extension === '.bin' && filenames.length > 5) continue;
-            if (!['.bin', '.iso', '.img', '.pbp', '.chd', '.cue'].includes(extension)) {
+            if (!['.bin', '.img', '.cue'].includes(extension)) {
                 const unzipped = fflate.unzipSync(data, {filter: (file) => file.name === fileName});
                 return {config: consoleCore, data: unzipped[fileName], name: fileName};
             }
@@ -37,12 +37,22 @@ function findCore(name, data) {
 // ===== inputGame =====
 async function inputGame(event) {
     const file = event.target.files[0], storeName = storeForFilename(file.name);
+    if (file.name.toLowerCase().endsWith('.cbz')) {
+        await emuxDB(file, file.name);
+        if (typeof view === 'function') view('cbz');
+        else if (typeof listGame === 'function') listGame();
+        return;
+    }
     await emuxDB(await file.arrayBuffer(), file.name);
     if (storeName === 'games') await initCore(file);
 }
 // ===== loadGame =====
 async function loadGame(name) {
-    const gameData = await emuxDB(name), gameFile = new File([gameData], name);
+    const gameData = await emuxDB(name);
+    if (name.toLowerCase().endsWith('.cbz')) {
+        return initCore({name, arrayBuffer: async () => gameData instanceof ArrayBuffer ? gameData : (gameData.arrayBuffer ? await gameData.arrayBuffer() : gameData)});
+    }
+    const gameFile = new File([gameData], name);
     await initCore(gameFile);
 }
 // ===== saveState =====
