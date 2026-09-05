@@ -373,6 +373,7 @@
         flex-direction: column;
         height: 100vh;
         overflow-y: auto;
+        overflow-anchor: none;
         row-gap: 4px;
         scrollbar-color: rgba(160, 160, 160, 0.24) rgba(160, 160, 160, 0);
         top: 10px;
@@ -426,7 +427,6 @@
         height: auto;
         filter: url(#manga-sharp-lv1) contrast(1.20) saturate(0.80);
         transition: filter 0.5s ease;
-        will-change: filter;
         transform: translateZ(0);
         mix-blend-mode: multiply;
       }
@@ -617,6 +617,12 @@
     position: relative;
     background-color: var(--profile-paper);
     overflow: hidden;
+    /* Gói multiply + overlay gọn trong 1 trang. Nền paper đục nên hình không đổi,
+       nhưng compositor hết phải đọc backdrop cả tài liệu cho từng ảnh. */
+    isolation: isolate;
+    contain: layout paint;
+    /* KHÔNG dùng content-visibility: auto ở đây. Trên iOS nó làm cả vùng ảnh
+       đen và mất cuộn khi xuống sâu (~trang 200 của truyện 600 trang). */
   }
   .manga-1 manga img,
   .manga-2 manga img,
