@@ -1,0 +1,210 @@
+// ===== Tầng dữ liệu: đọc ZIP + kích thước ảnh =====
+// Không đụng một dòng DOM nào, nên test được độc lập (xem test/cbz-zip.test.js).
+
+const IMG_EXT = /\.(jpe?g|png|webp|gif|avif)$/i;
+const MIME = {jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif', avif: 'image/avif'};
+
+export const HEADER_BYTES = 32768;          // phần đầu ảnh cần đọc để lấy kích thước
+
+export const isScan = name => name.endsWith('.scan') || name.includes('.scan.');
+export const shortName = name => name.split('/').pop().replace(/\.[^/.]+$/, '');
+
+const mimeOf = name => MIME[name.split('.').pop().toLowerCase()] || 'image/jpeg';
+
+// ===== imageSize: kích thước ảnh đọc thẳng từ header, KHÔNG giải mã =====
+// Vài chục byte đầu file là đủ. Nhờ vậy biết trước chiều cao của cả nghìn trang
+// mà không tạo ra một bitmap nào - decode mới là thứ ngốn hàng trăm MB.
+// Trả {w, h}, hoặc null nếu không nhận dạng được.
+export function imageSize(b) {
+    if (!b || b.length < 16) return null;
+    const be16 = p => (b[p] << 8) | b[p + 1];
+    const be32 = p => ((b[p] << 24) | (b[p + 1] << 16) | (b[p + 2] << 8) | b[p + 3]) >>> 0;
+    const le16 = p => b[p] | (b[p + 1] << 8);
+    const tag = (p, s) => {
+        for (let i = 0; i < s.length; i++) if (b[p + i] !== s.charCodeAt(i)) return false;
+        return true;
+    };
+
+    // PNG: IHDR nằm ngay sau chữ ký 8 byte
+    if (be32(0) === 0x89504e47) return {w: be32(16), h: be32(20)};
+
+    // GIF: logical screen descriptor, little-endian
+    if (tag(0, 'GIF8')) return {w: le16(6), h: le16(8)};
+
+    // JPEG: nhảy theo độ dài từng segment cho tới marker SOF
+    if (b[0] === 0xFF && b[1] === 0xD8) {
+        for (let p = 2; p + 9 < b.length;) {
+            if (b[p] !== 0xFF || b[p + 1] === 0xFF) {p++; continue;}
+            const m = b[p + 1];
+            if (m === 0x01 || (m >= 0xD0 && m <= 0xD9)) {p += 2; continue;}   // marker không có payload
+            // SOF0..SOF15, trừ DHT(C4), JPG(C8), DAC(CC)
+            if (m >= 0xC0 && m <= 0xCF && m !== 0xC4 && m !== 0xC8 && m !== 0xCC) return {w: be16(p + 7), h: be16(p + 5)};
+            const size = be16(p + 2);
+            if (size < 2) return null;
+            p += 2 + size;
+        }
+        return null;
+    }
+
+    // WebP: ba biến thể chunk
+    if (tag(0, 'RIFF') && tag(8, 'WEBP')) {
+        if (tag(12, 'VP8X')) return {w: (b[24] | b[25] << 8 | b[26] << 16) + 1, h: (b[27] | b[28] << 8 | b[29] << 16) + 1};
+        if (tag(12, 'VP8L')) {
+            const n = (b[21] | b[22] << 8 | b[23] << 16 | b[24] << 24) >>> 0;
+            return {w: (n & 0x3FFF) + 1, h: ((n >>> 14) & 0x3FFF) + 1};
+        }
+        if (tag(12, 'VP8 ')) return {w: le16(26) & 0x3FFF, h: le16(28) & 0x3FFF};
+    }
+
+    // AVIF/HEIF: dò box 'ispe' trong phần đầu
+    if (tag(4, 'ftyp')) {
+        for (let p = 4, end = Math.min(b.length - 12, 4096); p < end; p++) {
+            if (tag(p, 'ispe')) return {w: be32(p + 8), h: be32(p + 12)};
+        }
+    }
+    return null;
+}
+
+// ===== openZip: đọc Central Directory, giải nén từng entry theo yêu cầu =====
+export function openZip(data) {
+    const u8 = data instanceof Uint8Array ? data : new Uint8Array(data);
+    const {buffer, byteOffset, length: len} = u8, view = new DataView(buffer, byteOffset, len);
+
+    // End Of Central Directory nằm cuối file, quét ngược tối đa 64KB comment
+    let eocd = -1;
+    for (let i = len - 22, min = Math.max(0, len - 65558); i >= min; i--) {
+        if (view.getUint32(i, true) === 0x06054b50) {eocd = i; break;}
+    }
+    if (eocd === -1) throw new Error("Không đúng chuẩn file ZIP!");
+
+    const cdSize = view.getUint32(eocd + 12, true), cdOffset = view.getUint32(eocd + 16, true);
+    const decoder = new TextDecoder('utf-8'), files = [];
+    let json = null, link = null, hash = null, conf = null;
+
+    for (let p = cdOffset, end = cdOffset + cdSize; p < end;) {
+        if (view.getUint32(p, true) !== 0x02014b50) break;
+        const nameLen = view.getUint16(p + 28, true);
+        const entry = {
+            name: decoder.decode(u8.subarray(p + 46, p + 46 + nameLen)),
+            method: view.getUint16(p + 10, true),
+            csize: view.getUint32(p + 20, true),
+            size: view.getUint32(p + 24, true),
+            offset: view.getUint32(p + 42, true),
+        };
+        if (!entry.name.startsWith('__MACOSX') && !entry.name.endsWith('/')) {
+            if (entry.name.endsWith('.json')) {if (!json) json = entry;}
+            // File .link nằm trong cbz là thứ đánh dấu "bộ này do Link tải": có nó thì
+            // trình đọc dựng lại được scraper để tải chương sau, không cần đoán từ tên file.
+            else if (entry.name.endsWith('.link')) {if (!link) link = entry;}
+            // .hash là bảng perceptual hash từng trang, để lần thêm chương sau chỉ phải
+            // giải mã ảnh của chương mới thay vì cả bộ.
+            else if (entry.name.endsWith('.hash')) {if (!hash) hash = entry;}
+            // .conf là những gì file .link đã hỏi người dùng (id truyện, tên, chương bắt
+            // đầu). Đi theo cbz để lần tải chương sau không phải hỏi lại.
+            else if (entry.name.endsWith('.conf')) {if (!conf) conf = entry;}
+            else if (IMG_EXT.test(entry.name) || isScan(entry.name)) files.push(entry);
+        }
+        p += 46 + nameLen + view.getUint16(p + 30, true) + view.getUint16(p + 32, true);
+    }
+
+    // Bytes thô (còn nén) của một entry, đọc qua Local Header
+    const rawBytes = entry => {
+        const lp = entry.offset;
+        if (view.getUint32(lp, true) !== 0x04034b50) throw new Error("Lỗi Local Header Offset: " + entry.name);
+        const from = lp + 30 + view.getUint16(lp + 26, true) + view.getUint16(lp + 28, true);
+        return u8.subarray(from, from + entry.csize);
+    };
+
+    const extract = entry => {
+        const raw = rawBytes(entry), type = mimeOf(entry.name);
+        if (entry.method === 0) return new Blob([raw], {type});
+        if (entry.method === 8) return new Blob([fflate.inflateSync(raw)], {type});
+        throw new Error("Chưa hỗ trợ compression method: " + entry.method);
+    };
+
+    // Chỉ lấy `limit` byte đầu của entry đã giải nén. Với entry stored thì là một view
+    // không tốn gì; với entry deflate thì bơm từng khúc rồi dừng ngay khi đủ, nên
+    // không phải giải nén cả tấm ảnh chỉ để đọc mấy chục byte header.
+    const prefix = (entry, limit) => {
+        let raw;
+        try {raw = rawBytes(entry);} catch (err) {return null;}
+        if (entry.method === 0) return raw.subarray(0, Math.min(raw.length, limit));
+        if (entry.method !== 8) return null;
+
+        const parts = [];
+        let total = 0;
+        try {
+            const inf = new fflate.Inflate(chunk => {parts.push(chunk); total += chunk.length;});
+            for (let p = 0; p < raw.length && total < limit; p += 8192) inf.push(raw.subarray(p, p + 8192), false);
+        } catch (err) { /* stream cụt là chuyện bình thường, dùng những gì đã ra */ }
+        if (!total) return null;
+
+        const out = new Uint8Array(Math.min(total, limit));
+        let o = 0;
+        for (const part of parts) {
+            if (o >= out.length) break;
+            out.set(part.subarray(0, out.length - o), o);
+            o += part.length;
+        }
+        return out;
+    };
+
+    // Bytes đã giải nén. Entry stored trả về view thẳng vào buffer gốc - không copy gì,
+    // nên gộp cbz cũ vào cbz mới không nhân đôi bộ nhớ.
+    const bytesOf = entry => {
+        const raw = rawBytes(entry);
+        if (entry.method === 0) return raw;
+        if (entry.method === 8) return fflate.inflateSync(raw);
+        throw new Error("Chưa hỗ trợ compression method: " + entry.method);
+    };
+
+    const collator = new Intl.Collator(undefined, {numeric: true, sensitivity: 'base'});
+    files.sort((a, b) => collator.compare(a.name, b.name));
+    return {files, json, link, hash, conf, extract, prefix, bytesOf};
+}
+
+// ===== buildZip: ghi danh sách entry thành một Blob .cbz =====
+// Dùng Zip streaming của fflate thay vì fflate.zip: bản sync dựng một Uint8Array liền
+// khối cho cả file, một bộ truyện vài trăm MB là đủ để tạch allocation. Bản streaming
+// nhả ra từng khúc, ta gói dần thành Blob nên phần đã ghi rời khỏi RAM.
+//
+// ZipPassThrough = stored, không nén. Cố ý: ảnh vốn đã nén, và entry stored làm prefix()
+// đọc header ảnh gần như miễn phí. Nhờ stored mà entry của cbz cũ chuyển sang cbz mới
+// bằng đúng bytes đó, không giải nén rồi nén lại.
+const BLOB_BATCH = 8 << 20;             // gom đủ 8MB mới cắt một Blob, tránh vụn nghìn Blob nhỏ
+
+export function buildZip(items) {
+    return new Promise((resolve, reject) => {
+        const parts = [];               // các Blob đã chốt
+        let pending = [], pendingSize = 0;
+        const flush = () => {
+            if (!pending.length) return;
+            parts.push(new Blob(pending));
+            pending = []; pendingSize = 0;
+        };
+
+        const zip = new fflate.Zip((err, chunk, final) => {
+            if (err) return reject(err);
+            if (chunk && chunk.length) {
+                pending.push(chunk);
+                pendingSize += chunk.length;
+                if (pendingSize >= BLOB_BATCH) flush();
+            }
+            if (final) {
+                flush();
+                resolve(new Blob(parts, {type: 'application/vnd.comicbook+zip'}));
+            }
+        });
+
+        try {
+            for (const {name, data} of items) {
+                const file = new fflate.ZipPassThrough(name);
+                zip.add(file);
+                file.push(data, true);
+            }
+            zip.end();
+        } catch (err) {
+            reject(err);
+        }
+    });
+}

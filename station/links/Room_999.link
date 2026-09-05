@@ -1,0 +1,119 @@
+export default {
+    title: "Room_999",
+    home: "https://cuutruyen.net", 
+    mangaId: 4871,
+    chap: "start",                  
+    // "start" đọc từ đầu, "new" lấy chương mới nhất
+    // ===== chapters(ctx) -> [{num, url, title}] =====
+    async chapters(ctx) {
+        const data = await ctx.json(ctx.abs(`/api/v2/mangas/${this.mangaId}/chapters`, this.home));
+        return (data.data || [])
+            .map(chapter => ({
+                // url holds the chapter ID, not a path: pages() calls the API by ID.
+                num: parseFloat(chapter.number),
+                url: chapter.id,
+                title: `Chapter ${chapter.number}`
+            }))
+            .filter(chapter => Number.isFinite(chapter.num) && chapter.url);
+    },
+
+    // ===== pages(chapterId, ctx) -> [{url, drm}] =====
+    async pages(chapterId, ctx) {
+        const data = await ctx.json(ctx.abs(`/api/v2/chapters/${chapterId}`, this.home));
+        const pages = data.data?.pages;
+        if (!Array.isArray(pages)) return [];
+
+        // The API makes no promise about order; `order` is the real page number.
+        return [...pages]
+            .sort((a, b) => (a.order || 0) - (b.order || 0))
+            .map(page => {
+                // Use image_url when present, otherwise rebuild it from image_path.
+                // Either way the domain must change: lrclib is the old host, now 403.
+                const url = page.image_url || (page.image_path ? `https://storage-bravo.cuutruyen.net${page.image_path}` : "");
+                if (!url) return null;
+                return {
+                    url: url.replace("storage-ct.lrclib.net", "storage-bravo.cuutruyen.net"),
+                    drm: page.drm_data || null
+                };
+            })
+            .filter(Boolean);
+    },
+
+    // ===== processImage(blob, page) -> Blob =====
+    async processImage(blob, page) {
+        if (!page.drm) return blob;
+        return unscramble(blob, page.drm);
+    }
+};
+
+// ===== Image unlocking - specific to cuutruyen =====
+const DRM_KEY = new TextEncoder().encode(String(Math.round(Math.PI * 1e15)));
+function drmParts(drmData) {
+    if (typeof drmData !== 'string' || !drmData.trim()) return [];
+    try {
+        const raw = atob(drmData.replace(/\s/g, ''));
+        const bytes = new Uint8Array(raw.length);
+        for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i) ^ DRM_KEY[i % DRM_KEY.length];
+
+        const chunks = new TextDecoder().decode(bytes).split("|");
+        // The first chunk is a version marker ("#v1"), not a coordinate.
+        if (chunks[0]?.startsWith("#v")) chunks.shift();
+
+        return chunks
+            .map(chunk => chunk.split("-").map(Number))
+            .filter(([y, height]) => Number.isFinite(y) && Number.isFinite(height) && height > 0);
+    } catch (err) {
+        console.error('bad drm_data:', err.message);
+        return [];
+    }
+}
+// Recut with a canvas: read the scrambled image top to bottom, paste each strip at
+// its true coordinate in the original.
+function unscramble(blob, drmData) {
+    const parts = drmParts(drmData);
+    if (!parts.length) return blob;
+
+    return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(blob);
+        const image = new Image();
+        image.onload = () => {
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = image.width;
+                canvas.height = image.height;
+                const target = canvas.getContext('2d');
+
+                // drawImage first, then getImageData per strip: cheaper than building a
+                // separate source canvas, and pixel-exact since both share a size.
+                target.drawImage(image, 0, 0);
+                const scrambled = target.getImageData(0, 0, image.width, image.height);
+                target.clearRect(0, 0, image.width, image.height);
+
+                const source = document.createElement('canvas');
+                source.width = image.width;
+                source.height = image.height;
+                const from = source.getContext('2d');
+                from.putImageData(scrambled, 0, 0);
+
+                let readY = 0;
+                for (const [y, height] of parts) {
+                    target.putImageData(from.getImageData(0, readY, image.width, height), 0, y);
+                    readY += height;
+                }
+
+                // JPEG quality 85: the source is already JPEG so re-encoding is
+                // unavoidable, and at this level the difference is invisible.
+                canvas.toBlob(result => result ? resolve(result) : reject(new Error('empty toBlob')), 'image/jpeg', 0.85);
+            } catch (err) {
+                reject(err);
+            } finally {
+                URL.revokeObjectURL(url);
+            }
+        };
+        image.onerror = () => {
+            URL.revokeObjectURL(url);
+            reject(new Error('image could not be decoded'));
+        };
+        image.src = url;
+    });
+}

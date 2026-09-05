@@ -1,0 +1,67 @@
+export default {
+    title: "One_Piece",
+    home: "https://truyen-one-piece.com/category/truyen-one-piece/",
+
+    // ===== chapters(ctx) -> [{num, url, title}] =====
+    async chapters(ctx) {
+        // The category listing shows 10 chapters per page across ~122 pages. The first
+        // page is enough for "Fetch"; only walk them all on "Fetch All".
+        const out = [];
+        const scrape = doc => {
+            for (const anchor of doc.querySelectorAll("a[href*='chapter-']")) {
+                const href = anchor.getAttribute("href");
+                if (!href) continue;
+                const found = href.match(/chapter-(\d+(?:\.\d+)?)/i);
+                if (!found) continue;
+                out.push({
+                    num: parseFloat(found[1]),
+                    url: ctx.abs(href, this.home).split("#")[0],
+                    title: anchor.textContent.trim()
+                });
+            }
+        };
+
+        const first = await ctx.dom(this.home);
+        scrape(first);
+        if (!ctx.deep) return out;
+
+        // The last page number lives in .nav-pagination; absent means a single page.
+        const last = Math.max(1, ...[...first.querySelectorAll("a[href*='/page/']")]
+            .map(anchor => parseInt((anchor.getAttribute("href").match(/\/page\/(\d+)/) || [])[1]))
+            .filter(Number.isFinite));
+
+        for (let page = 2; page <= last; page++) {
+            ctx.log(`Scanning page ${page}.${last}`);
+            try {
+                scrape(await ctx.dom(`${this.home}page/${page}/`));
+            } catch (err) {
+                // One bad page should not cost us the other 121.
+                console.error(`Page ${page} failed:`, err.message);
+            }
+        }
+        return out;
+    },
+
+    // ===== pages(chapterUrl, ctx) -> [url] =====
+    async pages(chapterUrl, ctx) {
+        const doc = await ctx.dom(chapterUrl);
+
+        // Narrowest to widest, take the first region holding images. This theme
+        // sometimes swaps between .entry-content and <article> depending on post type.
+        for (const area of [doc.querySelector(".entry-content"), doc.querySelector("article"), doc.body]) {
+            if (!area) continue;
+
+            const pages = [...area.querySelectorAll("img")]
+                .map(img => (img.dataset.src || img.dataset.lazySrc || img.getAttribute("src") || "").trim())
+                .filter(src => src && !/gravatar|logo|avatar/i.test(src))
+                // A standing bug on this site: the dot before the extension is missing,
+                // page_015-5jpg instead of page_015-5.jpg.
+                .map(src => src.replace(/(\d+)(jpg|jpeg|png|webp)$/i, "$1.$2"))
+                .filter(src => src.includes("/uploads/") || /\.(jpe?g|png|webp)/i.test(src))
+                .map(src => ctx.abs(src, chapterUrl));
+
+            if (pages.length) return pages;
+        }
+        return [];
+    }
+};
