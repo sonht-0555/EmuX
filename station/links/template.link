@@ -1,0 +1,76 @@
+// ===== template.link =====
+// The skeleton for a .link file. Copy this, change the identity block, then rewrite
+// chapters() and pages() to match how your site hands over its data.
+//
+// A .link file answers only three questions: which chapters this manga has, which
+// images make up a chapter, and (if the site locks its images) how to rebuild them.
+// Everything else - sorting, dedup, proxying, retry, page naming, .cbz packing,
+// storing into emuxDB - belongs to src/core/link.js. Do not redo it here.
+
+export default {
+    // ===== Identity =====
+    title: "Template",                      // required: display name, also the .cbz filename (sanitized).
+    home: "https://example.com",            // required: also used as the Referer.
+    // Add site-specific fields here if needed - `this` inside both functions below
+    // sees them all. See `mangaId` in cuutruyen.link for an example.
+
+    // ===== chapters(ctx) -> [{num, url, title}] =====
+    // num   : chapter number, decimals allowed (1150.5).
+    // url   : whatever gets passed back to pages() - a URL, or an ID if the site has an API.
+    // title : chapter name; if absent link.js falls back to "Chapter <num>".
+    // A raw array is enough: link.js handles duplicates and ordering.
+    //
+    // The tools in ctx - a .link file must not call fetch() itself, so that every
+    // request goes through one proxy and one retry layer:
+    //   ctx.dom(url)        -> Document        (site returns HTML)
+    //   ctx.json(url)       -> object          (site has an API)
+    //   ctx.text(url)       -> string          (image links embedded in <script>)
+    //   ctx.abs(href, base) -> absolute URL    (sites love relative hrefs)
+    //   ctx.log(msg)        -> show a message on screen
+    //   ctx.deep            -> true when the user picks "Fetch All"
+    async chapters(ctx) {
+        const doc = await ctx.dom(this.home);
+        const out = [];
+        for (const anchor of doc.querySelectorAll("a[href*='chapter-']")) {
+            const href = anchor.getAttribute("href");
+            const found = href?.match(/chapter-(\d+(?:\.\d+)?)/i);
+            if (!found) continue;
+            out.push({
+                num: parseFloat(found[1]),
+                url: ctx.abs(href, this.home),
+                title: anchor.textContent.trim()
+            });
+        }
+        // If the site paginates, only walk every page when ctx.deep - a plain "Fetch"
+        // usually just wants the newest chapter, no reason to scan a hundred pages.
+        if (!ctx.deep) return out;
+        return out;
+    },
+
+    // ===== pages(chapterUrl, ctx) -> [url] | [{url, ...}] =====
+    // chapterUrl is exactly the `url` chapters() assigned to this chapter.
+    // Raw URLs are enough. Return {url, ...} only when you need to carry extra data
+    // across to processImage() - a per-page DRM key, for instance.
+    // Array order is page order in the .cbz, so sort here if the site serves images
+    // out of order.
+    async pages(chapterUrl, ctx) {
+        const doc = await ctx.dom(chapterUrl);
+        return [...doc.querySelectorAll(".entry-content img")]
+            .map(img => (img.dataset.src || img.getAttribute("src") || "").trim())
+            .filter(Boolean)
+            .map(src => ctx.abs(src, chapterUrl));
+    }
+
+    // ===== processImage(blob, page) -> Blob (optional) =====
+    // Delete this function outright if the site serves usable images - most do.
+    // You only need it when the downloaded image still needs work: shuffled rows
+    // (DRM), tiled pieces, watermarks.
+    // blob : the image just downloaded.
+    // page : the exact object pages() returned, with every field you attached.
+    // See station/links/cuutruyen.link for a real example.
+    //
+    // async processImage(blob, page) {
+    //     if (!page.drm) return blob;
+    //     return await unscramble(blob, page.drm);
+    // }
+};

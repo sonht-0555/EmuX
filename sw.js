@@ -1,6 +1,6 @@
-let revision = 'EmuX_9.29';
+let revision = 'EmuX_9.40';
 // git add . && git commit --amend --no-edit && git push -f && clear
-// git reset --hard xxxxxxx && git push -f && clear
+// git reset --hard 5fc906e && git push -f && clear
 // git add .github/workflows/build-pico.yml && git commit --amend --no-edit && git push -f && clear
 var urlsToCache = [
     './',
@@ -8,6 +8,10 @@ var urlsToCache = [
     './manifest.json',
     './src/assets/css/main.css',
     './src/assets/img/icon.png',
+    './src/assets/img/texture00.png',
+    './src/assets/img/texture01.png',
+    './src/assets/img/texture02.png',
+    './src/assets/img/texture03.png',
     './src/assets/font/04bf.woff',
     './src/assets/font/3x3.ttf',
     './src/assets/font/afacad.ttf',
@@ -19,6 +23,7 @@ var urlsToCache = [
     './src/utils/wsg/klotski.html',
     './src/utils/wsg/3x3.ttf',
     './src/core/loader.js',
+    './src/core/link.js',
     './src/core/audio.js',
     './src/core/video.js',
     './src/core/pico8.js',
@@ -58,6 +63,7 @@ self.addEventListener('install', function (event) {
 self.addEventListener('fetch', function (event) {
     const url = event.request.url;
     if (url.includes('api.github.com')) return;
+    if (url.includes('/proxy?')) return;
     if (url.match(/\.(zip|bin|pce|img|wasm|png)$/i) || url.match(/(workers\.dev|pico-8\.com|lexaloffle\.com)/)) {
         event.respondWith(
             caches.match(event.request).then(response => {

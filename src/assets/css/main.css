@@ -615,7 +615,8 @@
   }
   dimg {
     position: relative;
-    background-color: var(--profile-paper);
+    background: url("/src/assets/img/texture00.png") repeat;
+    background-size: 390px auto;
     overflow: hidden;
     /* Gói multiply + overlay gọn trong 1 trang. Nền paper đục nên hình không đổi,
        nhưng compositor hết phải đọc backdrop cả tài liệu cho từng ảnh. */
@@ -692,5 +693,17 @@
   }
   .manga-O2 dimg::after {
     opacity: 20%;
+  }
+  .manga-B1 dimg {
+    background: url("/src/assets/img/texture01.png") repeat;
+    background-size: 390px auto;
+  }
+  .manga-B2 dimg {
+    background: url("/src/assets/img/texture02.png") repeat;
+    background-size: 390px auto;
+  }
+  .manga-B3 dimg {
+    background: url("/src/assets/img/texture03.png") repeat;
+    background-size: 390px auto;
   }
 }
