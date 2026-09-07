@@ -11,8 +11,15 @@ export default {
     // ===== Identity =====
     title: "Template",                      // required: display name, also the .cbz filename (sanitized).
     home: "https://example.com",            // required: also used as the Referer.
+    chap: "new",                            // optional, where downloading starts:
+                                            //   "new"   (default) only the latest chapter
+                                            //   "start" from the site's first chapter to the end
+                                            //   50      from chapter 50 to the end (decimals ok)
+                                            // "start" and a number both walk forward, and both
+                                            // resume where you stopped rather than restarting,
+                                            // because chapters you already have are skipped.
     // Add site-specific fields here if needed - `this` inside both functions below
-    // sees them all. See `mangaId` in cuutruyen.link for an example.
+    // sees them all. See `mangaId` in room-999.link for an example.
 
     // ===== chapters(ctx) -> [{num, url, title}] =====
     // num   : chapter number, decimals allowed (1150.5).

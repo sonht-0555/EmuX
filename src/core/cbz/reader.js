@@ -81,7 +81,48 @@ export async function startReader({zip, entries, romName, trans, level}) {
     const span = Math.min(WINDOW, totalPages);
     let isInit = true, scrollTmr, lastScrollTop = 0, scrollDir = 1;
 
-    const updateNum = () => {numText.textContent = `${globalPage + 1}|${totalPages}`;};
+    // ===== Ô số: trang|tổng, thêm đoạn thứ ba khi đang tải chương sau =====
+    const ERROR_MS = 10000;
+    let status = '', statusTmr;
+    const renderNum = () => {
+        numText.textContent = `${globalPage + 1}|${totalPages}` + (status ? `|${status}` : '');
+    };
+    const setStatus = text => {
+        clearTimeout(statusTmr);
+        status = text || '';
+        renderNum();
+    };
+    // Chỉ lỗi cần tự tắt. Các trạng thái khác đều có đường ra: message sau ghi đè lên,
+    // hoặc mất cùng reader khi mở được chương mới. Lỗi thì không gì ghi đè, mà reader
+    // vẫn sống - không tự tắt là nó đọng trên ô số tới lúc khởi động lại.
+    const setError = text => {
+        setStatus(text);
+        statusTmr = setTimeout(() => setStatus(''), ERROR_MS);
+    };
+
+    // ===== Hết chương: mời tải chương sau =====
+    // Điều kiện là cbz có chứa manga.link, tức do Link tải. File .cbz tự thêm bằng tay
+    // không có entry đó nên không bao giờ bị hỏi.
+    let offered = false;
+    const offerNextChapter = async () => {
+        if (isInit || offered || !zip.link || !window.Link?.continueFrom) return;
+        offered = true;
+        if (!confirm('Load next chapter?')) return;
+        try {
+            const {key, page} = await window.Link.continueFrom({zip, onStatus: setStatus});
+            local(`page_${key}`, page);        // mở chương mới ở trang 1 của nó
+            if (typeof loadGame === 'function') await loadGame(key);
+        } catch (err) {
+            console.error('Next chapter failed:', err.message);
+            setError(err.message);            // lỗi nằm luôn ở ô số, không cần alert
+        }
+    };
+
+    const updateNum = () => {
+        renderNum();
+        if (globalPage === totalPages - 1) offerNextChapter();
+        else offered = false;
+    };
     const updateTrans = p => {if (trans && entries[p]) trans.update(shortName(entries[p].name));};
 
     // ===== Ảnh: giải nén rải theo frame, không bao giờ dồn một tick =====
@@ -118,7 +159,7 @@ export async function startReader({zip, entries, romName, trans, level}) {
         const item = slots.get(p);
         if (item) item.replaceChildren();
         const url = blobUrls.get(p);
-        if (url) {URL.revokeObjectURL(url); blobUrls.delete(p); }
+        if (url) {URL.revokeObjectURL(url); blobUrls.delete(p);}
         pending.delete(p);
     };
 
@@ -327,6 +368,7 @@ export async function startReader({zip, entries, romName, trans, level}) {
     return {
         dispose() {
             clearTimeout(scrollTmr);
+            clearTimeout(statusTmr);
             cancelAnimationFrame(mountRaf);
             cancelAnimationFrame(measureRaf);
             mountQueue.length = 0;

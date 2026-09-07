@@ -1,7 +1,9 @@
 export default {
-    title: "Room_999",
-    home: "https://cuutruyen.net", mangaId: 4871,
-
+    title: "Chainsaw_Man",
+    home: "https://cuutruyen.net", 
+    mangaId: 556,
+    chap: "53",                  
+    // "start" đọc từ đầu, "new" lấy chương mới nhất
     // ===== chapters(ctx) -> [{num, url, title}] =====
     async chapters(ctx) {
         const data = await ctx.json(ctx.abs(`/api/v2/mangas/${this.mangaId}/chapters`, this.home));
@@ -99,9 +101,9 @@ function unscramble(blob, drmData) {
                     readY += height;
                 }
 
-                // JPEG quality 95: the source is already JPEG so re-encoding is
+                // JPEG quality 85: the source is already JPEG so re-encoding is
                 // unavoidable, and at this level the difference is invisible.
-                canvas.toBlob(result => result ? resolve(result) : reject(new Error('empty toBlob')), 'image/jpeg', 0.95);
+                canvas.toBlob(result => result ? resolve(result) : reject(new Error('empty toBlob')), 'image/jpeg', 0.85);
             } catch (err) {
                 reject(err);
             } finally {
