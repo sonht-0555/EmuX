@@ -24,6 +24,7 @@ const IMG_EXT = /\.(jpe?g|png|webp|gif|avif)(?:[?#]|$)/i;
 const EXT_OF_MIME = {'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif', 'image/avif': 'avif'};
 const LINK_ENTRY = 'manga.link';
 const HASH_ENTRY = 'manga.hash';
+const CONF_ENTRY = 'manga.conf';
 const HASH_W = 9, HASH_H = 8;       // dHash: 8 hàng x 8 phép so = 64 bit
 
 // ===== 1. Network =====
@@ -194,9 +195,25 @@ const keyNum = key => {
 };
 
 // Zero-pad để Intl.Collator trong cbz/zip.js sắp đúng thứ tự.
-function pageName(index, url, contentType) {
+// Định dạng thật, đọc từ vài byte đầu. Đây mới là nguồn đáng tin: processImage có thể
+// đổi codec (cuutruyen giao JPEG, ta lưu WebP) nên đuôi trong URL không còn phản ánh nội
+// dung, mà content-type của CDN thì cũng có nơi trả sai.
+const sniffExt = bytes => {
+    if (!bytes || bytes.length < 12) return null;
+    if (bytes[0] === 0xFF && bytes[1] === 0xD8) return 'jpg';
+    if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E) return 'png';
+    if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) return 'gif';
+    // RIFF....WEBP
+    if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[8] === 0x57 && bytes[9] === 0x45) return 'webp';
+    if (bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) return 'avif';
+    return null;
+};
+
+function pageName(index, url, contentType, bytes) {
     const fromUrl = url.match(IMG_EXT);
-    const ext = fromUrl ? fromUrl[1].toLowerCase().replace('jpeg', 'jpg') : (EXT_OF_MIME[(contentType || '').split(';')[0].trim().toLowerCase()] || 'jpg');
+    const ext = sniffExt(bytes)
+        || EXT_OF_MIME[(contentType || '').split(';')[0].trim().toLowerCase()]
+        || (fromUrl ? fromUrl[1].toLowerCase().replace('jpeg', 'jpg') : 'jpg');
     return `${String(index + 1).padStart(4, '0')}.${ext}`;
 }
 
@@ -371,7 +388,41 @@ async function dedupItems(items, oldIndex, knownCredits) {
 
 // dedup = true thì xoá trang credit lặp xuyên chương. Lọc chạy TRƯỚC khi build: lọc sau
 // khi đã ghi nghĩa là ghi cả bộ truyện hai lần cho một lần thêm chương.
-async function writeCbz({existing, additions, linkCode, title, onStatus, dedup = false}) {
+// ===== Config của .link: nhớ những gì đã hỏi người dùng =====
+// Một file .link dùng chung cho nhiều truyện (cuutruyen.link, moetruyen.link) phải hỏi
+// id/tên/chương bắt đầu bằng prompt ở lần chạy đầu. Bản .link lưu trong cbz là source
+// GỐC - vẫn còn mangaId: null - nên nạp lại là hỏi lại. Vì vậy phải lưu riêng câu trả lời.
+//
+// .link khai báo `save: ['mangaId', 'title', 'chap']`: liệt kê tên trường cần nhớ.
+// link.js chỉ đọc/ghi đúng những trường đó, không cần biết chúng nghĩa là gì - site nào
+// cần nhớ thứ gì thì tự khai, đúng ranh giới phần mềm/phần cứng.
+const readConf = manga => {
+    if (!Array.isArray(manga?.save)) return null;
+    const conf = {};
+    for (const field of manga.save) {
+        const value = manga[field];
+        if (value !== undefined && typeof value !== 'function') conf[field] = value;
+    }
+    return Object.keys(conf).length ? conf : null;
+};
+
+// Gán ngược vào manga TRƯỚC khi gọi chapters(), để _init() thấy đã có sẵn và không hỏi.
+const applyConf = (manga, conf) => {
+    if (!conf || !Array.isArray(manga?.save)) return manga;
+    for (const field of manga.save) {
+        if (conf[field] !== undefined) manga[field] = conf[field];
+    }
+    return manga;
+};
+
+const parseConf = bytes => {
+    if (!bytes?.length) return null;
+    try {return JSON.parse(new TextDecoder().decode(bytes));} catch (err) {return null;}
+};
+
+const confOf = zip => parseConf(zip?.conf ? zip.bytesOf(zip.conf) : null);
+
+async function writeCbz({existing, additions, linkCode, title, conf, onStatus, dedup = false}) {
     const {buildZip} = await zipLib();
     let items = [];
 
@@ -411,6 +462,10 @@ async function writeCbz({existing, additions, linkCode, title, onStatus, dedup =
     // tách ra khỏi files nên không lọt vào items.
     items.push({name: LINK_ENTRY, data: new TextEncoder().encode(linkCode)});
     if (index.size || credits.length) items.push({name: HASH_ENTRY, data: serializeIndex(index, credits)});
+    // Không có conf mới thì giữ lại conf cũ: openZip tách .conf ra khỏi files nên nó
+    // không tự đi theo items, mỗi lần ghi mà không push lại là mất.
+    const keepConf = conf ?? confOf(existing.zip);
+    if (keepConf) items.push({name: CONF_ENTRY, data: new TextEncoder().encode(JSON.stringify(keepConf))});
 
     onStatus?.('Saving.');
     const blob = await buildZip(items);
@@ -427,7 +482,7 @@ function firstPageOf(items, num) {
     const dir = chapterDir(num) + '/';
     // Chỉ ảnh mới được đếm: openZip tách .link và .hash ra khỏi files, nên nếu tính
     // chúng vào đây thì chỉ số trang sẽ lệch so với thứ tự trình đọc thấy.
-    const pages = items.filter(item => item.name !== LINK_ENTRY && item.name !== HASH_ENTRY);
+    const pages = items.filter(item => item.name !== LINK_ENTRY && item.name !== HASH_ENTRY && item.name !== CONF_ENTRY);
     return Math.max(0, pages.findIndex(item => item.name.startsWith(dir)));
 }
 
@@ -476,7 +531,8 @@ async function grabPages({manga, chapter, context, onProgress, ask = askUser}) {
             if (blob.size < MIN_BYTES) throw new Error(`only ${blob.size} bytes`);
             // Móc tuỳ chọn: site nào khoá ảnh thì tự dựng lại trong .link của nó.
             if (manga.processImage) blob = await manga.processImage(blob, page);
-            files[pageName(index, page.url, blob.type)] = new Uint8Array(await blob.arrayBuffer());
+            const bytes = new Uint8Array(await blob.arrayBuffer());
+            files[pageName(index, page.url, blob.type, bytes)] = bytes;
             got.add(index);
             lastProgress = Date.now();
             onProgress?.(got.size, total);
@@ -586,7 +642,8 @@ async function syncManga(manga, linkCode, {newest = 1, force = false, ask = askU
         return {key: existing.key, saved: 0};
     }
 
-    const {key, items} = await writeCbz({existing, additions, linkCode, title: manga.title});
+    // readConf sau khi chapters() đã chạy: lúc này _init() đã điền id/tên/chương.
+    const {key, items} = await writeCbz({existing, additions, linkCode, title: manga.title, conf: readConf(manga)});
     // Mở ngay ở chương sớm nhất vừa tải, không phải vị trí đọc cũ.
     local(`page_${key}`, firstPageOf(items, additions[0].num));
 
@@ -606,7 +663,9 @@ async function continueFrom({zip, onStatus, ask = askUser}) {
 
     onStatus?.('Waiting.');
     const linkCode = new TextDecoder().decode(zip.bytesOf(zip.link));
-    const manga = await loadLink(linkCode);
+    // Nạp config TRƯỚC khi chapters() chạy: _init() trong .link thấy id/tên đã có sẵn
+    // thì không bật prompt nữa. Thiếu dòng này là mỗi lần next chương lại hỏi lại.
+    const manga = applyConf(await loadLink(linkCode), confOf(zip));
 
     const have = new Set();
     let max = 0;
@@ -643,6 +702,7 @@ async function continueFrom({zip, onStatus, ask = askUser}) {
     const {key, items, removed} = await writeCbz({
         existing, linkCode, title: manga.title,
         additions: [{num: chapter.num, files}],
+        conf: readConf(manga),
         onStatus,
         dedup: true
     });

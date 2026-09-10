@@ -1,0 +1,373 @@
+export default {
+    // Tên mặc định trước khi người dùng nhập qua popup
+    title: "MoeTruyen",
+    home: "https://moetruyen.rinmyau.workers.dev",
+    mangaId: null,
+    chap: "1", // Mặc định: "1", "start" (đọc từ đầu), "new" (chương mới nhất)
+
+    // link.js nhớ những trường này vào manga.conf bên trong cbz, rồi gán lại trước khi
+    // gọi chapters() - nhờ vậy lần tải chương sau không bật lại prompt.
+    // Có _initialized trong danh sách nên _init() thoát ngay, không cần sửa gì bên dưới.
+    save: ['mangaId', 'title', 'chap', '_initialized'],
+
+    _initialized: false,
+    async _init(ctx) {
+        if (this._initialized) return;
+
+        // 1. Enter Manga URL or ID
+        const rawInput = prompt(
+            "Manga URL or ID:",
+            ""
+        );
+        if (!rawInput) {
+            throw new Error("Cancelled by user");
+        }
+
+        const match = rawInput.match(/(\d+)/);
+        if (!match) {
+            throw new Error(`Invalid Manga ID from: "${rawInput}"`);
+        }
+        this.mangaId = parseInt(match[1], 10);
+
+        // 2. Auto-fetch suggested title from API
+        let suggestedTitle = `Manga_${this.mangaId}`;
+        try {
+            const res = await ctx.json(ctx.abs(`/api/v2/manga/${this.mangaId}/chapters?limit=1&page=1`, this.home));
+            const mangaInfo = res?.data?.manga;
+            if (mangaInfo?.title) {
+                suggestedTitle = mangaInfo.title;
+            }
+        } catch (err) {
+            console.warn("Could not fetch manga title:", err);
+        }
+
+        // 3. Manga Title
+        const customTitle = prompt("Manga Title:", suggestedTitle);
+        this.title = (customTitle || suggestedTitle).trim();
+
+        // 4. Start Chapter
+        const chapInput = prompt("Start Chapter (e.g. 1, 33, new, start):", "1");
+        this.chap = (chapInput || "1").trim();
+
+        this._initialized = true;
+    },
+
+    // ===== chapters(ctx) -> [{num, url, title}] =====
+    async chapters(ctx) {
+        await this._init(ctx);
+
+        let chapters = [];
+        let page = 1;
+        while (true) {
+            const data = await ctx.json(ctx.abs(`/api/v2/manga/${this.mangaId}/chapters?limit=100&page=${page}`, this.home));
+            const list = data?.data?.chapters || (Array.isArray(data?.data) ? data.data : []);
+            if (!list || list.length === 0) break;
+            chapters.push(...list);
+
+            const totalPages = data?.meta?.pagination?.totalPages || 1;
+            if (page >= totalPages) break;
+            page++;
+        }
+
+        return chapters
+            .map(chapter => ({
+                num: parseFloat(chapter.number),
+                url: chapter.id,
+                title: chapter.title ? `Chapter ${chapter.numberText || chapter.number} - ${chapter.title}` : `Chapter ${chapter.numberText || chapter.number}`
+            }))
+            .filter(chapter => Number.isFinite(chapter.num) && chapter.url)
+            .sort((a, b) => a.num - b.num);
+    },
+
+    // ===== pages(chapterId, ctx) -> [{url, drm}] =====
+    async pages(chapterId, ctx) {
+        const data = await ctx.json(ctx.abs(`/api/v2/chapters/${chapterId}`, this.home));
+        const pageUrls = data?.data?.pageUrls;
+        if (!Array.isArray(pageUrls) || pageUrls.length === 0) return [];
+
+        // Kiểm tra xem chapter có sử dụng mã hoá IMGX không (.bin hoặc .js)
+        const isImgx = pageUrls.some(u => {
+            const clean = (u || "").split(/[?#]/)[0].toLowerCase();
+            return clean.endsWith(".bin") || clean.endsWith(".js");
+        });
+
+        let pageGrants = {};
+        if (isImgx) {
+            try {
+                // Xin khóa giải mã cho trang đầu tiên để lấy maxWindow
+                // Thêm tham số dummy '?_=&/proxy?' để sw.js bỏ qua không chặn cache POST gây lỗi
+                const accessUrl = `https://moetruyen.rinmyau.workers.dev/api/v2/chapters/${chapterId}/page-access?_=&/proxy?`;
+                const firstRes = await fetch(accessUrl, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ pageIndexes: [0] })
+                });
+
+                if (firstRes.ok) {
+                    const firstPayload = await firstRes.json();
+                    if (firstPayload?.success && firstPayload?.data) {
+                        const maxWindow = firstPayload.data.maxWindow || 5;
+                        if (firstPayload.data.pages?.[0]) {
+                            pageGrants[0] = firstPayload.data.pages[0];
+                        }
+
+                        const remaining = [];
+                        for (let i = 1; i < pageUrls.length; i++) remaining.push(i);
+
+                        for (let i = 0; i < remaining.length; i += maxWindow) {
+                            const batch = remaining.slice(i, i + maxWindow);
+                            const batchRes = await fetch(accessUrl, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ pageIndexes: batch })
+                            });
+                            if (batchRes.ok) {
+                                const bData = await batchRes.json();
+                                bData?.data?.pages?.forEach(p => {
+                                    pageGrants[p.pageIndex] = p;
+                                });
+                            }
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error("Lỗi khi lấy grant giải mã IMGX:", err);
+            }
+        }
+
+        return pageUrls.map((originalUrl, idx) => {
+            const grantInfo = pageGrants[idx];
+            return {
+                url: grantInfo?.downloadUrl || originalUrl,
+                drm: grantInfo || null
+            };
+        });
+    },
+
+    // ===== processImage(blob, page) -> Blob =====
+    async processImage(blob, page) {
+        const arrayBuffer = await blob.arrayBuffer();
+        const uint8 = new Uint8Array(arrayBuffer);
+
+        // 1. Kiểm tra chữ ký IMGX magic bytes: 'I', 'M', 'G', 'X'
+        if (uint8.length > 13 && uint8[0] === 0x49 && uint8[1] === 0x4d && uint8[2] === 0x47 && uint8[3] === 0x58) {
+            if (page.drm && page.drm.grant && page.drm.storageKey) {
+                const decrypted = await decodeImgxToWebp(uint8, page.drm.grant, page.drm.storageKey);
+                return new Blob([decrypted.webp], { type: "image/webp" });
+            }
+        }
+
+        // 2. Fallback nếu ảnh được nhúng dạng base64 trong script JS
+        const text = new TextDecoder().decode(uint8.slice(0, 500));
+        if (text.includes("window.pages.push")) {
+            const fullText = new TextDecoder().decode(uint8);
+            const match = fullText.match(/window\.pages\.push\(\s*["'`]?(data:[^"'`]+)["'`]?\s*\)/);
+            if (match) {
+                return dataURLtoBlob(match[1]);
+            }
+        }
+
+        // 3. Ảnh thường không bị mã hóa
+        return blob;
+    }
+};
+
+// ============================================================================
+// CÁC HÀM GIẢI MÃ IMGX V2 & V3 (Thuần Web Crypto API, không phụ thuộc thư viện ngoài)
+// ============================================================================
+
+const IMGX_HEADER_BYTES = 13;
+const IMGX_KEY_BYTES = 32;
+const IMGX_MAGIC = [0x49, 0x4d, 0x47, 0x58];
+const IMGX_LEGACY_VERSION = 2;
+const IMGX_VERSION = 3;
+const IMGX_V3_NONCE_BYTES = 12;
+const textEncoder = new TextEncoder();
+
+function base64UrlToBytes(value) {
+    const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), "=");
+    const binary = atob(padded);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+}
+
+function bytesToBase64Url(bytes) {
+    let binary = "";
+    for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+async function sha256Base64Url(bytes) {
+    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    return bytesToBase64Url(new Uint8Array(digest));
+}
+
+function normalizeStorageKey(storageKey) {
+    return (storageKey || "").trim().replace(/^\/+/, "");
+}
+
+function nextXorShift32(value) {
+    let x = value >>> 0;
+    x ^= (x << 13) >>> 0;
+    x ^= x >>> 17;
+    x ^= (x << 5) >>> 0;
+    return x >>> 0;
+}
+
+function fnv1a32(bytes) {
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < bytes.byteLength; i++) {
+        hash ^= bytes[i] ?? 0;
+        hash = Math.imul(hash, 0x01000193) >>> 0;
+    }
+    return hash || 0x9e3779b9;
+}
+
+function seedFromKey(key) {
+    if (key.byteLength < 4) throw new Error("IMGX key invalid");
+    return new DataView(key.buffer, key.byteOffset, key.byteLength).getUint32(0, false) || 0x9e3779b9;
+}
+
+function createGrantKeyWrapMaterial(grant, storageKey) {
+    return [
+        "IMGX-GRANT-WRAP-v1",
+        grant.version,
+        grant.algorithm,
+        grant.imageId,
+        grant.issuedAt,
+        grant.expiresAt,
+        grant.nonce,
+        grant.keyNonce,
+        grant.signature,
+        normalizeStorageKey(storageKey),
+    ].join(".");
+}
+
+function createGrantKeyMask(material, byteLength = IMGX_KEY_BYTES) {
+    const mask = new Uint8Array(byteLength);
+    let seed = fnv1a32(textEncoder.encode(material));
+    for (let i = 0; i < byteLength; i++) {
+        if (i % 4 === 0) {
+            seed = nextXorShift32((seed + i + 0x9e3779b9) & 0xFFFFFFFF) ;
+        }
+        mask[i] = (seed >>> ((i % 4) * 8)) & 0xff;
+    }
+    return mask;
+}
+
+function swapByte(bytes, left, right) {
+    if (left === right) return;
+    const tmp = bytes[left];
+    bytes[left] = bytes[right];
+    bytes[right] = tmp;
+}
+
+function unshuffleBytesInPlace(bytes, key) {
+    const swaps = new Uint32Array(bytes.byteLength);
+    let seed = seedFromKey(key);
+    for (let i = bytes.byteLength - 1; i > 0; i--) {
+        seed = nextXorShift32(seed);
+        swaps[i] = seed % (i + 1);
+    }
+    for (let i = 1; i < bytes.byteLength; i++) {
+        swapByte(bytes, i, swaps[i] ?? 0);
+    }
+}
+
+function xorBytesInPlace(bytes, key) {
+    for (let i = 0; i < bytes.byteLength; i++) {
+        bytes[i] = (bytes[i] ?? 0) ^ (key[i % key.byteLength] ?? 0);
+    }
+}
+
+function parseImgxHeader(binary) {
+    if (binary.byteLength <= IMGX_HEADER_BYTES) throw new Error("IMGX payload empty");
+    for (let i = 0; i < IMGX_MAGIC.length; i++) {
+        if (binary[i] !== IMGX_MAGIC[i]) throw new Error("IMGX magic invalid");
+    }
+    const version = Number(binary[4]) || 0;
+    const view = new DataView(binary.buffer, binary.byteOffset, binary.byteLength);
+    const width = view.getUint32(5, false);
+    const height = view.getUint32(9, false);
+    return { version, width, height };
+}
+
+async function unwrapImgxGrantWrappedKey(grant, storageKey, fieldName, hashFieldName, label) {
+    const wrapped = base64UrlToBytes(grant[fieldName]);
+    if (wrapped.byteLength !== IMGX_KEY_BYTES) throw new Error(`${label} invalid`);
+    const mask = createGrantKeyMask(createGrantKeyWrapMaterial(grant, storageKey), wrapped.byteLength);
+    xorBytesInPlace(wrapped, mask);
+    if ((await sha256Base64Url(wrapped)) !== grant[hashFieldName]) {
+        throw new Error(`${label} hash mismatch`);
+    }
+    return wrapped;
+}
+
+function createImgxV3AdditionalData(grant, storageKey, header) {
+    return textEncoder.encode([
+        "IMGX-v3",
+        grant.imageId.trim(),
+        normalizeStorageKey(storageKey),
+        Math.max(1, Math.floor(Number(header.width) || 0)),
+        Math.max(1, Math.floor(Number(header.height) || 0)),
+    ].join("."));
+}
+
+async function decodeImgxV3ToWebp(binary, grant, storageKey, header) {
+    const contentKey = await unwrapImgxGrantWrappedKey(
+        grant, storageKey, "wrappedContentKey", "contentKeyHash", "IMGX wrapped content key"
+    );
+    const nonce = binary.slice(IMGX_HEADER_BYTES, IMGX_HEADER_BYTES + IMGX_V3_NONCE_BYTES);
+    const encryptedWithTag = binary.slice(IMGX_HEADER_BYTES + IMGX_V3_NONCE_BYTES);
+    const cryptoKey = await crypto.subtle.importKey(
+        "raw", contentKey, { name: "AES-GCM" }, false, ["decrypt"]
+    );
+    const decrypted = await crypto.subtle.decrypt(
+        {
+            name: "AES-GCM",
+            iv: nonce,
+            additionalData: createImgxV3AdditionalData(grant, storageKey, header),
+            tagLength: 128,
+        },
+        cryptoKey,
+        encryptedWithTag
+    );
+    return new Uint8Array(decrypted);
+}
+
+async function decodeImgxToWebp(source, grant, storageKey) {
+    const binary = source instanceof Uint8Array ? source : new Uint8Array(source);
+    const header = parseImgxHeader(binary);
+
+    if (header.version === IMGX_VERSION) {
+        const webp = await decodeImgxV3ToWebp(binary, grant, storageKey, header);
+        return { width: header.width, height: header.height, webp };
+    }
+
+    const decodeKey = await unwrapImgxGrantWrappedKey(
+        grant, storageKey, "wrappedDecodeKey", "keyHash", "IMGX wrapped decode key"
+    );
+    const webp = binary.slice(IMGX_HEADER_BYTES);
+    unshuffleBytesInPlace(webp, decodeKey);
+    xorBytesInPlace(webp, decodeKey);
+
+    return { width: header.width, height: header.height, webp };
+}
+
+function dataURLtoBlob(dataurl) {
+    const arr = dataurl.split(",");
+    const mime = arr[0].match(/:(.*?);/)[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], { type: mime });
+}

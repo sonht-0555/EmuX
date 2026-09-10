@@ -79,7 +79,7 @@ export function openZip(data) {
 
     const cdSize = view.getUint32(eocd + 12, true), cdOffset = view.getUint32(eocd + 16, true);
     const decoder = new TextDecoder('utf-8'), files = [];
-    let json = null, link = null, hash = null;
+    let json = null, link = null, hash = null, conf = null;
 
     for (let p = cdOffset, end = cdOffset + cdSize; p < end;) {
         if (view.getUint32(p, true) !== 0x02014b50) break;
@@ -99,6 +99,9 @@ export function openZip(data) {
             // .hash là bảng perceptual hash từng trang, để lần thêm chương sau chỉ phải
             // giải mã ảnh của chương mới thay vì cả bộ.
             else if (entry.name.endsWith('.hash')) {if (!hash) hash = entry;}
+            // .conf là những gì file .link đã hỏi người dùng (id truyện, tên, chương bắt
+            // đầu). Đi theo cbz để lần tải chương sau không phải hỏi lại.
+            else if (entry.name.endsWith('.conf')) {if (!conf) conf = entry;}
             else if (IMG_EXT.test(entry.name) || isScan(entry.name)) files.push(entry);
         }
         p += 46 + nameLen + view.getUint16(p + 30, true) + view.getUint16(p + 32, true);
@@ -157,7 +160,7 @@ export function openZip(data) {
 
     const collator = new Intl.Collator(undefined, {numeric: true, sensitivity: 'base'});
     files.sort((a, b) => collator.compare(a.name, b.name));
-    return {files, json, link, hash, extract, prefix, bytesOf};
+    return {files, json, link, hash, conf, extract, prefix, bytesOf};
 }
 
 // ===== buildZip: ghi danh sách entry thành một Blob .cbz =====

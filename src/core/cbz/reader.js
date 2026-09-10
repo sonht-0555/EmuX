@@ -103,11 +103,14 @@ export async function startReader({zip, entries, romName, trans, level}) {
     // ===== Hết chương: mời tải chương sau =====
     // Điều kiện là cbz có chứa manga.link, tức do Link tải. File .cbz tự thêm bằng tay
     // không có entry đó nên không bao giờ bị hỏi.
-    let offered = false;
+    // `loading` khoá riêng khỏi `offered`: đang tải mà cuộn ngược lên rồi xuống lại thì
+    // `offered` được reset, nếu chỉ có mình nó thì popup bật lại giữa lúc tải dở.
+    let offered = false, loading = false;
     const offerNextChapter = async () => {
-        if (isInit || offered || !zip.link || !window.Link?.continueFrom) return;
+        if (isInit || offered || loading || !zip.link || !window.Link?.continueFrom) return;
         offered = true;
         if (!confirm('Load next chapter?')) return;
+        loading = true;
         try {
             const {key, page} = await window.Link.continueFrom({zip, onStatus: setStatus});
             local(`page_${key}`, page);        // mở chương mới ở trang 1 của nó
@@ -115,13 +118,17 @@ export async function startReader({zip, entries, romName, trans, level}) {
         } catch (err) {
             console.error('Next chapter failed:', err.message);
             setError(err.message);            // lỗi nằm luôn ở ô số, không cần alert
+        } finally {
+            // Tải xong thì trình đọc bị thay bằng chương mới; chỉ nhánh lỗi mới dùng tới
+            // dòng này, để người dùng thử lại được.
+            loading = false;
         }
     };
 
     const updateNum = () => {
         renderNum();
         if (globalPage === totalPages - 1) offerNextChapter();
-        else offered = false;
+        else if (!loading) offered = false;
     };
     const updateTrans = p => {if (trans && entries[p]) trans.update(shortName(entries[p].name));};
 

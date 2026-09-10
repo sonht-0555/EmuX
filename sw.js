@@ -1,4 +1,4 @@
-let revision = 'EmuX_9.29';
+let revision = 'EmuX_9.34';
 // git add . && git commit --amend --no-edit && git push -f && clear
 // git reset --hard 5fc906e && git push -f && clear
 // git add .github/workflows/build-pico.yml && git commit --amend --no-edit && git push -f && clear
