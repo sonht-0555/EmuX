@@ -27,7 +27,7 @@ jobs:
           - {id: nes,      repo: quicknes,          make: ""}
           - {id: snes,     repo: snes9x,            make: "-C libretro"}
           - {id: snes2010, repo: snes9x2010,        make: "-f Makefile.libretro"}
-          - {id: gba,      repo: mgba,              make: "-f Makefile.libretro"}
+          - {id: gba,      repo: mgba,              build: "emcmake cmake -S . -B build -DBUILD_LIBRETRO=ON -DLIBRETRO_STATIC=ON -DSKIP_LIBRARY=ON -DBUILD_QT=OFF -DBUILD_SDL=OFF -DBUILD_SHARED=OFF -DBUILD_STATIC=OFF -DDISABLE_DEPS=ON -DENABLE_SCRIPTING=OFF && emmake make -C build mgba_libretro -j$(nproc)"}
           - {id: genesis,  repo: genesis_plus_gx,   make: "-f Makefile.libretro"}
           - {id: ngp,      repo: mednafen_ngp,      make: ""}
           - {id: pce,      repo: mednafen_pce_fast, make: "-f Makefile"}
@@ -77,7 +77,7 @@ jobs:
           cd $CORE
           if [ -n "${{ matrix.core.subdir }}" ]; then cd ${{ matrix.core.subdir }}; fi
           ${{ matrix.core.patch || 'true' }}
-          emmake make ${{ matrix.core.make }} platform=emscripten STATIC_LINKING=0 WANT_ZLIB=1 WANT_VFS=1 -j$(nproc)
+          ${{ matrix.core.build || format('emmake make {0} platform=emscripten STATIC_LINKING=0 WANT_ZLIB=1 WANT_VFS=1 -j$(nproc)', matrix.core.make) }}
           EMUX="$GITHUB_WORKSPACE/emux/.github/workflows/retro"
           emcc -c $EMUX/retro_utils.c -o $GITHUB_WORKSPACE/retro_utils.o $OPT_FLAGS -flto
           GLUE_NAME="${{ matrix.core.glue || 'retro_glue.c' }}"
