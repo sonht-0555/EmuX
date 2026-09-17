@@ -19,13 +19,33 @@ window.onkeyup = function (e) {
     var id = KEYS[e.key];
     if (id !== undefined) keyMask &= ~(1 << id);
 };
+// ===== pollPads =====
+const AXIS_DEAD = 0.5;
+function pollPads() {
+    var pads = navigator.getGamepads ? navigator.getGamepads() : [], mask = 0, found = false;
+    for (var p = 0; p < pads.length; p++) {
+        var pad = pads[p];
+        if (!pad || !pad.connected) continue;
+        found = true;
+        var buttons = pad.buttons, count = Math.min(buttons.length, 16);
+        for (var i = 0; i < count; i++) if (PHYS[i] !== -1 && buttons[i]?.pressed) mask |= (1 << PHYS[i]);
+        var axes = pad.axes || [];
+        if (axes[0] < -AXIS_DEAD) mask |= (1 << 6); if (axes[0] > AXIS_DEAD) mask |= (1 << 7);
+        if (axes[1] < -AXIS_DEAD) mask |= (1 << 4); if (axes[1] > AXIS_DEAD) mask |= (1 << 5);
+        if (pad.mapping !== 'standard' && axes.length === 10 && axes[9] >= -1.01 && axes[9] <= 1.01) {
+            var hat = Math.round((axes[9] + 1) * 3.5);
+            if (hat === 0 || hat === 1 || hat === 7) mask |= (1 << 4);
+            if (hat >= 3 && hat <= 5) mask |= (1 << 5);
+            if (hat >= 5 && hat <= 7) mask |= (1 << 6);
+            if (hat >= 1 && hat <= 3) mask |= (1 << 7);
+        }
+    }
+    hasGamepad = found;
+    padMask = mask;
+}
 // ===== input_poll_cb =====
 function input_poll_cb() {
-    if (hasGamepad) {
-        var pad = navigator.getGamepads()[0], mask = 0;
-        if (pad) for (var i = 0; i < 16; i++) if (PHYS[i] !== -1 && pad.buttons[i]?.pressed) mask |= (1 << PHYS[i]);
-        padMask = mask;
-    }
+    pollPads();
     gamepadMask = touchMask | padMask | keyMask;
 }
 // ===== buttonPress =====

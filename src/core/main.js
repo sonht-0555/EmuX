@@ -34,19 +34,24 @@ function findCore(name, data) {
     const id = local(name) === 'mame' ? 'mame' : 'fbneo';
     return {config: CORE_CONFIG.find(c => c.id === id), data, name};
 }
-const CBZ_AUTO_OPEN_MAX = 200 * 1024 * 1024;
+const AUTO_OPEN_MAX = 200 * 1024 * 1024;
 // ===== inputGame =====
 async function inputGame(event) {
     const file = event.target.files[0], storeName = storeForFilename(file.name);
     if (file.name.toLowerCase().endsWith('.link')) return window.Link?.openLinkFile(file);
+    const autoOpen = file.size <= AUTO_OPEN_MAX;
     if (file.name.toLowerCase().endsWith('.cbz')) {
         await emuxDB(file, file.name);
         if (typeof view === 'function') view('cbz');
         else if (typeof listGame === 'function') listGame();
-        if (file.size <= CBZ_AUTO_OPEN_MAX) await initCore(file);
+        if (autoOpen) await initCore(file);
         return;
     }
     await emuxDB(await file.arrayBuffer(), file.name);
+    if (!autoOpen) {
+        if (typeof listGame === 'function') listGame();
+        return;
+    }
     if (storeName === 'games') await initCore(file);
 }
 // ===== loadGame =====
