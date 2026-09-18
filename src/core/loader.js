@@ -41,7 +41,7 @@ window.CORE_CONFIG = [
     {tag: 'fneo', ext: '.zip', id: 'fbneo', isMame: true, isFbneo: true, script: 'fbneo.zip', btns: {'btn-1': ['A', 0], 'btn-3': ['B', 8], 'btn-2': ['C', 1], 'btn-4': ['D', 9], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' cn.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/neogeo.zip']},
     {tag: 'mame', ext: '.zip', id: 'mame', isMame: true, isFbneo: true, script: 'mame.zip', btns: {'btn-1': ['A', 0], 'btn-3': ['B', 8], 'btn-2': ['C', 1], 'btn-4': ['D', 9], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' cn.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/neogeo.zip']},
     {tag: 'nds', ext: '.nds', isNDS: true, script: 'nds2021.zip', btns: {'btn-1': ['A', 8], 'btn-2': ['X', 9], 'btn-3': ['B', 0], 'btn-4': ['Y', 1], 'btn-l': [' bl.', 10], 'btn-r': [' br.', 11], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/bios7.bin', './src/utils/bios/bios9.bin', './src/utils/bios/firmware.bin'], vars: {melonds_touch_mode: 'Touch'}},
-    {tag: 'ps1', ext: '.bin,.iso,.img,.pbp,.chd,.cue', script: 'ps1.zip', btns: {'btn-1': ['A', 8], 'btn-2': ['X', 9], 'btn-3': ['B', 0], 'btn-4': ['Y', 1], 'btn-l': [' bl.', 10], 'btn-r': [' br.', 11], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/scph5501.bin']},
+    {tag: 'ps1', ext: '.bin,.iso,.img,.pbp,.chd,.cue', script: 'ps1.zip', fullpath: true, btns: {'btn-1': ['O', 8], 'btn-2': ['A', 9], 'btn-3': ['X', 0], 'btn-4': ['B', 1], 'btn-l': [' bl.', 10], 'btn-r': [' br.', 11], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/scph5501.bin'], vars: {pcsx_rearmed_icache_emulation: 'disabled', pcsx_rearmed_dithering: 'disabled', pcsx_rearmed_spu_reverb: 'disabled', pcsx_rearmed_scale_hires: 'enabled'}},
     {tag: 'mini', ext: '.min', script: 'pokemini.zip', btns: {'btn-1': ['A', 8], 'btn-3': ['B', 0], 'btn-l': [' bc.', 1], 'btn-r': [' br.', 2], 'btn-select': [' sc.', ''], 'btn-start': [' st.', 3]}},
     {tag: 'lynx', ext: '.lnx', script: 'lynx.zip', btns: {'btn-1': ['A', 0], 'btn-3': ['B', 8], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', 2], 'btn-start': [' st.', 3]}, bios: ['./src/utils/bios/lynxboot.img']},
     {tag: 'pico', ext: '.p8.png,.p8,.png', id: 'pico8', script: './src/core/pico8.js', btns: {'btn-1': ['O', 8], 'btn-3': ['X', 9], 'btn-l': [' bl.', ''], 'btn-r': [' br.', ''], 'btn-select': [' sc.', ''], 'btn-start': [' st.', 3]}},
@@ -66,6 +66,8 @@ async function initCore(romFile) {
     activeVars = config.vars || {};
     updateButtons(config.btns);
     const isMame = config.isMame, isFbneo = config.isFbneo, isNDS = config.isNDS;
+    // Disc-based cores read the game from the MEMFS path, so a second copy in the wasm heap is wasted.
+    const isFullpath = config.fullpath || isMame;
     let scriptSource = config.script;
     // Step 3: Prepare Core Engine
     await showNotification("", "#", "--", "", true);
@@ -89,7 +91,7 @@ async function initCore(romFile) {
             async onRuntimeInitialized() {
                 // Step 5: Core engine setup
                 let romPointer = 0;
-                if (!isMame) romPointer = Module._malloc(finalRomData.length);
+                if (!isFullpath) romPointer = Module._malloc(finalRomData.length);
                 const infoPointer = Module._malloc(16);
                 window._logFnPtr = Module.addFunction((_, f) => {
                     const msg = Module.UTF8ToString(f);
@@ -116,7 +118,7 @@ async function initCore(romFile) {
                 let romPath = isFbneo ? `/${finalRomName}` : (isNDS ? '/game.nds' : `/game.${finalRomName.toLowerCase().split('.').pop()}`);
                 Module.FS.writeFile(romPath, finalRomData);
                 const loadInfo = [getPointer(romPath), 0, 0, 0];
-                if (!isMame && romPointer) {
+                if (!isFullpath && romPointer) {
                     Module.HEAPU8.set(finalRomData, romPointer);
                     loadInfo[1] = romPointer;
                     loadInfo[2] = finalRomData.length;
