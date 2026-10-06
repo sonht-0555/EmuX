@@ -422,12 +422,14 @@ const parseConf = bytes => {
 
 const confOf = zip => parseConf(zip?.conf ? zip.bytesOf(zip.conf) : null);
 
-async function writeCbz({existing, additions, linkCode, title, conf, onStatus, dedup = false}) {
+async function writeCbz({existing, additions, linkCode, title, conf, onStatus, dedup = false, replace = new Set()}) {
     const {buildZip} = await zipLib();
     let items = [];
 
     if (existing.zip) {
-        for (const entry of existing.zip.files) items.push({name: entry.name, data: existing.zip.bytesOf(entry)});
+        for (const entry of existing.zip.files) {
+            if (!replace.has(dirNum(entry.name))) items.push({name: entry.name, data: existing.zip.bytesOf(entry)});
+        }
     }
     for (const {num, files} of additions) {
         for (const [name, data] of Object.entries(files)) items.push({name: `${chapterDir(num)}/${name}`, data});
@@ -436,6 +438,8 @@ async function writeCbz({existing, additions, linkCode, title, conf, onStatus, d
     // Bảng hash cũ đi kèm trong cbz. openZip tách .hash ra khỏi files nên nó không lọt
     // vào items - phải tự đọc lại rồi tự ghi lại, không thì mỗi lần ghi là mất bảng.
     let {index, credits} = parseIndex(existing.zip?.hash ? existing.zip.bytesOf(existing.zip.hash) : null);
+    // Ảnh tải lại phải tính hash mới, kể cả khi tên trang vẫn giống bản cũ.
+    for (const name of index.keys()) if (replace.has(dirNum(name))) index.delete(name);
     let removed = 0;
     if (dedup) {
         onStatus?.('Checking.');
@@ -684,14 +688,13 @@ async function continueFrom({zip, onStatus, ask = askUser}) {
     // Trình đọc đang ở cuối chương cao nhất, nên chương sau là chương nhỏ nhất lớn hơn
     // nó. Lỗ hổng ở giữa để dành cho .link với chap:"start" lấp.
     //
-    // "Không lấy được danh sách" và "không có chương nào sau đây" đi chung một lối hỏi:
-    // cái thứ hai cũng throw, nên người dùng thử lại được cả hai bằng một câu confirm.
-    const chapter = await retryAsk(async () => {
-        const all = normalizeChapters(await manga.chapters(context), manga);
-        const found = all.find(item => item.num > max && item.num >= floor && !have.has(item.num));
-        if (!found) throw new Error(`No chapter after ${max}`);
-        return found;
-    }, `${manga.title}: next chapter after ${max}`, ask);
+    // Chỉ hỏi thử lại khi không lấy được danh sách. Đã tới chương mới nhất thì
+    // báo ở ô số của reader, không bật popup mỗi lần tự tải chương sau.
+    const all = await retryAsk(
+        async () => normalizeChapters(await manga.chapters(context), manga),
+        `${manga.title}: chapter list`, ask);
+    const chapter = all.find(item => item.num > max && item.num >= floor && !have.has(item.num));
+    if (!chapter) throw new Error(`No chapter after ${max}`);
 
     const {files} = await grabPages({
         manga, chapter, context, ask,
@@ -710,6 +713,37 @@ async function continueFrom({zip, onStatus, ask = askUser}) {
 
     if (typeof listGame === 'function') listGame();
     return {key, page: firstPageOf(items, chapter.num)};
+}
+// Tải lại đúng chương đang đọc, chỉ thay bản cũ sau khi đã lấy đủ ảnh.
+async function reloadChapter({zip, entryName, romName, onStatus, ask = askUser}) {
+    if (!zip?.link) throw new Error('This .cbz was not created by Link.');
+    const num = dirNum(entryName);
+    if (!Number.isFinite(num)) throw new Error('Cannot identify the current chapter.');
+
+    onStatus?.('Waiting.');
+    const linkCode = new TextDecoder().decode(zip.bytesOf(zip.link));
+    const manga = applyConf(await loadLink(linkCode), confOf(zip));
+    const context = createContext(true, manga.home);
+    const chapter = await retryAsk(async () => {
+        const all = normalizeChapters(await manga.chapters(context), manga);
+        const found = all.find(item => item.num === num);
+        if (!found) throw new Error(`Chapter ${num} not found`);
+        return found;
+    }, `${manga.title}: chapter ${num}`, ask);
+
+    const {files, skipped} = await grabPages({
+        manga, chapter, context, ask,
+        onProgress: (done, total) => onStatus?.(`Reloading_${num}.|${done}.${total}|`)
+    });
+    if (skipped) throw new Error(`Chapter ${num}: ${skipped} page(s) failed. Original chapter kept.`);
+
+    const {key, items} = await writeCbz({
+        existing: {key: romName, zip}, additions: [{num, files}],
+        replace: new Set([num]), linkCode, title: manga.title,
+        conf: readConf(manga), onStatus, dedup: true
+    });
+    if (typeof listGame === 'function') listGame();
+    return {key, page: firstPageOf(items, num)};
 }
 
 // ===== 11. Cửa vào =====
@@ -743,4 +777,4 @@ async function checkProxy() {
     }
 }
 
-window.Link = {openLinkFile, checkProxy, continueFrom};
+window.Link = {openLinkFile, checkProxy, continueFrom, reloadChapter};

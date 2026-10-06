@@ -100,16 +100,14 @@ export async function startReader({zip, entries, romName, trans, level}) {
         statusTmr = setTimeout(() => setStatus(''), ERROR_MS);
     };
 
-    // ===== Hết chương: mời tải chương sau =====
+    // ===== Hết chương: tự tải chương sau =====
     // Điều kiện là cbz có chứa manga.link, tức do Link tải. File .cbz tự thêm bằng tay
-    // không có entry đó nên không bao giờ bị hỏi.
-    // `loading` khoá riêng khỏi `offered`: đang tải mà cuộn ngược lên rồi xuống lại thì
-    // `offered` được reset, nếu chỉ có mình nó thì popup bật lại giữa lúc tải dở.
-    let offered = false, loading = false;
-    const offerNextChapter = async () => {
-        if (isInit || offered || loading || !zip.link || !window.Link?.continueFrom) return;
-        offered = true;
-        if (!confirm('Load next chapter?')) return;
+    // không có entry đó nên không tự tải.
+    // Khoá đang tải và ghi nhớ lần chạm cuối để không tải trùng khi cuộn qua lại.
+    let nextRequested = false, loading = false;
+    const loadNextChapter = async () => {
+        if (isInit || nextRequested || loading || !zip.link || !window.Link?.continueFrom) return;
+        nextRequested = true;
         loading = true;
         try {
             const {key, page} = await window.Link.continueFrom({zip, onStatus: setStatus});
@@ -125,10 +123,30 @@ export async function startReader({zip, entries, romName, trans, level}) {
         }
     };
 
+    const reloadCurrentChapter = async () => {
+        if (loading || !zip.link || !window.Link?.reloadChapter) return;
+        const entryName = entries[globalPage]?.name;
+        const chapter = entryName?.match(/^C(\d+(?:~\d+)?)[/]/);
+        if (!chapter) return;
+        const label = Number(chapter[1].replace('~', '.'));
+        if (!confirm(`Reload chapter ${label}`)) return;
+        loading = true;
+        try {
+            const {key, page} = await window.Link.reloadChapter({zip, entryName, romName, onStatus: setStatus});
+            local(`page_${key}`, page);
+            if (typeof loadGame === 'function') await loadGame(key);
+        } catch (err) {
+            console.error('Reload chapter failed:', err.message);
+            setError(err.message);
+        } finally {
+            loading = false;
+        }
+    };
+
     const updateNum = () => {
         renderNum();
-        if (globalPage === totalPages - 1) offerNextChapter();
-        else if (!loading) offered = false;
+        if (globalPage === totalPages - 1) loadNextChapter();
+        else if (!loading) nextRequested = false;
     };
     const updateTrans = p => {if (trans && entries[p]) trans.update(shortName(entries[p].name));};
 
@@ -310,15 +328,21 @@ export async function startReader({zip, entries, romName, trans, level}) {
         [bpad, dpad, jpad, page00, page01, switch0].forEach(el => el.hidden = true);
     }, 200);
 
-    // ===== Nhảy trang bằng ô số =====
-    num.onclick = event => {
-        event.stopPropagation();
+    // ===== Ô số: một chạm nhảy trang, hai chạm tải lại chương do Link tải =====
+    const jumpPage = () => {
         const input = prompt("Page:", globalPage + 1)?.trim();
         if (!input) return;
         const page = parseInt(input) - 1;
         if (!(page >= 0 && page < totalPages)) return;
         goToPage(page);
         savePage();
+    };
+    num.style.touchAction = 'manipulation';
+    num.onclick = event => {
+        event.stopPropagation();
+        if (loading) return;
+        if (!zip.link || !window.Link?.reloadChapter) {jumpPage(); return;}
+        click(jumpPage, reloadCurrentChapter);
     };
 
     await showNotification("", "###", "", "", true);
@@ -374,6 +398,8 @@ export async function startReader({zip, entries, romName, trans, level}) {
 
     return {
         dispose() {
+            clearTimeout(click.timer);
+            click.count = 0;
             clearTimeout(scrollTmr);
             clearTimeout(statusTmr);
             cancelAnimationFrame(mountRaf);
