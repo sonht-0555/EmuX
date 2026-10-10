@@ -30,7 +30,7 @@ async function extractCBZ(data, romName) {
         catch (err) {console.error('Lỗi đọc file dịch:', err);}
     }
 
-    const level = createLevel();
+    const level = createLevel(romName);
     const trans = createTrans(transData);
     session = await startReader({zip, entries, romName, trans, level});
 }

@@ -16,6 +16,8 @@ var urlsToCache = [
     './src/assets/font/3x3.ttf',
     './src/assets/font/afacad.ttf',
     './src/utils/zip.js',
+    './src/utils/links/cuutruyen.link',
+    './src/utils/links/moetruyen.link',
     './src/utils/wsg/wsg.html',
     './src/utils/wsg/style.css',
     './src/utils/wsg/app.js',

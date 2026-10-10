@@ -761,6 +761,17 @@ async function openLinkFile(file) {
     }
 }
 
+// Read chapter totals through the existing embedded adapter without downloading pages.
+async function getChapterCount({zip}) {
+    const conf = confOf(zip);
+    if (!zip?.link || !conf) return null;
+    const manga = applyConf(await loadLink(new TextDecoder().decode(zip.bytesOf(zip.link))), conf);
+    // Optional reader metadata must not reopen setup prompts for older archives.
+    if (typeof manga._init === 'function' && manga._initialized !== true) return null;
+    const chapters = normalizeChapters(await manga.chapters(createContext(false, manga.home)), manga);
+    return chapters.length;
+}
+
 async function checkProxy() {
     try {
         const response = await fetch(wrap('https://example.com/'));
@@ -777,4 +788,4 @@ async function checkProxy() {
     }
 }
 
-window.Link = {openLinkFile, checkProxy, continueFrom, reloadChapter};
+window.Link = {openLinkFile, checkProxy, continueFrom, reloadChapter, getChapterCount};
