@@ -1,0 +1,140 @@
+function workerFailure(payload, status, fallback) {
+    const fields = [];
+    const visit = (value, depth = 0) => {
+        if (depth > 3 || value == null) return;
+        if (typeof value === "string" && value.trim()) fields.push(value.trim());
+        else if (typeof value === "object") {
+            for (const name of ["code", "message", "error", "reason"]) visit(value[name], depth + 1);
+        }
+    };
+    visit(payload);
+    const detail = [...new Set(fields)].join(": ") || fallback;
+    const error = new Error(`Worker HTTP ${status}: ${detail}`);
+    if (status === 429 || fields.some(field => field.toUpperCase() === "RATE_LIMITED")) {
+        error.code = "RATE_LIMITED";
+        error.retryable = false;
+        error.message += "\nNguồn đang giới hạn request. Hủy lượt tải và chờ trước khi mở lại file .link.";
+    }
+    return error;
+}
+
+async function workerJson(response) {
+    try { return await response.json(); }
+    catch { throw workerFailure(null, response.status, "Phản hồi không phải JSON hợp lệ"); }
+}
+
+export default {
+    // Tên mặc định trước khi người dùng nhập qua popup
+    title: "MoeTruyen",
+    home: "https://moetruyen-worker.hoangtuanson91.workers.dev",
+    mangaId: null,
+    chap: "1", // Mặc định: "1", "start" (đọc từ đầu), "new" (chương mới nhất)
+
+    // link.js nhớ những trường này vào manga.conf bên trong cbz, rồi gán lại trước khi
+    // gọi chapters() - nhờ vậy lần tải chương sau không bật lại prompt.
+    // Có _initialized trong danh sách nên _init() thoát ngay, không cần sửa gì bên dưới.
+    save: ['mangaId', 'title', 'chap', '_initialized'],
+
+    async _json(path) {
+        const endpoint = new URL(path, this.home);
+        if (endpoint.origin !== new URL(this.home).origin) throw new Error("API URL không thuộc Worker của bạn");
+        endpoint.searchParams.set("requestId", crypto.randomUUID());
+        const response = await fetch(endpoint.href, { cache: "no-store" });
+        const data = await workerJson(response);
+        if (!response.ok || data?.success !== true) throw workerFailure(data, response.status, "Worker không trả dữ liệu hợp lệ");
+        return data;
+    },
+
+    _initialized: false,
+    async _init(ctx) {
+        if (this._initialized) return;
+
+        // 1. Enter Manga URL or ID
+        const rawInput = prompt(
+            "Manga URL or ID:",
+            ""
+        );
+        if (!rawInput) {
+            throw new Error("Cancelled by user");
+        }
+
+        const match = rawInput.match(/(\d+)/);
+        if (!match) {
+            throw new Error(`Invalid Manga ID from: "${rawInput}"`);
+        }
+        this.mangaId = parseInt(match[1], 10);
+
+        // 2. Auto-fetch suggested title from API
+        let suggestedTitle = `Manga_${this.mangaId}`;
+        try {
+            const res = await this._json(`/api/v1/manga/${this.mangaId}/chapters?page=1`);
+            const mangaInfo = res?.data?.manga;
+            if (mangaInfo?.title) {
+                suggestedTitle = mangaInfo.title;
+            }
+        } catch (err) {
+            console.warn("Could not fetch manga title:", err);
+        }
+
+        // 3. Manga Title
+        const customTitle = prompt("Manga Title:", suggestedTitle);
+        this.title = (customTitle || suggestedTitle).trim();
+
+        // 4. Start Chapter
+        const chapInput = prompt("Start Chapter (e.g. 1, 33, new, start):", "1");
+        this.chap = (chapInput || "1").trim();
+
+        this._initialized = true;
+    },
+
+    // ===== chapters(ctx) -> [{num, url, title}] =====
+    async chapters(ctx) {
+        await this._init(ctx);
+
+        let chapters = [];
+        let page = 1;
+        while (true) {
+            const data = await this._json(`/api/v1/manga/${this.mangaId}/chapters?page=${page}`);
+            const list = data?.data?.chapters || (Array.isArray(data?.data) ? data.data : []);
+            if (!list || list.length === 0) break;
+            chapters.push(...list);
+
+            const totalPages = data?.meta?.pagination?.totalPages || 1;
+            if (page >= totalPages) break;
+            page++;
+        }
+
+        return chapters
+            .map(chapter => ({
+                num: parseFloat(chapter.number),
+                url: chapter.pagesUrl,
+                title: chapter.title ? `Chapter ${chapter.numberText || chapter.number} - ${chapter.title}` : `Chapter ${chapter.numberText || chapter.number}`
+            }))
+            .filter(chapter => Number.isFinite(chapter.num) && chapter.url)
+            .sort((a, b) => a.num - b.num);
+    },
+
+    // Worker quản lý nguồn, phiên reader, khóa và các phiên bản IMGX.
+    async pages(chapterUrl) {
+        const data = await this._json(chapterUrl);
+        if (!Array.isArray(data?.data?.pages) || !data.data.pages.length) throw new Error("Worker không trả danh sách ảnh");
+        return data.data.pages.map(page => {
+            if (!page.downloadUrl) throw new Error("Worker thiếu URL ảnh");
+            return { url: page.downloadUrl, drm: null, workerImage: true };
+        });
+    },
+
+    // Hook đã có trong core nguyên bản: kiểm tra ảnh Worker sau khi download manager tải qua proxy chung.
+    async processImage(blob, page) {
+        if (!page.workerImage) return blob;
+        const bytes = new Uint8Array(await blob.arrayBuffer());
+        const isWebp = bytes.length >= 12
+            && String.fromCharCode(...bytes.subarray(0, 4)) === "RIFF"
+            && String.fromCharCode(...bytes.subarray(8, 12)) === "WEBP";
+        const isJpeg = bytes[0] === 0xff && bytes[1] === 0xd8;
+        if (!isWebp && !isJpeg) {
+            throw new Error("Worker chưa trả ảnh truyện đã giải mã (WebP/JPEG)");
+        }
+        return blob;
+    }
+};

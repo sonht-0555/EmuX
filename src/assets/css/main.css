@@ -407,6 +407,10 @@
         height: 4px;
       }
       num .num-text {
+        display: block;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
         position: relative;
         z-index: 1;
       }

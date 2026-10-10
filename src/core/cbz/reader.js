@@ -81,24 +81,60 @@ export async function startReader({zip, entries, romName, trans, level}) {
     const span = Math.min(WINDOW, totalPages);
     let isInit = true, scrollTmr, lastScrollTop = 0, scrollDir = 1;
 
-    // ===== Ô số: trang|tổng, thêm đoạn thứ ba khi đang tải chương sau =====
-    const ERROR_MS = 10000;
-    let status = '', statusTmr;
+    // ===== Reader label: page → title → source chapter total, every twenty seconds =====
+    const ERROR_MS = 10000, LABEL_MS = 20000;
+    let status = '', statusTmr, labelTmr, labelMode = 0, disposed = false;
+    let mangaTitle = romName.replace(/\.cbz$/i, '');
+    let chapterTotal = null;
+    if (zip.conf) {
+        try {
+            const conf = JSON.parse(new TextDecoder().decode(zip.bytesOf(zip.conf)));
+            if (typeof conf.title === 'string' && conf.title.trim()) mangaTitle = conf.title.trim();
+        } catch (error) {console.warn('Reader title unavailable:', error.message);}
+    }
     const renderNum = () => {
-        numText.textContent = `${globalPage + 1}|${totalPages}` + (status ? `|${status}` : '');
+        const chapter = entries[globalPage]?.name.match(/^C(\d+(?:~\d+)?)[/]/);
+        const chapterLabel = chapter ? Number(chapter[1].replace('~', '.')) : '?';
+        const pageLabel = `${globalPage + 1}|${totalPages}`;
+        numText.textContent = status ? `${pageLabel}|${status}`
+            : labelMode === 1 ? mangaTitle
+            : labelMode === 2 ? `Chap|${chapterLabel}|${chapterTotal ?? '?'}`
+            : pageLabel;
     };
+    const scheduleNum = () => {
+        clearTimeout(labelTmr);
+        if (!disposed && !status && !document.hidden) labelTmr = setTimeout(rotateNum, LABEL_MS);
+    };
+    const rotateNum = () => {
+        if (disposed || status || document.hidden) return;
+        labelMode = (labelMode + 1) % 3;
+        renderNum();
+        scheduleNum();
+    };
+    const resetNum = () => {
+        labelMode = 0;
+        renderNum();
+        scheduleNum();
+    };
+    // Give the visible label a full interval after returning from another tab.
+    const onLabelVisibility = () => scheduleNum();
+    document.addEventListener('visibilitychange', onLabelVisibility);
     const setStatus = text => {
         clearTimeout(statusTmr);
         status = text || '';
-        renderNum();
+        resetNum();
     };
-    // Chỉ lỗi cần tự tắt. Các trạng thái khác đều có đường ra: message sau ghi đè lên,
-    // hoặc mất cùng reader khi mở được chương mới. Lỗi thì không gì ghi đè, mà reader
-    // vẫn sống - không tự tắt là nó đọng trên ô số tới lúc khởi động lại.
     const setError = text => {
         setStatus(text);
         statusTmr = setTimeout(() => setStatus(''), ERROR_MS);
     };
+    if (zip.link && window.Link?.getChapterCount) {
+        window.Link.getChapterCount({zip}).then(count => {
+            if (disposed || !Number.isSafeInteger(count) || count < 1) return;
+            chapterTotal = count;
+            renderNum();
+        }).catch(error => console.warn('Reader chapter total unavailable:', error.message));
+    }
 
     // ===== Hết chương: tự tải chương sau =====
     // Điều kiện là cbz có chứa manga.link, tức do Link tải. File .cbz tự thêm bằng tay
@@ -144,7 +180,7 @@ export async function startReader({zip, entries, romName, trans, level}) {
     };
 
     const updateNum = () => {
-        renderNum();
+        resetNum();
         if (globalPage === totalPages - 1) loadNextChapter();
         else if (!loading) nextRequested = false;
     };
@@ -398,6 +434,9 @@ export async function startReader({zip, entries, romName, trans, level}) {
 
     return {
         dispose() {
+            disposed = true;
+            clearTimeout(labelTmr);
+            document.removeEventListener('visibilitychange', onLabelVisibility);
             clearTimeout(click.timer);
             click.count = 0;
             clearTimeout(scrollTmr);

@@ -16,6 +16,32 @@ function view(name) {
     logo.innerText = isHome ? 'ux' : isCbz ? 'kx' : 'ck';
     if (isLibrary) listGame();
 }
+// ===== downloadMangaLink =====
+let mangaLinkBusy = false;
+async function downloadMangaLink() {
+    if (mangaLinkBusy) return;
+    mangaLinkBusy = true;
+    try {
+        const choice = prompt("MoeTruyen [1] CuuTruyen [2]", "1");
+        if (choice === null) return;
+        const selection = choice.trim();
+        const source = selection === '1' ? 'moetruyen' : selection === '2' ? 'cuutruyen' : null;
+        if (!source) {
+            alert("Enter 1 for MoeTruyen or 2 for CuuTruyen.");
+            return;
+        }
+        if (!window.Link?.openLinkFile) throw new Error("Manga download is not ready yet.");
+        const response = await fetch(`./src/utils/links/${source}.link`, {cache: 'no-store'});
+        if (!response.ok) throw new Error(`Cannot load the manga adapter: HTTP ${response.status}`);
+        const code = await response.text();
+        await window.Link.openLinkFile(new File([code], `${source}.link`, {type: 'text/plain'}));
+    } catch (error) {
+        console.error('Download manga:', error);
+        await message(error.message || "Cannot open the manga source.", 4000);
+    } finally {
+        mangaLinkBusy = false;
+    }
+}
 // ===== showFileGroups =====
 async function showFileGroups(gameName) {
     const isCbzMode = libraryMode === 'cbz';
@@ -73,7 +99,7 @@ async function listGame() {
 
         while (list.children.length > (isCbzMode ? 0 : 1)) list.removeChild(list.lastChild);
 
-        const html = (isCbzMode ? `<rom data-link="./src/utils/wsg/klotski.html"><name>Klotski</name><tag>_game</tag></rom>` : '') + items.map(item => {
+        const html = (isCbzMode ? `<rom data-action="download-manga"><name>MoeCuu</name><tag>_link</tag></rom>` : `<rom data-link="./src/utils/wsg/klotski.html"><name>Klotski</name><tag>_game</tag></rom>`) + items.map(item => {
             const isLocal = typeof item === 'string', path = isLocal ? item : item.path;
             const fileExtension = supportedExtensions.find(extension => path.toLowerCase().endsWith(extension.toLowerCase())) || ('.' + path.split('.').pop().toLowerCase());
             const fileName = path.split('/').pop();
@@ -87,7 +113,9 @@ async function listGame() {
 
         Array.from(list.children).slice(isCbzMode ? 0 : 1).forEach(romElement => {
             const link = romElement.getAttribute('data-link'), fullName = romElement.getAttribute('data-full'), url = romElement.getAttribute('data-url'), displayName = romElement.querySelector('name').textContent;
-            if (link) {
+            if (romElement.getAttribute('data-action') === 'download-manga') {
+                romElement.onclick = downloadMangaLink;
+            } else if (link) {
                 romElement.onclick = () => window.location.href = link;
             } else if (fullName) {
                 romElement.querySelectorAll('name, tag').forEach(element => element.onclick = () => loadGame(fullName));

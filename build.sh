@@ -8,6 +8,8 @@ rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"
 EXCLUDE_ARGS=""
 for item in "${EXCLUDE_LIST[@]}"; do EXCLUDE_ARGS="$EXCLUDE_ARGS --exclude=$item"; done
+mkdir -p src/utils/links
+cp station/links/cuutruyen.link station/links/moetruyen.link src/utils/links/
 rsync -av $EXCLUDE_ARGS ./ "$OUT_DIR/"
 find "$OUT_DIR" -type f -name "*.js" ! -path "*/src/utils/*" | while read -r file; do
     sed -i '' -E 's/([^:])\/\/.*$/\1/g' "$file"

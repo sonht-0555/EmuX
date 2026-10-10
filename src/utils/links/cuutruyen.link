@@ -1,0 +1,195 @@
+export default {
+    title: "CuuTruyen",
+    home: "https://cuutruyen.net", 
+    mangaId: null,
+    chap: "1", // "start" đọc từ đầu, "new" lấy chương mới nhất, hoặc số chapter cụ thể
+
+    // link.js nhớ những trường này vào manga.conf bên trong cbz, rồi gán lại trước khi
+    // gọi chapters() - nhờ vậy lần tải chương sau không bật lại prompt.
+    // Có _initialized trong danh sách nên _init() thoát ngay, không cần sửa gì bên dưới.
+    save: ['mangaId', 'title', 'chap', '_initialized'],
+
+    _initialized: false,
+    async _init(ctx) {
+        if (this._initialized) return;
+
+        // 1. Enter Manga URL or ID
+        const rawInput = prompt(
+            "Manga URL or ID:",
+            ""
+        );
+        if (!rawInput) {
+            throw new Error("Cancelled by user");
+        }
+
+        const match = rawInput.match(/(\d+)/);
+        if (!match) {
+            throw new Error(`Invalid Manga ID from: "${rawInput}"`);
+        }
+        this.mangaId = parseInt(match[1], 10);
+
+        // 2. Auto-fetch suggested title from API
+        let suggestedTitle = `Manga_${this.mangaId}`;
+        try {
+            const res = await ctx.json(ctx.abs(`/api/v2/mangas/${this.mangaId}`, this.home));
+            const mangaInfo = res?.data;
+            if (mangaInfo?.name) {
+                suggestedTitle = mangaInfo.name;
+            }
+        } catch (err) {
+            console.warn("Could not fetch manga title:", err);
+        }
+
+        // 3. Manga Title
+        const customTitle = prompt("Manga Title:", suggestedTitle);
+        this.title = (customTitle || suggestedTitle).trim();
+
+        // 4. Start Chapter
+        const chapInput = prompt("Start Chapter (e.g. 1, 53, new, start):", "1");
+        this.chap = (chapInput || "1").trim();
+
+        this._initialized = true;
+    },
+
+    // ===== chapters(ctx) -> [{num, url, title}] =====
+    async chapters(ctx) {
+        await this._init(ctx);
+        const data = await ctx.json(ctx.abs(`/api/v2/mangas/${this.mangaId}/chapters`, this.home));
+        return (data.data || [])
+            .map(chapter => ({
+                // url holds the chapter ID, not a path: pages() calls the API by ID.
+                num: parseFloat(chapter.number),
+                url: chapter.id,
+                title: `Chapter ${chapter.number}`
+            }))
+            .filter(chapter => Number.isFinite(chapter.num) && chapter.url);
+    },
+
+    // ===== pages(chapterId, ctx) -> [{url, drm}] =====
+    async pages(chapterId, ctx) {
+        const data = await ctx.json(ctx.abs(`/api/v2/chapters/${chapterId}`, this.home));
+        const pages = data.data?.pages;
+        if (!Array.isArray(pages)) return [];
+
+        // The API makes no promise about order; `order` is the real page number.
+        return [...pages]
+            .sort((a, b) => (a.order || 0) - (b.order || 0))
+            .map(page => {
+                // Use image_url when present, otherwise rebuild it from image_path.
+                // Either way the domain must change: lrclib is the old host, now 403.
+                const url = page.image_url || (page.image_path ? `https://storage-bravo.cuutruyen.net${page.image_path}` : "");
+                if (!url) return null;
+                return {
+                    url: url.replace("storage-ct.lrclib.net", "storage-bravo.cuutruyen.net"),
+                    drm: page.drm_data || null
+                };
+            })
+            .filter(Boolean);
+    },
+
+    // ===== processImage(blob, page) -> Blob =====
+    async processImage(blob, page) {
+        if (!page.drm) return blob;
+        return unscramble(blob, page.drm);
+    }
+};
+
+// ===== Định dạng đầu ra =====
+// WebP nhỏ hơn JPEG khoảng 9% ở cùng chất lượng cảm nhận (đo trên 3 trang thật của bộ
+// này: 0.2564 so với 0.2815 byte/pixel). Ảnh nguồn là JPEG và ta buộc phải nén lại sau
+// khi unscramble, nên đổi codec ở đúng lần nén đó không mất gì thêm.
+//
+// PHẢI kiểm tra hỗ trợ: toBlob với type lạ KHÔNG báo lỗi, nó âm thầm trả PNG - trang
+// truyện lưu dạng PNG sẽ phình lên nhiều lần mà không có dấu hiệu gì.
+const OUT_QUALITY = 0.85;
+let outTypePromise = null;
+function outputType() {
+    return outTypePromise ??= new Promise(resolve => {
+        try {
+            const probe = document.createElement('canvas');
+            probe.width = probe.height = 1;
+            probe.toBlob(
+                blob => resolve(blob?.type === 'image/webp' ? 'image/webp' : 'image/jpeg'),
+                'image/webp', OUT_QUALITY
+            );
+        } catch (err) {
+            resolve('image/jpeg');
+        }
+    });
+}
+
+// ===== Image unlocking - specific to cuutruyen =====
+const DRM_KEY = new TextEncoder().encode(String(Math.round(Math.PI * 1e15)));
+function drmParts(drmData) {
+    if (typeof drmData !== 'string' || !drmData.trim()) return [];
+    try {
+        const raw = atob(drmData.replace(/\s/g, ''));
+        const bytes = new Uint8Array(raw.length);
+        for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i) ^ DRM_KEY[i % DRM_KEY.length];
+
+        const chunks = new TextDecoder().decode(bytes).split("|");
+        // The first chunk is a version marker ("#v1"), not a coordinate.
+        if (chunks[0]?.startsWith("#v")) chunks.shift();
+
+        return chunks
+            .map(chunk => chunk.split("-").map(Number))
+            .filter(([y, height]) => Number.isFinite(y) && Number.isFinite(height) && height > 0);
+    } catch (err) {
+        console.error('bad drm_data:', err.message);
+        return [];
+    }
+}
+
+// Recut with a canvas: read the scrambled image top to bottom, paste each strip at
+// its true coordinate in the original.
+async function unscramble(blob, drmData) {
+    const parts = drmParts(drmData);
+    if (!parts.length) return blob;
+
+    // Dò hỗ trợ trước khi vào callback của Image.onload - chỉ chạy thật một lần, các
+    // lần sau dùng lại promise đã có.
+    const type = await outputType();
+
+    return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(blob);
+        const image = new Image();
+        image.onload = () => {
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = image.width;
+                canvas.height = image.height;
+                const target = canvas.getContext('2d');
+
+                // drawImage first, then getImageData per strip: cheaper than building a
+                // separate source canvas, and pixel-exact since both share a size.
+                target.drawImage(image, 0, 0);
+                const scrambled = target.getImageData(0, 0, image.width, image.height);
+                target.clearRect(0, 0, image.width, image.height);
+
+                const source = document.createElement('canvas');
+                source.width = image.width;
+                source.height = image.height;
+                const from = source.getContext('2d');
+                from.putImageData(scrambled, 0, 0);
+
+                let readY = 0;
+                for (const [y, height] of parts) {
+                    target.putImageData(from.getImageData(0, readY, image.width, height), 0, y);
+                    readY += height;
+                }
+
+                // WebP nếu máy hỗ trợ, không thì JPEG - xem outputType() ở trên.
+                canvas.toBlob(result => result ? resolve(result) : reject(new Error('empty toBlob')), type, OUT_QUALITY);
+            } catch (err) {
+                reject(err);
+            } finally {
+                URL.revokeObjectURL(url);
+            }
+        };
+        image.onerror = () => {
+            URL.revokeObjectURL(url);
+            reject(new Error('image could not be decoded'));
+        };
+        image.src = url;
+    });
+}
