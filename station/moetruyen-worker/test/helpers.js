@@ -10,6 +10,26 @@ export const imageId = "0123456789abcdef0123456789abcdef";
 export const storageKey = "chapters/manga-45/ch-1/001.js";
 export const image = new Uint8Array(await readFile(new URL("./fixtures/page.webp", import.meta.url)));
 
+// Node/OpenSSL is an independent AES-GCM oracle for the Web Crypto V3 decoder.
+export function encryptImageV3(plaintext = image) {
+    const key = random(32), header = Buffer.alloc(25);
+    header.write("IMGX"); header[4] = 3;
+    header.writeUInt32BE(240, 5); header.writeUInt32BE(160, 9);
+    header.set(random(12), 13);
+    const cipher = createCipheriv("aes-256-gcm", key, header.subarray(13));
+    cipher.setAAD(Buffer.from(`IMGX-v3.${imageId}.${storageKey}.240.160`));
+    return { key, binary: concat(header, cipher.update(plaintext), cipher.final(), cipher.getAuthTag()) };
+}
+
+export function webpWithChunks(...chunks) {
+    const body = Buffer.concat(chunks.map(([name, bytes]) => {
+        const header = Buffer.alloc(8); header.write(name); header.writeUInt32LE(bytes.length, 4);
+        return Buffer.concat([header, bytes, Buffer.alloc(bytes.length & 1)]);
+    }));
+    const header = Buffer.alloc(12); header.write("RIFF"); header.writeUInt32LE(body.length + 4, 4); header.write("WEBP", 8);
+    return concat(header, body);
+}
+
 export async function encryptImage(profile = 1, plaintext = image) {
     if (profile === 8) {
         const fixture = JSON.parse(await readFile(new URL("./fixtures/p08.json",import.meta.url),"utf8"));

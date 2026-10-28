@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { Miniflare, createFetchMock } from "miniflare";
 import { build } from "esbuild";
-import { encryptImage, image, imageId, storageKey } from "./helpers.js";
+import { encryptImage, encryptImageV3, webpWithChunks, image, imageId, storageKey } from "./helpers.js";
 import { toBase64Url } from "../src/reader-access.js";
 
 async function runtime(mock) {
@@ -43,4 +43,23 @@ test(`workerd decrypts p${String(profile).padStart(2,"0")} into exact WebP bytes
         assert.deepEqual(new Uint8Array(await response.arrayBuffer()), image);
     } finally { await mf.dispose(); }
 });
+}
+
+for (const nested of [false, true]) {
+    test(`workerd decrypts V3${nested ? " with nested V4" : ""} into exact WebP bytes`, async () => {
+        const v4 = nested ? await encryptImage() : undefined;
+        const { key, binary } = encryptImageV3(nested ? webpWithChunks(["IMX4", v4.binary]) : image);
+        const mock = createFetchMock(); mock.disableNetConnect();
+        mock.get("https://i.truyen.moe").intercept({ path: "/test.js" }).reply(200, Buffer.from(binary));
+        const url = new URL("https://worker.test/api/image");
+        url.search = new URLSearchParams({ url: "https://i.truyen.moe/test.js", k3: toBase64Url(key), imageId, storageKey });
+        if (v4) url.searchParams.set("k", toBase64Url(v4.key));
+        const mf = await runtime(mock);
+        try {
+            const response = await mf.dispatchFetch(url);
+            assert.equal(response.status, 200);
+            assert.equal(response.headers.get("content-type"), "image/webp");
+            assert.deepEqual(new Uint8Array(await response.arrayBuffer()), image);
+        } finally { await mf.dispose(); }
+    });
 }

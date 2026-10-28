@@ -10,6 +10,7 @@ function workerFailure(payload, status, fallback) {
     visit(payload);
     const detail = [...new Set(fields)].join(": ") || fallback;
     const error = new Error(`Worker HTTP ${status}: ${detail}`);
+    error.code = typeof payload?.code === "string" ? payload.code : undefined;
     if (status === 429 || fields.some(field => field.toUpperCase() === "RATE_LIMITED")) {
         error.code = "RATE_LIMITED";
         error.retryable = false;
@@ -114,12 +115,39 @@ export default {
             .sort((a, b) => a.num - b.num);
     },
 
-    // Worker quản lý nguồn, phiên reader, khóa và các phiên bản IMGX.
+    // PWA mới giải mã ở thiết bị. App cũ hoặc thiếu module vẫn dùng API v1.
+    async _clientDecoder() {
+        if (typeof Worker !== "function" || typeof document === "undefined" || !document.baseURI) return null;
+        try {
+            const decoder = await import(new URL("src/utils/imgx/client.js", document.baseURI).href);
+            await decoder.ready();
+            return decoder;
+        } catch {
+            console.warn("Trình giải mã IMGX trên thiết bị chưa sẵn sàng; dùng Worker server.");
+            return null;
+        }
+    },
+
     async pages(chapterUrl) {
-        const data = await this._json(chapterUrl);
+        this._decoder = await this._clientDecoder();
+        const endpoint = new URL(chapterUrl, this.home);
+        let data;
+        if (this._decoder) {
+            endpoint.pathname = endpoint.pathname.replace(/^[/]api[/]v1[/]/, "/api/v2/");
+            try { data = await this._json(endpoint.href); }
+            catch (error) {
+                if (error.code !== "route_not_found") throw error;
+                this._decoder = null;
+            }
+        }
+        data ||= await this._json(chapterUrl);
         if (!Array.isArray(data?.data?.pages) || !data.data.pages.length) throw new Error("Worker không trả danh sách ảnh");
         return data.data.pages.map(page => {
             if (!page.downloadUrl) throw new Error("Worker thiếu URL ảnh");
+            if (this._decoder) {
+                if (page.drm?.type !== "emux-imgx-v1") throw new Error("Worker thiếu dữ liệu giải mã IMGX");
+                return { url: page.downloadUrl, drm: page.drm, workerImage: true };
+            }
             return { url: page.downloadUrl, drm: null, workerImage: true };
         });
     },
@@ -127,6 +155,11 @@ export default {
     // Hook đã có trong core nguyên bản: kiểm tra ảnh Worker sau khi download manager tải qua proxy chung.
     async processImage(blob, page) {
         if (!page.workerImage) return blob;
+        if (page.drm?.type === "emux-imgx-v1") {
+            const decoder = this._decoder || await this._clientDecoder();
+            if (!decoder) throw new Error("Thiếu trình giải mã IMGX trên thiết bị");
+            blob = await decoder.decode(blob, page.drm);
+        }
         const bytes = new Uint8Array(await blob.arrayBuffer());
         const isWebp = bytes.length >= 12
             && String.fromCharCode(...bytes.subarray(0, 4)) === "RIFF"

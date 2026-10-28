@@ -1,6 +1,51 @@
 # Mòe Truyện: ngữ cảnh và hướng bảo trì Worker
 
-Cập nhật: 2026-10-03. Tài liệu dành cho lần sửa tiếp theo, gồm kết quả đã kiểm chứng, hợp đồng phải giữ và cách điều tra khi nguồn thay đổi. Số liệu triển khai bên dưới là mốc đã xác minh trong phiên làm việc, không thay thế việc kiểm tra trạng thái live ở lần sửa sau.
+Cập nhật: 2026-10-28. Tài liệu dành cho lần sửa tiếp theo, gồm kết quả đã kiểm chứng, hợp đồng phải giữ và cách điều tra khi nguồn thay đổi. Số liệu triển khai bên dưới là mốc đã xác minh trong phiên làm việc, không thay thế việc kiểm tra trạng thái live ở lần sửa sau.
+
+## Bản sửa V3 ngày 2026-10-28 — đã deploy, đã có bản tối ưu CPU tiếp theo
+
+- Sand Land, manga `2561`, chương `1` (ID `84513`), trả danh sách 35 ảnh nhưng ảnh nguồn bắt đầu bằng `IMGX 03`. Worker V4 cũ trả `unsupported_image_payload`.
+- `imgx-v3.js` mở AES-256-GCM với `wrappedContentKey`, IV bytes 13–24, AAD `IMGX-v3.{imageId}.{storageKey}.{width}.{height}`. Sau xác thực, kiểm tra WebP và giải mã tiếp nếu có chunk `IMX4` chứa V4; dùng khóa V4 riêng, không trả carrier làm ảnh truyện.
+- API v1 và `.link` giữ nguyên. URL `/api/image` giữ `k` cho V4, thêm `k3` tùy chọn cho V3; chọn decoder theo magic binary. Reader được phép trả khóa V3, V4 hoặc cả hai.
+- `/api/status` của bản sửa báo `2026-10-28-imgx-v3-v4`, thêm `imageVersions: [3, 4]`, giữ `decoderProfiles` cũ.
+- 44 test qua (31 Node + 13 workerd), build Wrangler 3.114.17 dry-run qua. Binary workerd 1.20250718.0 bị thiếu ở môi trường ngoài đã được tải đúng version vào bản sao thư mục tạm để kiểm thử; không sửa dependencies hoặc cấu hình môi trường ngoài.
+- Kiểm tra tuần tự chương 1: 34/35 ảnh qua ở lượt đầu; ảnh 25 báo `image_decryption_failed`, lấy phiên mới và kiểm tra riêng thì qua. Tổng cộng đã giải mã được cả 35 ảnh, mở ảnh đầu/cuối kiểm tra đúng nội dung. Chưa xác định nguyên nhân lần lỗi tạm thời của ảnh 25; chưa thêm retry vào Worker. Chưa kiểm tra Worker remote mới, proxy hoặc CBZ cũ với bản sửa; chưa chuyển traffic production.
+- Điều tra riêng ảnh 25: tải ba lần cùng một grant mới, nguồn đều HTTP 200/cache HIT, 416511 bytes và cùng SHA-256. V3 AES-GCM xác thực thành công, WebP chứa V4 profile `p10`, giải mã ra cùng WebP 392336 bytes, 1243×1800; đã mở ảnh đọc được bình thường. Không tái hiện lại lỗi; lượt lỗi cũ không lưu binary/grant nên chưa đủ bằng chứng quy lỗi cho mạng, cache hoặc lớp crypto cụ thể.
+
+Các mục dưới mô tả mốc V4 ngày 2026-10-03; số test/version và nhận định chỉ hỗ trợ V4 tại mốc đó được thay thế bởi bản sửa trên.
+
+### Triển khai production ngày 2026-10-28
+
+- Version mới `68bc239f-0eac-4689-8ae8-1e57ab08d4e0`, đã chuyển 100% traffic lúc 11:22 giờ Việt Nam; hostname/API v1 giữ nguyên. Bản rollback v1 trước đó: `5f5dc6fe-e6f6-4b68-b34f-6f998d91a8b6` (chỉ V4, không sửa được Sand Land V3).
+- Kiểm tra Version Preview URL rồi URL chính: ảnh 25 Sand Land trả WebP 392336 bytes đúng hash bản local; ảnh đầu manga 45 V4 cũng qua. Một ảnh qua proxy chung bằng curl/Node đều HTTP 200.
+- Kiểm tra tải cả chương 1 qua core `docs/src/core/link.js` và proxy chưa đạt: một lượt không tải được ảnh (502), lượt sau tải được nhiều ảnh nhưng có 503. Chưa kết luận tất cả lỗi này cùng nguyên nhân.
+- Log production quan sát đồng thời ghi `exceededCpu` / `Worker exceeded CPU time limit.` trên nhiều ảnh **chương 2 manga 2561**, CPU khoảng 10–14 ms trước khi bị dừng. Các request ảnh 21/25/30 chương 1 được kiểm tra riêng vẫn thành công, nhưng CPU ghi nhận 246/626/458 ms. Decoder JavaScript có tải CPU cao và deployment hiện chưa bảo đảm tải hàng loạt ổn định. Cần tối ưu phần giải mã hoặc lựa chọn runtime/ngân sách CPU phù hợp; không tự thay đổi gói trả phí.
+- Các ghi chú “chưa deploy” ở phần kiểm tra trước triển khai phía trên là trạng thái lịch sử trước bước chuyển traffic này. Chưa xác minh bằng CBZ cũ thực tế.
+
+### Bản tối ưu CPU tiếp theo ngày 2026-10-28
+
+- Đã deploy 100% version `715f15d7-bc40-428b-9601-227c31b3c81e`, status `2026-10-28-imgx-cpu-opt-v1`. Không đổi API v1, `.link`, gói Cloudflare, bindings hoặc compatibility date.
+- AEGIS (`p09/p10`): thay các mảng byte được tạo liên tục bằng state word 32-bit, bảng AES round và buffer tái sử dụng theo request. Vẫn xác thực tag 32 bytes và xóa plaintext khi thất bại. AES-SIV (`p08`): chuyển CMAC sang Web Crypto AES-CBC native (loại block PKCS#7 phụ khỏi MAC), dùng AES-CTR native; chờ xác thực trước khi trả plaintext.
+- Benchmark Node local với 512 KiB: AEGIS trước khoảng 110–160 ms, sau khoảng 2–8 ms; AES-SIV trước khoảng 64–92 ms, sau khoảng 1–2 ms. Đây là số đo local, không phải cam kết CPU Cloudflare.
+- 46 test qua, gồm AEGIS dữ liệu lớn/partial AAD/view lệch byte và AES-SIV dữ liệu lớn/ranh giới block so với oracle Node/OpenSSL, cùng fixture PyCryptodome và test runtime workerd. Build dry-run qua.
+- Preview và production đều tải đủ chương 1 (35/35) và chương 2 (14/14) bằng core `docs/src/core/link.js` qua proxy chung. Không có `exceededCpu` trong 62 event log thu tại thời điểm tổng hợp (hai tail có thể ghi trùng event). Ảnh 25 ghi nhận CPU 34 ms so với 626 ms ở bản trước; hash ảnh giữ nguyên. Lượt chương 2 có 14 event ảnh, CPU trung bình khoảng 4.9 ms, cao nhất 18 ms. Các request khác có thể vẫn vượt 10 ms trong phần linh động của runtime; không suy ra mọi ảnh/chương tương lai đều nằm dưới hạn mức Free.
+- Bản rollback ngay trước tối ưu là `68bc239f-0eac-4689-8ae8-1e57ab08d4e0`, có V3/V4 nhưng tốn CPU cao. Chưa kiểm tra CBZ cũ thực tế; kiểm tra đã dùng `.link` v1 hiện có và core nguyên bản.
+
+### Bản thử chuyển giải mã về PWA — mốc trước khi triển khai
+
+- Version Preview: `acf87f8d-acf8-494a-ae8c-bd69f7e9a5d6`, URL `https://acf87f8d-moetruyen-worker.hoangtuanson91.workers.dev`, status `2026-10-28-imgx-client-v1`. Production vẫn là bản tối ưu CPU `715f15d7-bc40-428b-9601-227c31b3c81e`.
+- Thêm API v2 riêng cho danh sách trang: trả URL nguồn và khóa/context V3/V4 trong JSON `private, no-store`. API v1 giữ cấu trúc và ý nghĩa cũ. Không chuyển cookie hoặc capability secret tới PWA.
+- Thêm browser bundle dùng chung decoder, client quản lý dedicated Web Worker và `.link` dùng hook `processImage()` hiện có. Không đổi core tải ảnh. `.link` cũ vẫn gọi v1; `.link` mới fallback v1 khi module trình duyệt hoặc API v2 chưa sẵn sàng. Chỉ ảnh plaintext và cấu hình manga cũ được lưu CBZ; không thêm trường lưu khóa.
+- 50 test qua: giữ các test crypto/runtime, thêm generated bundle parity, real worker-thread transfer/concurrency/authentication/crash/timeout, API v2 và fallback adapter. Giấy phép được phân phối cùng browser bundle.
+- Chrome thật, origin local, API Version Preview và proxy thật: chương 1 PASS 35/35, chương 2 PASS 14/14; mỗi chương 1 request API v2 và lần lượt 35/14 request binary nguồn, **0 request `/api/image`**. UI timer vẫn tiến triển trong lúc tải/giải mã; ảnh 25 đúng SHA-256 đã ghi ở lần kiểm tra server. Adapter cũ lấy từ Git HEAD vẫn tải và xác nhận WebP 392336 bytes qua v1.
+- PWA build `EmuX_9.50` đã tạo ở `docs`, thêm client/worker vào precache. Chưa push/publish website, chưa xác minh Safari/iPhone, chưa thử CBZ cũ thực tế hoặc bộ máy tốc độ thấp. Đây là thử nghiệm local + preview, không phải thông báo đã bật luồng mới cho PWA production.
+
+### Kích hoạt luồng PWA production ngày 2026-10-28
+
+- Người dùng đã publish commit `25fe76b2` (`IMGX to WPA`). Kiểm tra `https://emux.io.vn`: client decoder, browser worker, `.link` và `sw.js` khớp byte với bản build `docs` trong Git.
+- Đã chuyển 100% traffic Worker sang version `acf87f8d-acf8-494a-ae8c-bd69f7e9a5d6`, status `2026-10-28-imgx-client-v1`, protocol `emux-imgx-v1`. Hostname và API v1 giữ nguyên; bản rollback là `715f15d7-bc40-428b-9601-227c31b3c81e` (không có v2; client mới fallback v1).
+- Kiểm tra sau deploy: v2 production trả 35 trang chương 1 Sand Land với `private, no-store`; tải binary qua proxy chung và giải mã đủ 35/35 bằng client worker, không gọi `/api/image`; ảnh 25 khớp hash cũ. API v1 vẫn trả ảnh 25 Sand Land và ảnh đầu manga 45 đúng hash.
+- Mốc thử Chrome local/preview phía trên vẫn là bằng chứng trình duyệt thật; kiểm tra v2 sau deploy dùng worker thread Node với chính bundle/client khớp production. Chưa xác minh Safari/iPhone hoặc một CBZ cũ thực tế. Các ghi chú “chưa publish” phía trên là trạng thái lịch sử đã được thay thế bởi mục này.
 
 ## 1. Mục tiêu và cam kết với CBZ
 

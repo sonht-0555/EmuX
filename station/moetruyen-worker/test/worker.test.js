@@ -68,12 +68,14 @@ test("/api/pages rejects invalid chapter and page windows before any upstream ca
     });
 });
 
-for (const count of [1, 12]) {
-test(`anonymous reader session opens ${count} pages with sequenced proofs and V4 channel keys`, async () => {
+for (const [count, mode] of [[1, "v4"], [12, "both"], [1, "v3"]]) {
+test(`anonymous reader session opens ${count} pages with sequenced proofs and ${mode} channel keys`, async () => {
     const indexes = Array.from({ length: count }, (_, i) => i);
     const pair = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, false, ["deriveBits"]);
     const serverPub = toBase64Url(new Uint8Array(await crypto.subtle.exportKey("raw", pair.publicKey)));
     const secret = random(32), readerInstanceId = "a".repeat(48), wrappedV4Key = toBase64Url(random(32));
+    const wrappedContentKey = toBase64Url(random(32));
+    const keys = { ...(mode !== "v3" ? { wrappedV4Key } : {}), ...(mode !== "v4" ? { wrappedContentKey } : {}) };
     const path = "/manga/45-test/chapters/1/page-access", bootstrap = "/reader/bootstrap/capability";
     let clientPub, posted = 0;
     async function derive(proof, info) {
@@ -99,7 +101,7 @@ test(`anonymous reader session opens ${count} pages with sequenced proofs and V4
             assert.equal(headers.get("Sec-Fetch-Mode"), "navigate");
             assert.equal(headers.get("Sec-Fetch-User"), "?1");
             assert(headers.get("Accept").includes("application/xhtml+xml"));
-            return new Response(`requestPath: "${path}", bootstrapUrl: "${bootstrap}", initialIndexes: [58]`, {
+            return new Response(`chapterId: 986, media: ${JSON.stringify(indexes.map(pageIndex => ({ pageIndex, storageKey })))}, requestPath: "${path}", bootstrapUrl: "${bootstrap}", initialIndexes: [58]`, {
                 headers: { "Set-Cookie": "reader.sid=test; Path=/; HttpOnly" }
             });
         }
@@ -129,7 +131,7 @@ test(`anonymous reader session opens ${count} pages with sequenced proofs and V4
             const aad = enc.encode(JSON.stringify(["IMGX-READER-PAGE-KEY-v1", [clientPub, serverPub, proof.proof],
                 pageIndex, storageKey, imageId, grant.issuedAt, grant.expiresAt, grant.nonce, grant.signature]));
             const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: aad },
-                await derive(proof.proof, "IMGX-READER-PAGE-KEY-v1"), enc.encode(JSON.stringify({ wrappedV4Key })));
+                await derive(proof.proof, "IMGX-READER-PAGE-KEY-v1"), enc.encode(JSON.stringify(keys)));
             grant.channelKeys = { version: "IMGX-READER-PAGE-KEY-v1", iv: toBase64Url(iv),
                 ciphertext: toBase64Url(new Uint8Array(encrypted)) };
             batch.push(page);
@@ -139,10 +141,41 @@ test(`anonymous reader session opens ${count} pages with sequenced proofs and V4
     const pages = await requestReaderPages(986, indexes, fetcher, { documentUrl: "https://truyen.moe/manga/45-test/chapters/1" });
     assert.deepEqual(pages.map(page => page.pageIndex), indexes);
     for (const page of pages) {
-        assert.equal(page.grant.wrappedV4Key, wrappedV4Key);
+        assert.equal(page.grant.wrappedV4Key, keys.wrappedV4Key);
+        assert.equal(page.grant.wrappedContentKey, keys.wrappedContentKey);
         assert.equal(page.grant.channelKeys, undefined);
     }
     assert.equal(posted, 1 + Math.ceil(count / 10));
+    posted = 0;
+    await withFetch(fetcher, async () => {
+        const response = await worker.fetch(new Request("https://worker.test/api/v1/manga/45/chapters/1/pages"), {}, {});
+        assert.equal(response.status, 200);
+        const result = await response.json();
+        assert.equal(result.data.pages.length, count);
+        for (const page of result.data.pages) {
+            const url = new URL(page.downloadUrl);
+            assert.equal(url.origin, "https://worker.test");
+            assert.equal(url.searchParams.has("k"), mode !== "v3");
+            assert.equal(url.searchParams.has("k3"), mode !== "v4");
+            if (mode === "both") assert.notEqual(url.searchParams.get("k"), url.searchParams.get("k3"));
+        }
+    });
+    posted = 0;
+    await withFetch(fetcher, async () => {
+        const response = await worker.fetch(new Request("https://worker.test/api/v2/manga/45/chapters/1/pages"), {}, {});
+        assert.equal(response.status, 200);
+        assert.equal(response.headers.get("cache-control"), "private, no-store");
+        const result = await response.json();
+        assert.equal(result.data.pages.length, count);
+        for (const page of result.data.pages) {
+            assert.equal(page.downloadUrl, "https://i.truyen.moe/test.js");
+            assert.equal(page.drm.type, "emux-imgx-v1");
+            assert.equal(page.drm.storageKey, storageKey);
+            assert.equal(page.drm.imageId, imageId);
+            assert.equal(typeof page.drm.k === "string", mode !== "v3");
+            assert.equal(typeof page.drm.k3 === "string", mode !== "v4");
+        }
+    });
 });
 }
 
@@ -189,4 +222,35 @@ test(".link shows nested Worker errors and reject malformed responses", async ()
         });
         assert.equal(calls, 1);
     }
+});
+
+
+test("new .link uses v2 client decoding, and falls back to v1 when the API is unavailable", async () => {
+    const source = await readFile(repoPath("station/links/moetruyen.link"), "utf8");
+    const { default: link } = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
+    let decoded = 0;
+    const context = { type: "emux-imgx-v1", imageId, storageKey };
+    link._clientDecoder = async () => ({ decode: async (blob, drm) => {
+        assert.deepEqual(drm, context); decoded++; return new Blob([image], { type: "image/webp" });
+    } });
+    await withFetch(async url => {
+        assert.equal(new URL(url).pathname, "/api/v2/manga/45/chapters/1/pages");
+        return Response.json({ success: true, data: { pages: [{ downloadUrl: "https://i.truyen.moe/test.js", drm: context }] } });
+    }, async () => {
+        const [page] = await link.pages("/api/v1/manga/45/chapters/1/pages");
+        assert.equal(page.drm.type, context.type);
+        const blob = await link.processImage(new Blob([new Uint8Array(100)]), page);
+        assert.deepEqual(new Uint8Array(await blob.arrayBuffer()), image);
+    });
+    assert.equal(decoded, 1);
+    const paths = [];
+    await withFetch(async url => {
+        const path = new URL(url).pathname; paths.push(path);
+        return path.includes("/v2/") ? Response.json({ success: false, code: "route_not_found" }, { status: 404 })
+            : Response.json({ success: true, data: { pages: [{ downloadUrl: "https://worker.test/api/image" }] } });
+    }, async () => {
+        const [page] = await link.pages("/api/v1/manga/45/chapters/1/pages");
+        assert.equal(page.drm, null); assert.equal(link._decoder, null);
+    });
+    assert.deepEqual(paths, ["/api/v2/manga/45/chapters/1/pages", "/api/v1/manga/45/chapters/1/pages"]);
 });

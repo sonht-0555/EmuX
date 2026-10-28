@@ -1,0 +1,12 @@
+Emux IMGX browser decoder
+
+worker.js is generated from station/moetruyen-worker/src/browser/worker-entry.js
+and the shared IMGX V3/V4 decoder. It uses Web Crypto and @noble/ciphers 1.3.0.
+
+IMGX layouts and AEGIS/AES-SIV/secretstream adaptations follow Keiyoushi's
+MoeTruyen extension (Apache-2.0). See Apache-2.0.txt and the repository's
+station/moetruyen-worker/THIRD_PARTY_NOTICES.md for attribution and references.
+
+@noble/ciphers by Paul Miller is MIT licensed. See Noble-MIT.txt.
+
+No source keys, cookies, grants, or images are bundled in this decoder.

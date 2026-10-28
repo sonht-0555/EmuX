@@ -1,4 +1,5 @@
 import { decodeImgxV4, decoderProfiles } from "./imgx-v4.js";
+import { decodeImgxV3 } from "./imgx-v3.js";
 import { ReaderError, requestReaderPages } from "./reader-access.js";
 import { listChapters } from "./catalog.js";
 import { loadReader } from "./source.js";
@@ -53,12 +54,13 @@ export default {
 
         try {
             if (url.pathname === "/api/status") {
-                return Response.json({ version: "2026-10-03-own-source-v1", decoderProfiles }, {
+                return Response.json({ version: "2026-10-28-imgx-client-v1", decoderProfiles, imageVersions: [3, 4], clientProtocol: "emux-imgx-v1" }, {
                     headers: { ...corsHeaders, "Cache-Control": "no-store" }
                 });
             }
             const catalogRoute = /^\/api\/v1\/manga\/([1-9]\d*)\/chapters$/.exec(url.pathname);
-            const pagesRoute = /^\/api\/v1\/manga\/([1-9]\d*)\/chapters\/(\d+(?:\.\d+)?)\/pages$/.exec(url.pathname);
+            const pagesRoute = /^\/api\/v[12]\/manga\/([1-9]\d*)\/chapters\/(\d+(?:\.\d+)?)\/pages$/.exec(url.pathname);
+            const clientDecode = url.pathname.startsWith("/api/v2/");
             if (catalogRoute || pagesRoute) {
                 if (request.method !== "GET") throw new ReaderError("method_not_allowed", "Use GET", 405);
                 const mangaId = Number((catalogRoute || pagesRoute)[1]);
@@ -102,8 +104,8 @@ export default {
                 if (indexes.some(index => !reader.pages.some(page => page.pageIndex === index))) throw new ReaderError("invalid_indexes", "Page index outside chapter", 400);
                 const pages = await requestReaderPages(chapterId, indexes, fetch, reader);
                 const result = pages.map(page => {
-                    if (!page.grant?.wrappedV4Key) {
-                        throw new ReaderError("v4_key_missing", "Reader chưa cấp wrappedV4Key; không dùng khóa V3 để giải mã V4.");
+                    if (!page.grant?.wrappedV4Key && !page.grant?.wrappedContentKey) {
+                        throw new ReaderError("image_key_missing", "Reader chưa cấp khóa ảnh IMGX V3/V4.");
                     }
                     if (!page.storageKey || !page.grant.imageId) {
                         throw new ReaderError("image_context_missing", "Reader image context missing");
@@ -116,11 +118,22 @@ export default {
                     imageUrl.searchParams.set("url", target.href);
                     imageUrl.searchParams.set("storageKey", page.storageKey);
                     imageUrl.searchParams.set("imageId", page.grant.imageId);
-                    imageUrl.searchParams.set("k", bytesToB64(unmaskKey(page.grant, page.storageKey, page.grant.wrappedV4Key)));
+                    const drm = { type: "emux-imgx-v1", storageKey: page.storageKey, imageId: page.grant.imageId };
+                    for (const [field, parameter] of [["wrappedV4Key", "k"], ["wrappedContentKey", "k3"]]) {
+                        if (!page.grant[field]) continue;
+                        const key = unmaskKey(page.grant, page.storageKey, page.grant[field]);
+                        try {
+                            if (key.length !== 32) throw new ReaderError("image_key_invalid", "IMGX key length invalid");
+                            if (clientDecode) drm[parameter] = bytesToB64(key);
+                            else imageUrl.searchParams.set(parameter, bytesToB64(key));
+                        }
+                        finally { key.fill(0); }
+                    }
+                    if (clientDecode) return { pageIndex: page.pageIndex, downloadUrl: target.href, drm };
                     return { pageIndex: page.pageIndex, downloadUrl: imageUrl.href };
                 });
                 return Response.json({ success: true, data: { pages: result } }, {
-                    headers: { ...corsHeaders, "Cache-Control": "no-store" }
+                    headers: { ...corsHeaders, "Cache-Control": clientDecode ? "private, no-store" : "no-store" }
                 });
             }
 
@@ -141,17 +154,24 @@ export default {
                 if (!imgRes.ok) throw new ReaderError("image_fetch_failed", `Image source HTTP ${imgRes.status}`);
                 const binary = new Uint8Array(await imgRes.arrayBuffer());
 
-                if (binary.length > 5 && binary[0] === 73 && binary[1] === 77 && binary[2] === 71 && binary[3] === 88 && binary[4] === 4) {
-                    if (!k) throw new Error("Missing unmasked key (k) for IMGX V4 image");
-                    const contentKeyRaw = b64ToBytes(k);
-                    const decrypted = await decodeImgxV4(binary, contentKeyRaw, storageKey, imageId);
+                if (binary.length > 5 && binary[0] === 73 && binary[1] === 77 && binary[2] === 71 && binary[3] === 88 && [3, 4].includes(binary[4])) {
+                    const version = binary[4], k3 = url.searchParams.get("k3");
+                    if (version === 4 && !k) throw new ReaderError("v4_key_missing", "Missing IMGX V4 key");
+                    if (version === 3 && !k3) throw new ReaderError("v3_key_missing", "Missing IMGX V3 key");
+                    const v4Key = k ? b64ToBytes(k) : undefined;
+                    const v3Key = k3 ? b64ToBytes(k3) : undefined;
+                    let decrypted;
+                    try {
+                        decrypted = version === 4 ? await decodeImgxV4(binary, v4Key, storageKey, imageId)
+                            : await decodeImgxV3(binary, v3Key, storageKey, imageId, v4Key);
+                    } finally { v4Key?.fill(0); v3Key?.fill(0); }
                     if (new TextDecoder().decode(decrypted.subarray(0, 4)) !== "RIFF"
                         || new TextDecoder().decode(decrypted.subarray(8, 12)) !== "WEBP") {
                         throw new ReaderError("imgx_output_invalid", "IMGX decoder chưa trả ảnh WebP hợp lệ.");
                     }
                     return new Response(decrypted, { headers: { ...corsHeaders, "Content-Type": "image/webp", "Cache-Control": "private, no-store" } });
                 }
-                throw new ReaderError("unsupported_image_payload", "Nguồn ảnh không trả IMGX V4 binary; không chuyển PNG chứa dữ liệu mã hóa cho client.");
+                throw new ReaderError("unsupported_image_payload", "Nguồn ảnh không trả IMGX V3/V4 binary; không chuyển PNG chứa dữ liệu mã hóa cho client.");
             }
 
             return url.pathname.startsWith("/api/")

@@ -89,7 +89,7 @@ export async function decodeImgxV4(binary, key, storageKey, imageId) {
             case 7: output = gcmsiv(contentKey,body.subarray(0,12),aad).decrypt(body.subarray(12)); break;
             case 8: {
                 const subkey = await derive(contentKey,new Uint8Array(32),"IMGX-v4.p08");
-                try { output = decryptAesSiv(subkey,body,aad); }
+                try { output = await decryptAesSiv(subkey,body,aad); }
                 finally { subkey.fill(0); }
                 break;
             }

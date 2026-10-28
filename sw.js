@@ -1,4 +1,4 @@
-let revision = 'EmuX_9.49';
+let revision = 'EmuX_9.43';
 // git add . && git commit --amend --no-edit && git push -f && clear
 // git reset --hard 5fc906e && git push -f && clear
 // git add .github/workflows/build-pico.yml && git commit --amend --no-edit && git push -f && clear
@@ -18,6 +18,8 @@ var urlsToCache = [
     './src/utils/zip.js',
     './src/utils/links/cuutruyen.link',
     './src/utils/links/moetruyen.link',
+    './src/utils/imgx/client.js',
+    './src/utils/imgx/worker.js',
     './src/utils/wsg/wsg.html',
     './src/utils/wsg/style.css',
     './src/utils/wsg/app.js',
