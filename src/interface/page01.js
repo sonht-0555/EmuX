@@ -71,6 +71,20 @@ async function showFileGroups(gameName) {
         if (confirm(`Delete this file? ${name}`)) {await deleteFromStore(name); showFileGroups(gameName);}
     });
 }
+// listStore returns files in opening order, oldest first.
+function groupCbzVersions(files) {
+    const groups = new Map();
+    for (const file of files) {
+        const match = /^(.*)'(\d+(?:[~.]\d+)?)[.]cbz$/i.exec(file);
+        const key = match ? 'series:' + match[1].toLowerCase() : 'file:' + file;
+        const versions = groups.get(key) || [];
+        versions.push(file);
+        // Place the series at its most recently opened file's position too.
+        groups.delete(key);
+        groups.set(key, versions);
+    }
+    return [...groups.values()].map(versions => ({ latest: versions[versions.length - 1], files: versions }));
+}
 // ===== listGame =====
 async function listGame() {
     const isCbzMode = libraryMode === 'cbz';
@@ -99,15 +113,24 @@ async function listGame() {
 
         while (list.children.length > (isCbzMode ? 0 : 1)) list.removeChild(list.lastChild);
 
-        const html = (isCbzMode ? `<rom data-action="download-manga"><name>MoeCuu</name><tag>_link</tag></rom>` : `<rom data-link="./src/utils/wsg/klotski.html"><name>Klotski</name><tag>_game</tag></rom>`) + items.map(item => {
+        const escape = value => String(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const renderRom = (item, reveal = null, version = null) => {
             const isLocal = typeof item === 'string', path = isLocal ? item : item.path;
             const fileExtension = supportedExtensions.find(extension => path.toLowerCase().endsWith(extension.toLowerCase())) || ('.' + path.split('.').pop().toLowerCase());
             const fileName = path.split('/').pop();
             const displayName = fileName.toLowerCase().endsWith(fileExtension.toLowerCase()) ? fileName.slice(0, -fileExtension.length) : (fileName.lastIndexOf('.') > 0 ? fileName.substring(0, fileName.lastIndexOf('.')) : fileName);
             const coreConfiguration = window.CORE_CONFIG?.find(config => config.ext?.split(',').map(ext => ext.trim()).includes(fileExtension));
             const gameTag = isLocal ? (local('tags_' + path) || coreConfiguration?.tag || fileExtension.slice(1)).slice(0, 4) : path.split('/')[0].slice(0, 4);
-            return `<rom data-${isLocal ? 'full' : 'url'}="${isLocal ? path : rawContentBase + encodeURIComponent(path)}"><name>${displayName}</name><tag>_${gameTag}</tag><dot></dot></rom>`;
-        }).join('');
+            const attrs = reveal ? ` data-reveal="${reveal}"` : version ? ` data-version="${version}" hidden` : '';
+            return `<rom data-${isLocal ? 'full' : 'url'}="${escape(isLocal ? path : rawContentBase + encodeURIComponent(path))}"${attrs}><name>${escape(displayName)}</name><tag>_${escape(gameTag)}</tag><dot></dot></rom>`;
+        };
+        const rows = isCbzMode && !query ? groupCbzVersions(items).map((group, index) => {
+            if (group.files.length === 1) return renderRom(group.latest);
+            const id = `cbz-group-${index}`;
+            return renderRom(group.latest, id)
+                + group.files.filter(file => file !== group.latest).map(file => renderRom(file, null, id)).join('');
+        }).join('') : items.map(item => renderRom(item)).join('');
+        const html = (isCbzMode ? `<rom data-action="download-manga"><name>MoeCuu</name><tag>_link</tag></rom>` : `<rom data-link="./src/utils/wsg/klotski.html"><name>Klotski</name><tag>_game</tag></rom>`) + rows;
 
         list.insertAdjacentHTML('beforeend', html);
 
@@ -118,7 +141,15 @@ async function listGame() {
             } else if (link) {
                 romElement.onclick = () => window.location.href = link;
             } else if (fullName) {
-                romElement.querySelectorAll('name, tag').forEach(element => element.onclick = () => loadGame(fullName));
+                romElement.querySelectorAll('name, tag').forEach(element => element.onclick = () => {
+                    const reveal = romElement.getAttribute('data-reveal');
+                    if (reveal) {
+                        list.querySelectorAll(`rom[data-version="${reveal}"]`).forEach(row => row.hidden = false);
+                        romElement.removeAttribute('data-reveal');
+                        return;
+                    }
+                    loadGame(fullName);
+                });
                 romElement.querySelector('dot').onclick = () => {showFileGroups(displayName); view('details');};
             } else romElement.onclick = async () => {
                 const pathParts = decodeURIComponent(url).split('/');
