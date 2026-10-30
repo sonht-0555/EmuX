@@ -482,11 +482,11 @@ async function writeCbz({existing, additions, linkCode, title, conf, onStatus, d
 
 // Trang đầu của một chương, tính theo chỉ số trong danh sách ảnh - đúng thứ tự mà
 // trình đọc sẽ thấy. Dùng để mở chương mới ngay ở trang 1 thay vì vị trí cũ.
+const readerPages = items => items.filter(item => item.name !== LINK_ENTRY && item.name !== HASH_ENTRY && item.name !== CONF_ENTRY
+    && !/[.]scan(?:[.]|$)/.test(item.name));
 function firstPageOf(items, num) {
     const dir = chapterDir(num) + '/';
-    // Chỉ ảnh mới được đếm: openZip tách .link và .hash ra khỏi files, nên nếu tính
-    // chúng vào đây thì chỉ số trang sẽ lệch so với thứ tự trình đọc thấy.
-    const pages = items.filter(item => item.name !== LINK_ENTRY && item.name !== HASH_ENTRY && item.name !== CONF_ENTRY);
+    const pages = readerPages(items);
     return Math.max(0, pages.findIndex(item => item.name.startsWith(dir)));
 }
 
@@ -662,8 +662,20 @@ async function syncManga(manga, linkCode, {newest = 1, force = false, ask = askU
 // ===== 10. continueFrom: trình đọc hết chương, tải chương sau =====
 // Nhận luôn zip mà trình đọc đang mở, nên không đọc lại cả bộ truyện từ IndexedDB.
 // Trả về {key, page} để trình đọc mở đúng trang đầu chương mới.
-async function continueFrom({zip, onStatus, ask = askUser}) {
+// Tải khoảng giữ trang đang đọc qua getCurrentEntry; tự tải tiếp vẫn mở chương mới.
+async function continueFrom({zip, romName, throughChapter, afterChapter, getCurrentEntry, onStatus, ask = askUser}) {
     if (!zip?.link) throw new Error('This .cbz was not created by Link.');
+    const selected = throughChapter !== undefined;
+    const validChapter = num => typeof num === 'number' && Number.isFinite(num) && num >= 0 && num <= Number.MAX_SAFE_INTEGER;
+    if (selected && (!validChapter(throughChapter) || !validChapter(afterChapter)
+        || throughChapter <= afterChapter)) throw new Error('Invalid chapter range.');
+
+    const resultAt = (key, items, fallbackChapter) => {
+        // Đọc vị trí sau khi tải xong: người dùng có thể vẫn đọc trong lúc tải.
+        const entryName = selected ? getCurrentEntry?.() : null;
+        const index = entryName ? readerPages(items).findIndex(entry => entry.name === entryName) : -1;
+        return {key, page: index >= 0 ? index : firstPageOf(items, entryName ? dirNum(entryName) : fallbackChapter)};
+    };
 
     onStatus?.('Waiting.');
     const linkCode = new TextDecoder().decode(zip.bytesOf(zip.link));
@@ -693,18 +705,29 @@ async function continueFrom({zip, onStatus, ask = askUser}) {
     const all = await retryAsk(
         async () => normalizeChapters(await manga.chapters(context), manga),
         `${manga.title}: chapter list`, ask);
-    const chapter = all.find(item => item.num > max && item.num >= floor && !have.has(item.num));
-    if (!chapter) throw new Error(`No chapter after ${max}`);
+    const next = all.find(item => item.num > max && item.num >= floor && !have.has(item.num));
+    const queue = selected ? all.filter(item => item.num > afterChapter && item.num <= throughChapter && !have.has(item.num))
+        : next ? [next] : [];
+    const following = selected ? [...new Set([...have, ...queue.map(item => item.num)])]
+        .filter(num => num > afterChapter && num <= throughChapter).sort((a, b) => a - b)[0] : next?.num;
+    if (!queue.length) {
+        if (selected && following !== undefined) return resultAt(romName || await findCbz(manga.title), zip.files, following);
+        throw new Error(selected ? `No chapters after ${afterChapter} through ${throughChapter}` : `No chapter after ${max}`);
+    }
 
-    const {files} = await grabPages({
-        manga, chapter, context, ask,
-        onProgress: (done, total) => onStatus?.(`Loading.|${done}.${total}|`)
-    });
+    const additions = [];
+    for (const chapter of queue) {
+        const {files} = await grabPages({
+            manga, chapter, context, ask,
+            onProgress: (done, total) => onStatus?.(selected ? `Loading_${chapter.num}.|${done}.${total}|` : `Loading.|${done}.${total}|`)
+        });
+        additions.push({num: chapter.num, files});
+    }
 
-    const existing = {key: await findCbz(manga.title), zip, have, max};
+    const existing = {key: romName || await findCbz(manga.title), zip, have, max};
     const {key, items, removed} = await writeCbz({
         existing, linkCode, title: manga.title,
-        additions: [{num: chapter.num, files}],
+        additions,
         conf: readConf(manga),
         onStatus,
         dedup: true
@@ -712,7 +735,7 @@ async function continueFrom({zip, onStatus, ask = askUser}) {
     if (removed) console.log(`[link] removed ${removed} repeated page(s)`);
 
     if (typeof listGame === 'function') listGame();
-    return {key, page: firstPageOf(items, chapter.num)};
+    return resultAt(key, items, following);
 }
 // Tải lại đúng chương đang đọc, chỉ thay bản cũ sau khi đã lấy đủ ảnh.
 async function reloadChapter({zip, entryName, romName, onStatus, ask = askUser}) {

@@ -19,7 +19,7 @@ export async function startReader({zip, entries, romName, trans, level}) {
     const totalPages = entries.length;
 
     let globalPage = Number(local(`page_${romName}`)) || 0;
-    if (globalPage > 0 && globalPage <= 1) globalPage = Math.round(globalPage * (totalPages - 1)); // giá trị cũ lưu dạng tỉ lệ
+    if (globalPage > 0 && globalPage < 1) globalPage = Math.round(globalPage * (totalPages - 1)); // giá trị cũ lưu dạng tỉ lệ; số nguyên 1 là trang thứ hai
     globalPage = Math.max(0, Math.min(totalPages - 1, globalPage));
 
     const savePage = () => local(`page_${romName}`, globalPage);
@@ -98,8 +98,8 @@ export async function startReader({zip, entries, romName, trans, level}) {
         const pageLabel = `${globalPage + 1}|${totalPages}`;
         numText.textContent = status ? `${pageLabel}|${status}`
             : labelMode === 1 ? mangaTitle
-            : labelMode === 2 ? `Chap|${chapterLabel}|${chapterTotal ?? '?'}`
-            : pageLabel;
+                : labelMode === 2 ? `Chap|${chapterLabel}|${chapterTotal ?? '?'}`
+                    : pageLabel;
     };
     const scheduleNum = () => {
         clearTimeout(labelTmr);
@@ -141,22 +141,39 @@ export async function startReader({zip, entries, romName, trans, level}) {
     // không có entry đó nên không tự tải.
     // Khoá đang tải và ghi nhớ lần chạm cuối để không tải trùng khi cuộn qua lại.
     let nextRequested = false, loading = false;
-    const loadNextChapter = async () => {
-        if (isInit || nextRequested || loading || !zip.link || !window.Link?.continueFrom) return;
-        nextRequested = true;
+    const loadChapter = async (throughChapter, afterChapter) => {
+        if (isInit || disposed || loading || (throughChapter === undefined && nextRequested) || !zip.link || !window.Link?.continueFrom) return;
+        if (throughChapter === undefined) nextRequested = true;
         loading = true;
         try {
-            const {key, page} = await window.Link.continueFrom({zip, onStatus: setStatus});
-            local(`page_${key}`, page);        // mở chương mới ở trang 1 của nó
+            const {key, page} = await window.Link.continueFrom({zip, romName, throughChapter, afterChapter,
+                getCurrentEntry: () => entries[globalPage]?.name, onStatus: setStatus});
+            local(`page_${key}`, page);        // tải khoảng giữ trang; tự tải tiếp mở chương mới
             if (typeof loadGame === 'function') await loadGame(key);
         } catch (err) {
-            console.error('Next chapter failed:', err.message);
+            console.error('Load chapter failed:', err.message);
             setError(err.message);            // lỗi nằm luôn ở ô số, không cần alert
         } finally {
             // Tải xong thì trình đọc bị thay bằng chương mới; chỉ nhánh lỗi mới dùng tới
             // dòng này, để người dùng thử lại được.
             loading = false;
         }
+    };
+    const loadNextChapter = () => loadChapter();
+    const chooseChapter = () => {
+        if (isInit || disposed || loading) return;
+        if (!zip.link || !window.Link?.continueFrom) {setError('This .cbz was not created by Link.'); return;}
+        const current = entries[globalPage]?.name.match(/^C(\d+(?:~\d+)?)[/]/);
+        if (!current) {setError('Cannot identify the current chapter.'); return;}
+        const after = Number(current[1].replace('~', '.'));
+        const input = prompt('Download:', '')?.trim();
+        if (!input) return;
+        const chapter = Number(input);
+        if (!/^\d+(?:[.]\d+)?$/.test(input) || !Number.isFinite(chapter) || chapter > Number.MAX_SAFE_INTEGER) {
+            setError('Invalid chapter number.'); return;
+        }
+        if (chapter <= after) {setError(`Enter a chapter after ${after}.`); return;}
+        loadChapter(chapter, after);
     };
 
     const reloadCurrentChapter = async () => {
@@ -409,7 +426,7 @@ export async function startReader({zip, entries, romName, trans, level}) {
     num.ontouchstart = num.ontouchmove = event => event.stopPropagation();
     manga.oncontextmenu = event => event.preventDefault();
 
-    // ===== Chạm: 1 chạm chọn trang, 3 chạm đổi level, giữ lâu xem bản scan =====
+    // ===== Chạm: 1 chọn trang, 3 đổi level, 4 tải chương; giữ lâu xem scan =====
     const scan = attachScan({root: manga, zip, originalUrl: p => blobUrls.get(p)});
 
     manga.onpointerdown = event => {
@@ -427,9 +444,10 @@ export async function startReader({zip, entries, romName, trans, level}) {
             updateTrans(page);
             savePage();
         }, null, () => {
+            scan.cancel();
             const next = prompt("Level:", level.value);
             if (next != null) level.set(next, true);
-        });
+        }, () => {scan.cancel(); chooseChapter();});
     };
 
     return {
