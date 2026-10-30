@@ -6,13 +6,14 @@ const delay = milliseconds => new Promise(resolve => setTimeout(resolve, millise
 let gameName, gameWidth, gameHeight, integer, timerId, time1Element, count = null, recCount = 1, canvasBottom, hours = 0, minutes = 0, seconds = 0, count1 = 0, current = parseInt(local('vertical')) || 0;
 const canvas = document.getElementById('canvas');
 // ===== click =====
-function click(tap1, tap2, tap3) {
+function click(tap1, tap2, tap3, tap4) {
     clearTimeout(click.timer);
     click.count = (click.count || 0) + 1;
     click.timer = setTimeout(function () {
         if (click.count === 1 && tap1) tap1();
         if (click.count === 2 && tap2) tap2();
         if (click.count === 3 && tap3) tap3();
+        if (click.count === 4 && tap4) tap4();
         click.count = 0;
     }, 250);
 }

@@ -68,12 +68,6 @@ async function emuxDB(dataOrKey, name) {
         }
     });
 }
-// Keep CBZ opening order in the existing list; game order stays unchanged.
-function rememberCbzOpen(name) {
-    if (typeof name !== 'string' || !name.toLowerCase().endsWith('.cbz')) return;
-    const order = JSON.parse(localStorage.getItem('emux_order') || '[]');
-    localStorage.setItem('emux_order', JSON.stringify([...order.filter(file => file !== name), name]));
-}
 // ===== listStore =====
 async function listStore(storeName) {
     const db = await getDB();

@@ -33,5 +33,4 @@ async function extractCBZ(data, romName) {
     const level = createLevel(romName);
     const trans = createTrans(transData);
     session = await startReader({zip, entries, romName, trans, level});
-    window.rememberCbzOpen?.(romName);
 }

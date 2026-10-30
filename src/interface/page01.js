@@ -71,19 +71,22 @@ async function showFileGroups(gameName) {
         if (confirm(`Delete this file? ${name}`)) {await deleteFromStore(name); showFileGroups(gameName);}
     });
 }
-// listStore returns files in opening order, oldest first.
+// listStore returns files in the order they were added, oldest first.
 function groupCbzVersions(files) {
     const groups = new Map();
     for (const file of files) {
         const match = /^(.*)'(\d+(?:[~.]\d+)?)[.]cbz$/i.exec(file);
         const key = match ? 'series:' + match[1].toLowerCase() : 'file:' + file;
-        const versions = groups.get(key) || [];
-        versions.push(file);
-        // Place the series at its most recently opened file's position too.
-        groups.delete(key);
-        groups.set(key, versions);
+        // A series keeps the position of its first added file.
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(file);
     }
-    return [...groups.values()].map(versions => ({ latest: versions[versions.length - 1], files: versions }));
+    // Within a series, the highest number leads and the rest follow in ascending order.
+    const number = file => Number(/'(\d+(?:[~.]\d+)?)[.]cbz$/i.exec(file)?.[1].replace('~', '.'));
+    return [...groups.values()].map(versions => {
+        const files = versions.length > 1 ? [...versions].sort((a, b) => number(a) - number(b)) : versions;
+        return { latest: files[files.length - 1], files };
+    });
 }
 // ===== listGame =====
 async function listGame() {
@@ -127,8 +130,9 @@ async function listGame() {
         const rows = isCbzMode && !query ? groupCbzVersions(items).map((group, index) => {
             if (group.files.length === 1) return renderRom(group.latest);
             const id = `cbz-group-${index}`;
+            // list is rotated 180deg: the latest stays at the bottom, older versions read ascending above it.
             return renderRom(group.latest, id)
-                + group.files.filter(file => file !== group.latest).map(file => renderRom(file, null, id)).join('');
+                + group.files.filter(file => file !== group.latest).reverse().map(file => renderRom(file, null, id)).join('');
         }).join('') : items.map(item => renderRom(item)).join('');
         const html = (isCbzMode ? `<rom data-action="download-manga"><name>MoeCuu</name><tag>_link</tag></rom>` : `<rom data-link="./src/utils/wsg/klotski.html"><name>Klotski</name><tag>_game</tag></rom>`) + rows;
 
@@ -141,16 +145,17 @@ async function listGame() {
             } else if (link) {
                 romElement.onclick = () => window.location.href = link;
             } else if (fullName) {
-                romElement.querySelectorAll('name, tag').forEach(element => element.onclick = () => {
+                romElement.querySelectorAll('name, tag').forEach(element => element.onclick = () => loadGame(fullName));
+                romElement.querySelector('dot').onclick = () => {
+                    // Lần đầu bấm dot của bản mới nhất thì hiện các bản cũ, lần sau mới vào tuỳ chọn.
                     const reveal = romElement.getAttribute('data-reveal');
                     if (reveal) {
                         list.querySelectorAll(`rom[data-version="${reveal}"]`).forEach(row => row.hidden = false);
                         romElement.removeAttribute('data-reveal');
                         return;
                     }
-                    loadGame(fullName);
-                });
-                romElement.querySelector('dot').onclick = () => {showFileGroups(displayName); view('details');};
+                    showFileGroups(displayName); view('details');
+                };
             } else romElement.onclick = async () => {
                 const pathParts = decodeURIComponent(url).split('/');
                 const fileName = pathParts[pathParts.length - 1];
