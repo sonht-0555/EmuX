@@ -134,7 +134,7 @@ async function listGame() {
             return renderRom(group.latest, id)
                 + group.files.filter(file => file !== group.latest).reverse().map(file => renderRom(file, null, id)).join('');
         }).join('') : items.map(item => renderRom(item)).join('');
-        const html = (isCbzMode ? `<rom data-action="download-manga"><name>MoeCuu</name><tag>_link</tag></rom>` : `<rom data-link="./src/utils/wsg/klotski.html"><name>Klotski</name><tag>_game</tag></rom>`) + rows;
+        const html = (isCbzMode ? `<rom data-action="download-manga"><name>MoeCuu</name><tag>_link</tag></rom>` : `<rom data-link="./src/utils/wsg/klotski.html"><name>Klotski</name><tag>_game</tag></rom><rom data-link="./src/utils/wsg/shikaku.html"><name>Shikaku</name><tag>_game</tag></rom>`) + rows;
 
         list.insertAdjacentHTML('beforeend', html);
 
