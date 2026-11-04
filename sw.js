@@ -1,4 +1,4 @@
-let revision = 'EmuX_9.69';
+let revision = 'EmuX_9.70';
 // git add . && git commit --amend --no-edit && git push -f && clear
 // git reset --hard 5fc906e && git push -f && clear
 // git add .github/workflows/build-pico.yml && git commit --amend --no-edit && git push -f && clear
@@ -38,6 +38,7 @@ var urlsToCache = [
     './src/core/cbz/trans.js',
     './src/core/cbz/level.js',
     './src/core/cbz/scan.js',
+    './src/core/cbz/enhance.js',
     './src/core/video/w2d.js',
     './src/core/video/wgl.js',
     './src/core/video/wgpu.js',
@@ -68,7 +69,7 @@ self.addEventListener('fetch', function (event) {
     const url = event.request.url;
     if (url.includes('api.github.com')) return;
     if (url.includes('/proxy?')) return;
-    if (url.match(/\.(zip|bin|pce|img|wasm|png)$/i) || url.match(/(workers\.dev|pico-8\.com|lexaloffle\.com)/)) {
+    if (url.match(/\.(zip|bin|pce|img|wasm|png)$/i) || url.match(/(workers\.dev|pico-8\.com|lexaloffle\.com|\/anime4k\/)/)) {
         event.respondWith(
             caches.match(event.request).then(response => {
                 return response || fetch(event.request).then(res => {

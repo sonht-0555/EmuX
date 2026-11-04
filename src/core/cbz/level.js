@@ -17,7 +17,16 @@ export function createLevel(romName) {
         if (save) local(storageKey, level);
     };
 
-    set(local(storageKey) ?? '2 S2 O8 B3');
+    // W0-W3: mức làm nét Anime4K (xem enhance.js). Thiết lập cũ chưa có W thì hiện thêm W0 để dễ sửa.
+    const saved = local(storageKey) ?? '2 S2 O8 B3 W0';
+    set(/(^|\s)W\d/i.test(saved) ? saved : `${saved} W0`.trim());
 
-    return {set, get value() {return level;}};
+    return {
+        set,
+        get value() {return level;},
+        get enhance() {
+            const m = level.match(/(?:^|\s)W([0-3])(?=\s|$)/i);
+            return m ? Number(m[1]) : 0;
+        },
+    };
 }

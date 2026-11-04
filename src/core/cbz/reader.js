@@ -1,6 +1,7 @@
 import {HEADER_BYTES, imageSize, shortName} from './zip.js';
 import {createLayout} from './layout.js';
 import {attachScan} from './scan.js';
+import {createEnhancer} from './enhance.js';
 
 // ===== Tham số cửa sổ =====
 // Số <dimg> sống trong DOM. KHÔNG phụ thuộc độ dài truyện: 60 trang hay 50.000 trang
@@ -8,6 +9,8 @@ import {attachScan} from './scan.js';
 const WINDOW = 40;
 const AHEAD = 28, BEHIND = 12;      // chia cửa sổ theo hướng đang lướt (28 + 12 = WINDOW)
 const MOUNT_PER_FRAME = 2;          // số ảnh được giải nén mỗi frame
+// Chỉ giữ bản làm nét (Anime4K) cho vài trang quanh chỗ đang đọc: ảnh x2 ngốn gấp 4 bộ nhớ.
+const ENHANCE_BEHIND = 2, ENHANCE_AHEAD = 8;
 
 // Chiều cao trang luôn là SỐ NGUYÊN, và luôn cắt XUỐNG. Cắt lên thì dimg cao hơn ảnh
 // và hở ra một vệt nền paper; cắt xuống thì phần thừa dưới 1px bị overflow:hidden xén đi,
@@ -85,7 +88,7 @@ export async function startReader({zip, entries, romName, trans, level}) {
     const ERROR_MS = 10000, LABEL_MS = 20000;
     let status = '', statusTmr, labelTmr, labelMode = 0, disposed = false;
     let mangaTitle = romName.replace(/\.cbz$/i, '');
-    let chapterTotal = null;
+    let chapterTotal = null, chapterLast = null;     // chapterLast: số chương mới nhất, điền sẵn khi chạm 4 lần
     if (zip.conf) {
         try {
             const conf = JSON.parse(new TextDecoder().decode(zip.bytesOf(zip.conf)));
@@ -128,10 +131,12 @@ export async function startReader({zip, entries, romName, trans, level}) {
         setStatus(text);
         statusTmr = setTimeout(() => setStatus(''), ERROR_MS);
     };
-    if (zip.link && window.Link?.getChapterCount) {
-        window.Link.getChapterCount({zip}).then(count => {
-            if (disposed || !Number.isSafeInteger(count) || count < 1) return;
-            chapterTotal = count;
+    if (zip.link && window.Link?.getChapterInfo) {
+        window.Link.getChapterInfo({zip}).then(info => {
+            if (disposed || !info) return;
+            if (Number.isFinite(info.last)) chapterLast = info.last;
+            if (!Number.isSafeInteger(info.count) || info.count < 1) return;
+            chapterTotal = info.count;
             renderNum();
         }).catch(error => console.warn('Reader chapter total unavailable:', error.message));
     }
@@ -166,7 +171,7 @@ export async function startReader({zip, entries, romName, trans, level}) {
         const current = entries[globalPage]?.name.match(/^C(\d+(?:~\d+)?)[/]/);
         if (!current) {setError('Cannot identify the current chapter.'); return;}
         const after = Number(current[1].replace('~', '.'));
-        const input = prompt('Download:', '')?.trim();
+        const input = prompt('Download:', chapterLast > after ? String(chapterLast) : '')?.trim();
         if (!input) return;
         const chapter = Number(input);
         if (!/^\d+(?:[.]\d+)?$/.test(input) || !Number.isFinite(chapter) || chapter > Number.MAX_SAFE_INTEGER) {
@@ -196,8 +201,44 @@ export async function startReader({zip, entries, romName, trans, level}) {
         }
     };
 
+    // ===== Làm nét: thay src của <img> bằng bản Anime4K khi làm xong =====
+    const enhancer = createEnhancer({level: level.enhance, onError: setError});
+    const enhanced = new Map();     // số trang -> blob URL bản đã làm nét
+
+    const wantEnhance = p => enhancer.level > 0 && p >= globalPage - ENHANCE_BEHIND && p <= globalPage + ENHANCE_AHEAD;
+    const pageUrl = p => enhanced.get(p) || blobUrls.get(p);
+    const showPage = p => {
+        const img = slots.get(p)?.querySelector('img'), url = pageUrl(p);
+        if (img && url && img.src !== url) img.src = url;
+    };
+    const dropEnhanced = p => {
+        enhancer.cancel(p);
+        const url = enhanced.get(p);
+        if (!url) return;
+        enhanced.delete(p);
+        showPage(p);
+        URL.revokeObjectURL(url);
+    };
+    const requestEnhance = p => {
+        let blob;
+        try {blob = zip.extract(entries[p]);} catch {return;}
+        enhancer.request(p, blob).then(out => {
+            if (!out || disposed || enhanced.has(p) || !blobUrls.has(p) || !wantEnhance(p)) return;
+            enhanced.set(p, URL.createObjectURL(out));
+            showPage(p);
+        });
+    };
+    const syncEnhance = () => {
+        enhancer.focus(globalPage);
+        for (const p of [...enhanced.keys()]) if (!wantEnhance(p)) dropEnhanced(p);
+        for (const p of slots.keys()) {
+            if (wantEnhance(p) && blobUrls.has(p) && !enhanced.has(p) && !enhancer.has(p)) requestEnhance(p);
+        }
+    };
+
     const updateNum = () => {
         resetNum();
+        syncEnhance();
         if (globalPage === totalPages - 1) loadNextChapter();
         else if (!loading) nextRequested = false;
     };
@@ -230,12 +271,16 @@ export async function startReader({zip, entries, romName, trans, level}) {
         if (!known[p]) img.addEventListener('load', () => queueMeasure(p, img), {once: true});
         img.src = url;
         item.append(img);
+        if (wantEnhance(p) && !enhancer.has(p)) requestEnhance(p);
         return true;
     };
 
     const unmountImage = p => {
         const item = slots.get(p);
         if (item) item.replaceChildren();
+        enhancer.cancel(p);
+        const enhancedUrl = enhanced.get(p);
+        if (enhancedUrl) {URL.revokeObjectURL(enhancedUrl); enhanced.delete(p);}
         const url = blobUrls.get(p);
         if (url) {URL.revokeObjectURL(url); blobUrls.delete(p);}
         pending.delete(p);
@@ -427,7 +472,7 @@ export async function startReader({zip, entries, romName, trans, level}) {
     manga.oncontextmenu = event => event.preventDefault();
 
     // ===== Chạm: 1 chọn trang, 3 đổi level, 4 tải chương; giữ lâu xem scan =====
-    const scan = attachScan({root: manga, zip, originalUrl: p => blobUrls.get(p)});
+    const scan = attachScan({root: manga, zip, originalUrl: pageUrl});
 
     manga.onpointerdown = event => {
         scan.cancel();
@@ -446,7 +491,12 @@ export async function startReader({zip, entries, romName, trans, level}) {
         }, null, () => {
             scan.cancel();
             const next = prompt("Level:", level.value);
-            if (next != null) level.set(next, true);
+            if (next == null) return;
+            level.set(next, true);
+            if (enhancer.setLevel(level.enhance)) {
+                for (const p of [...enhanced.keys()]) dropEnhanced(p);
+                syncEnhance();
+            }
         }, () => {scan.cancel(); chooseChapter();});
     };
 
@@ -463,6 +513,9 @@ export async function startReader({zip, entries, romName, trans, level}) {
             cancelAnimationFrame(measureRaf);
             mountQueue.length = 0;
             scan.dispose();
+            enhancer.dispose();
+            enhanced.forEach(url => URL.revokeObjectURL(url));
+            enhanced.clear();
             blobUrls.forEach(url => URL.revokeObjectURL(url));
             blobUrls.clear();
             pending.clear();

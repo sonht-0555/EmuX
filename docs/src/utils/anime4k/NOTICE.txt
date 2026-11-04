@@ -1,0 +1,10 @@
+Emux Anime4K enhancer
+
+anime4k.js is lib/index.js from the npm package anime4k-webgpu 1.0.0
+(https://github.com/Anime4KWebBoost/Anime4K-WebGPU), MIT licensed.
+LICENSE.md is the license file shipped in that package.
+
+The shaders and network weights come from Anime4K by bloc97
+(https://github.com/bloc97/Anime4K), MIT licensed.
+
+Loaded only when the reader level contains W1, W2 or W3.
