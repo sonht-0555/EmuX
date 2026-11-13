@@ -67,14 +67,19 @@ async function gameView(name) {
     const safeLeft = parseFloat(styles.getPropertyValue('--safe-left')) || 0;
     const safeRight = parseFloat(styles.getPropertyValue('--safe-right')) || 0;
     switch0.textContent = local('render');
-    const maxInteger = Math.floor(window.innerWidth < window.innerHeight ? (window.innerWidth * window.devicePixelRatio) / canvas.width : (window.innerWidth >= 1024 && matchMedia('(pointer: fine)').matches) ? (window.innerHeight * window.devicePixelRatio) / canvas.height : Math.min(((window.innerWidth - ((Math.floor((window.innerHeight * 0.5 - 13) / 4) * 4) * 2) - 17 - Math.max(0, safeLeft - 10) - Math.max(0, safeRight - 10)) * window.devicePixelRatio) / canvas.width, (window.innerHeight * window.devicePixelRatio) / canvas.height));
+    // wful vẽ canvas ở độ phân giải màn hình nên canvas.width không còn là kích thước game; nó ghi kích thước game vào data-gw/gh
+    const gw = +canvas.dataset.gw || canvas.width, gh = +canvas.dataset.gh || canvas.height;
+    const isFull = scriptName === 'wful';
+    body.classList.toggle('wful', isFull);
+    const maxInteger = Math.floor(window.innerWidth < window.innerHeight ? (window.innerWidth * window.devicePixelRatio) / gw : (window.innerWidth >= 1024 && matchMedia('(pointer: fine)').matches) ? (window.innerHeight * window.devicePixelRatio) / gh : Math.min(((window.innerWidth - ((Math.floor((window.innerHeight * 0.5 - 13) / 4) * 4) * 2) - 17 - Math.max(0, safeLeft - 10) - Math.max(0, safeRight - 10)) * window.devicePixelRatio) / gw, (window.innerHeight * window.devicePixelRatio) / gh));
     integer = (maxInteger > 6) ? maxInteger - (maxInteger % 2) : maxInteger;
-    const ratio = integer / window.devicePixelRatio;
-    display.style.cssText = `height:${Math.ceil(canvas.height * ratio)}px;width:${Math.ceil(canvas.width * ratio)}px`;
-    screen.style.width = `${(canvas.width * ratio)}px`;
+    // wful ở màn dọc: lấp kín bề ngang, không cần phóng số nguyên (shader tự làm mịn mép điểm ảnh); màn ngang giữ như cũ
+    const ratio = isFull && window.innerWidth < window.innerHeight ? window.innerWidth / gw : integer / window.devicePixelRatio;
+    display.style.cssText = `height:${Math.ceil(gh * ratio)}px;width:${Math.ceil(gw * ratio)}px`;
+    screen.style.width = `${(gw * ratio)}px`;
     screen.style.setProperty("--size", `${integer}px`);
-    screen.style.setProperty("--width", `${canvas.width * integer}px`);
-    screen.style.setProperty("--height", `${canvas.height * integer}px`);
+    screen.style.setProperty("--width", `${gw * integer}px`);
+    screen.style.setProperty("--height", `${gh * integer}px`);
     screen.style.setProperty("--scale", ratio / integer);
     await delay(100);
     [page01, list01, list02, switch0].forEach(page => page.hidden = true);

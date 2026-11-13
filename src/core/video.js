@@ -32,7 +32,7 @@ function video_cb(pointer, width, height, pitch) {
 }
 // ===== switchRenderer =====
 function switchRenderer() {
-    const list = ['w2d', 'wgl', 'wgpu'], next = list[(list.indexOf(local('render')) + 1) % 3];
+    const list = ['w2d', 'wgl', 'wgpu', 'wful'], next = list[(list.indexOf(local('render')) + 1) % list.length];
     local('render', next);
     switch0.textContent = next;
     window._loadDelay = (window._loadDelay || 0) + 1000;

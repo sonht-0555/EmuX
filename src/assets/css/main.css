@@ -610,6 +610,16 @@
   .cbz-open page02 {
     padding-top: env(safe-area-inset-top) !important;
   }
+  /* wful: hiệu ứng CRT do shader vẽ (video/wful.js), bỏ lớp lưới SVG phủ ngoài */
+  .wful screen::after {
+    display: none;
+  }
+  /* wful màn dọc lấp kín bề ngang, thụt xuống để góc bo của màn hình không cắt vào khung game */
+  @media (orientation: portrait) {
+    .wful page02 display {
+      margin-top: 12px;
+    }
+  }
   .cbz-open canvas {
     image-rendering: auto;
   }
